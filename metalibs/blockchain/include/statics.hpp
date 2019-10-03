@@ -1,0 +1,120 @@
+#ifndef STATICS_HPP
+#define STATICS_HPP
+
+//#include <cinttypes>
+#include <string>
+
+#define MHC *(1000l * 1000l)
+
+// BLOCK TYPE's
+const uint64_t BLOCK_BAD = 0x6745230100000000;
+const uint64_t BLOCK_GOOD = 0x6745230111111111;
+const uint64_t BLOCK_UGLY = 0x6745230122222222;
+
+const uint64_t BLOCK_TYPE = 0xEFCDAB8967452301;
+
+const uint64_t BLOCK_TYPE_COMMON = 0x0001000067452301;
+const uint64_t BLOCK_TYPE_STATE = 0x1101000067452301;
+const uint64_t BLOCK_TYPE_FORGING = 0x2201000067452301;
+
+const uint64_t BLOCK_TYPE_TECH_APPROVE = 0x1100111167452301;
+const uint64_t BLOCK_TYPE_TECH_STATS = 0x2200111167452301;
+const uint64_t BLOCK_TYPE_TECH_BAD_TX = 0x3300111167452301;
+
+// SPECIAL WALLETS
+static const std::string MASTER_WALLET_COIN_FORGING = "0x666174686572206f662077616c6c65747320666f7267696e67";
+static const std::string MASTER_WALLET_NODE_FORGING = "0x666174686572206f662073657276657220666f7267696e6720";
+static const std::string SPECIAL_WALLET_COMISSIONS = "0x5350454349414c5f57414c4c45545f434f4d495353494f4e53";
+static const std::string STATE_FEE_WALLET = "0x7374617465206665652061732077616c6c6574206164726573";
+static const std::string ZERO_WALLET = "0x00000000000000000000000000000000000000000000000000";
+
+// DELEGATION LIMITS
+const uint64_t LIMIT_DELEGATE_TO = 256;
+const uint64_t LIMIT_DELEGATE_FROM = 4096;
+
+const uint64_t MINIMUM_COIN_FORGING_W = 100 MHC;
+const uint64_t MINIMUM_COIN_FORGING_C = 512 MHC;
+const uint64_t MINIMUM_COIN_FORGING_N = 512 MHC;
+
+const uint64_t NODE_PROXY_SOFT_CAP = 100'000 MHC;
+const uint64_t NODE_PROXY_HARD_CAP = 10'000'000 MHC;
+const uint64_t NODE_TORRENT_SEED_CAP = 1'000 MHC;
+const uint64_t NODE_TORRENT_SOFT_CAP = 500'000 MHC;
+const uint64_t NODE_TORRENT_HARD_CAP = 20'000'000 MHC;
+
+const uint64_t MINIMUM_AVERAGE_PROXY_RPS = 1000;
+const uint64_t MINIMUM_PROXY_RPS = 0;
+
+// NO COMMENTS
+const uint64_t FORGING_POOL = 1940822 MHC;
+
+// COMISSIONS FOR TRANSACTIONS
+const uint64_t COMISSION_COMMON_00_20 = 0 MHC;
+const uint64_t COMISSION_COMMON_21_40 = 1 MHC;
+const uint64_t COMISSION_COMMON_41_60 = 10 MHC;
+const uint64_t COMISSION_COMMON_61_80 = 50 MHC;
+const uint64_t COMISSION_COMMON_81_99 = 100 MHC;
+
+const uint64_t COMISSION_JSON_00_20 = 1 MHC;
+const uint64_t COMISSION_JSON_21_40 = 10 MHC;
+const uint64_t COMISSION_JSON_41_60 = 30 MHC;
+const uint64_t COMISSION_JSON_61_80 = 100 MHC;
+const uint64_t COMISSION_JSON_81_99 = 1000 MHC;
+
+const uint64_t COMISSION_DATA_00_20 = 1 MHC;
+const uint64_t COMISSION_DATA_21_40 = 30 MHC;
+const uint64_t COMISSION_DATA_41_60 = 60 MHC;
+const uint64_t COMISSION_DATA_61_80 = 200 MHC;
+const uint64_t COMISSION_DATA_81_99 = 2000 MHC;
+
+const uint64_t MAX_TRANSACTION_COUNT = 50 * 1024;
+
+// WALLET STATE
+const uint64_t NODE_STATE_FLAG_PRETEND = 0b0001;
+const uint64_t NODE_STATE_FLAG_PROXY_PRETEND = 0b0000'0000'0001'0000;
+const uint64_t NODE_STATE_FLAG_PROXY_SOFT_CAP = 0b0000'0000'0100'0000;
+const uint64_t NODE_STATE_FLAG_TORRENT_PRETEND = 0b0000'0001'0000'0000;
+const uint64_t NODE_STATE_FLAG_TORRENT_SEED_CAP = 0b0000'0010'0000'0000;
+const uint64_t NODE_STATE_FLAG_TORRENT_SOFT_CAP = 0b0000'0100'0000'0000;
+
+const uint64_t NODE_STATE_FLAG_PROXY_FORGING = 0b0000'0000'0100'0001;
+const uint64_t NODE_STATE_FLAG_TORRENT_FORGING = 0b0000'0111'0000'0001;
+
+// BLOCK STATE IN CORE PROCESSIONG
+const uint8_t BLOCK_STATE_EMPTY = 0x00;
+const uint8_t BLOCK_STATE_PARSE = 0x10;
+const uint8_t BLOCK_STATE_PARSED = 0x20;
+const uint8_t BLOCK_STATE_CHECK = 0x30;
+const uint8_t BLOCK_STATE_CHECKED = 0x40;
+const uint8_t BLOCK_STATE_WRITE = 0x50;
+const uint8_t BLOCK_STATE_WRITED = 0x60;
+
+// TX STATE
+const uint64_t TX_STATE_APPROVE = 1;
+const uint64_t TX_STATE_FEE = 2;
+const uint64_t TX_STATE_ACCEPT = 20;
+const uint64_t TX_STATE_WRONG_DATA = 40;
+const uint64_t TX_STATE_FORGING = 100;
+const uint64_t TX_STATE_FORGING_W = 101;
+const uint64_t TX_STATE_FORGING_N = 102;
+const uint64_t TX_STATE_FORGING_C = 103;
+const uint64_t TX_STATE_FORGING_R = 104;
+const uint64_t TX_STATE_FORGING_DAPP = 110;
+const uint64_t TX_STATE_STATE = 200;
+const uint64_t TX_STATE_TECH_NODE_STAT = 0x1101;
+
+const uint64_t DAY_IN_SECONDS = 24 * 60 * 60;
+
+static const std::string RPC_PING = "ping";
+static const std::string RPC_TX = "tx";
+static const std::string RPC_PRETEND_BLOCK = "pretend_block";
+static const std::string RPC_APPROVE = "approve";
+static const std::string RPC_APPROVE_BLOCK = "approve_block";
+static const std::string RPC_DISAPPROVE = "disapprove";
+static const std::string RPC_LAST_BLOCK = "last_block_hash";
+static const std::string RPC_GET_BLOCK = "get_block";
+static const std::string RPC_GET_CHAIN = "get_chain";
+static const std::string RPC_GET_CORE_LIST = "get_core_list";
+static const std::string RPC_GET_CORE_ADDR = "get_core_addr";
+
+#endif // STATICS_HPP

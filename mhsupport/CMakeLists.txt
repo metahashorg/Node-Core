@@ -1,0 +1,5 @@
+add_subdirectory(microhttpd)
+add_subdirectory(xxhash)
+add_subdirectory(threads)
+add_subdirectory(libevent)
+add_subdirectory(mhd)
