@@ -134,7 +134,7 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
 
                 bool revard_set = false;
                 std::string geo;
-                uint64_t MAXIMUM_NODE_VALUE;
+                uint64_t MAXIMUM_NODE_VALUE = 0;
                 uint64_t role;
 
                 DEBUG_COUT(proxy_pair.first + "\t" + int2bin(wallet_state));
@@ -533,10 +533,6 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
 
     {
         for (auto& wallet_pair : wallet_map) {
-            if (wallet_pair.first.substr(2, 2) != "08") {
-                continue;
-            }
-
             auto* wallet = dynamic_cast<DecentralizedApplication*>(wallet_pair.second);
             if (!wallet) {
                 continue;
@@ -1168,7 +1164,6 @@ bool BlockChain::can_apply_forging_block(Block* block)
                 uint64_t w_state = wallet->get_state();
                 if (w_state & NODE_STATE_FLAG_PRETEND) {
                     if (nodes.find(wallet_pair.first) == nodes.end()) {
-                        uint64_t w_state = wallet->get_state();
                         w_state &= ~NODE_STATE_FLAG_PRETEND;
                     }
                 }
