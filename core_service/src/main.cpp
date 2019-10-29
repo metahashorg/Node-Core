@@ -76,19 +76,22 @@ void SIGPIPE_handler(int /*s*/)
     DEBUG_COUT("Caught SIGPIPE");
 };
 
-[[noreturn]] void SIGSEGV_handler(int /*s*/) {
+[[noreturn]] void SIGSEGV_handler(int /*s*/)
+{
     DEBUG_COUT("Caught SIGSEGV");
     std::this_thread::sleep_for(std::chrono::seconds(2));
     exit(1);
 };
 
-[[noreturn]] void SIGTERM_handler(int /*s*/) {
+[[noreturn]] void SIGTERM_handler(int /*s*/)
+{
     DEBUG_COUT("Caught SIGTERM");
     std::this_thread::sleep_for(std::chrono::seconds(2));
     exit(0);
 };
 
-[[noreturn]] void print_config_file_params_and_exit() {
+[[noreturn]] void print_config_file_params_and_exit()
+{
     DEBUG_COUT("");
     DEBUG_COUT("Configureation file parameters:");
     DEBUG_COUT("Line 1: network name [net-main|net-dev|net-test]");
@@ -336,6 +339,24 @@ int main(int argc, char** argv)
         path.erase(std::remove(path.begin(), path.end(), '/'), path.end());
         std::string_view url_sw(path);
 
+        if (path == "getinfo") {
+            static const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COMMIT_HASH);
+            rapidjson::StringBuffer s;
+            rapidjson::Writer<rapidjson::StringBuffer> writer(s);
+            writer.StartObject();
+            {
+                writer.String("result");
+                writer.StartObject();
+                {
+                    writer.String("version");
+                    writer.String(version.c_str());
+                    writer.String("mh_addr");
+                    writer.String(BlckChnCtrl.get_str_address().c_str());
+                }
+                writer.EndObject();
+            }
+            writer.EndObject();
+        }
         //        DEBUG_COUT(url_sw);
         return BlckChnCtrl.add_pack_to_queue(pack_sw, url_sw);
     });
