@@ -356,9 +356,11 @@ int main(int argc, char** argv)
                 writer.EndObject();
             }
             writer.EndObject();
+            return std::string(s.GetString());
+        } else {
+            //        DEBUG_COUT(url_sw);
+            return BlckChnCtrl.add_pack_to_queue(pack_sw, url_sw);
         }
-        //        DEBUG_COUT(url_sw);
-        return BlckChnCtrl.add_pack_to_queue(pack_sw, url_sw);
     });
     BS.start();
 }
