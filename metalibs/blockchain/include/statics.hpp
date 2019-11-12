@@ -22,11 +22,11 @@ const uint64_t BLOCK_TYPE_TECH_STATS = 0x2200111167452301;
 const uint64_t BLOCK_TYPE_TECH_BAD_TX = 0x3300111167452301;
 
 // SPECIAL WALLETS
-static const std::string MASTER_WALLET_COIN_FORGING = "0x666174686572206f662077616c6c65747320666f7267696e67";
-static const std::string MASTER_WALLET_NODE_FORGING = "0x666174686572206f662073657276657220666f7267696e6720";
-static const std::string SPECIAL_WALLET_COMISSIONS = "0x5350454349414c5f57414c4c45545f434f4d495353494f4e53";
-static const std::string STATE_FEE_WALLET = "0x7374617465206665652061732077616c6c6574206164726573";
-static const std::string ZERO_WALLET = "0x00000000000000000000000000000000000000000000000000";
+const std::string MASTER_WALLET_COIN_FORGING = "0x666174686572206f662077616c6c65747320666f7267696e67";
+const std::string MASTER_WALLET_NODE_FORGING = "0x666174686572206f662073657276657220666f7267696e6720";
+const std::string SPECIAL_WALLET_COMISSIONS = "0x5350454349414c5f57414c4c45545f434f4d495353494f4e53";
+const std::string STATE_FEE_WALLET = "0x7374617465206665652061732077616c6c6574206164726573";
+const std::string ZERO_WALLET = "0x00000000000000000000000000000000000000000000000000";
 
 // DELEGATION LIMITS
 const uint64_t LIMIT_DELEGATE_TO = 256;
@@ -80,15 +80,6 @@ const uint64_t NODE_STATE_FLAG_TORRENT_SOFT_CAP = 0b0000'0100'0000'0000;
 const uint64_t NODE_STATE_FLAG_PROXY_FORGING = 0b0000'0000'0100'0001;
 const uint64_t NODE_STATE_FLAG_TORRENT_FORGING = 0b0000'0111'0000'0001;
 
-// BLOCK STATE IN CORE PROCESSIONG
-const uint8_t BLOCK_STATE_EMPTY = 0x00;
-const uint8_t BLOCK_STATE_PARSE = 0x10;
-const uint8_t BLOCK_STATE_PARSED = 0x20;
-const uint8_t BLOCK_STATE_CHECK = 0x30;
-const uint8_t BLOCK_STATE_CHECKED = 0x40;
-const uint8_t BLOCK_STATE_WRITE = 0x50;
-const uint8_t BLOCK_STATE_WRITED = 0x60;
-
 // TX STATE
 const uint64_t TX_STATE_APPROVE = 1;
 const uint64_t TX_STATE_FEE = 2;
@@ -105,16 +96,16 @@ const uint64_t TX_STATE_TECH_NODE_STAT = 0x1101;
 
 const uint64_t DAY_IN_SECONDS = 24 * 60 * 60;
 
-static const std::string RPC_PING = "ping";
-static const std::string RPC_TX = "tx";
-static const std::string RPC_PRETEND_BLOCK = "pretend_block";
-static const std::string RPC_APPROVE = "approve";
-static const std::string RPC_APPROVE_BLOCK = "approve_block";
-static const std::string RPC_DISAPPROVE = "disapprove";
-static const std::string RPC_LAST_BLOCK = "last_block_hash";
-static const std::string RPC_GET_BLOCK = "get_block";
-static const std::string RPC_GET_CHAIN = "get_chain";
-static const std::string RPC_GET_CORE_LIST = "get_core_list";
-static const std::string RPC_GET_CORE_ADDR = "get_core_addr";
+const std::string RPC_PING = "ping";
+const std::string RPC_TX = "tx";
+const std::string RPC_PRETEND_BLOCK = "pretend_block";
+const std::string RPC_APPROVE = "approve";
+const std::string RPC_APPROVE_BLOCK = "approve_block";
+const std::string RPC_DISAPPROVE = "disapprove";
+const std::string RPC_LAST_BLOCK = "last_block_hash";
+const std::string RPC_GET_BLOCK = "get_block";
+const std::string RPC_GET_CHAIN = "get_chain";
+const std::string RPC_GET_CORE_LIST = "get_core_list";
+const std::string RPC_GET_CORE_ADDR = "get_core_addr";
 
 #endif // STATICS_HPP

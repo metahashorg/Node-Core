@@ -42,7 +42,7 @@ struct ControllerImplementation {
 
     bool master = false;
 
-    sha256_2 last_applyed_block = { { 0 } };
+    sha256_2 last_applied_block = { { 0 } };
     sha256_2 last_created_block = { { 0 } };
     sha256_2 proved_block = { { 0 } };
 
@@ -63,10 +63,10 @@ struct ControllerImplementation {
 public:
     ControllerImplementation(
         const std::string& priv_key_line,
-        const std::string _path,
+        const std::string& _path,
         const std::string& proved_hash,
         const std::set<std::pair<std::string, int>>& core_list,
-        const std::pair<std::string, int> host_port);
+        const std::pair<std::string, int>& host_port);
 
     std::string add_pack_to_queue(std::string_view, std::string_view);
 
