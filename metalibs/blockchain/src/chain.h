@@ -61,7 +61,6 @@ private:
     uint64_t get_fee(uint64_t cnt);
 
     bool try_apply_block(Block* block, bool apply);
-    bool can_apply_old_block(Block* block);
     bool can_apply_common_block(Block* block);
     bool can_apply_state_block(Block* block, bool);
     bool can_apply_forging_block(Block* block);

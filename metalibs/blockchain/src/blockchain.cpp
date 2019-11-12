@@ -24,6 +24,18 @@ bool BlockChain::apply_block(Block* block)
         if (block->get_block_type() == BLOCK_TYPE_STATE) {
             state_hash_xx64 = get_xxhash64(block->get_data());
         }
+
+        {
+#include <ctime>
+            std::time_t now = block->get_block_timestamp();
+            std::tm* ptm = std::localtime(&now);
+            char buffer[32] = { 0 };
+            // Format: Mo, 15.06.2009 20:20:00
+            std::strftime(buffer, 32, "%a, %d.%m.%Y %H:%M:%S", ptm);
+
+            DEBUG_COUT(buffer);
+        }
+
         return true;
     }
     DEBUG_COUT("block is corrupt");
@@ -388,6 +400,8 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
                     }
                 }
             }
+        } else {
+            DEBUG_COUT("no statistics");
         }
 
         {
@@ -836,6 +850,7 @@ bool BlockChain::try_apply_block(Block* block, bool apply)
 
     if (status && apply) {
         wallet_map.apply_changes();
+
         return true;
     }
 
@@ -954,49 +969,80 @@ bool BlockChain::can_apply_state_block(Block* block, bool check)
     auto common_block = dynamic_cast<CommonBlock*>(block);
 
     if (common_block) {
-        {
-
-#include <ctime>
-
-            std::time_t now = common_block->get_block_timestamp();
-            std::tm* ptm = std::localtime(&now);
-            char buffer[32] = { 0 };
-            // Format: Mo, 15.06.2009 20:20:00
-            std::strftime(buffer, 32, "%a, %d.%m.%Y %H:%M:%S", ptm);
-
-            DEBUG_COUT(buffer);
-        }
 
         if (check) {
-            for (auto tx : common_block->get_txs()) {
-                const std::string& addr_to = tx->addr_to;
-                Wallet* wallet_to = wallet_map.get_wallet(addr_to);
+            if (common_block->get_block_timestamp() >= 1572120000) {
+                for (auto tx : common_block->get_txs()) {
+                    const std::string& addr = tx->addr_to;
+                    Wallet* wallet_to = wallet_map.get_wallet(addr);
 
-                if (!wallet_to) {
-                    DEBUG_COUT("invalid wallet:\t" + addr_to);
-                    continue;
+                    if (!wallet_to) {
+                        DEBUG_COUT("invalid wallet:\t" + addr);
+                        continue;
+                    }
+
+                    if (auto* common_wallet = dynamic_cast<CommonWallet*>(wallet_to)) {
+                        uint64_t nonce = 0;
+                        uint64_t value;
+                        std::string data;
+
+                        std::tie(value, nonce, data) = common_wallet->serialize();
+
+                        if (tx->nonce != nonce) {
+                            DEBUG_COUT("nonce not equal in state block");
+                            DEBUG_COUT(addr);
+
+                            return false;
+                        }
+
+                        if (tx->value != value) {
+                            DEBUG_COUT("balance not equal in state block");
+                            DEBUG_COUT(addr);
+                            DEBUG_COUT(tx->value);
+                            DEBUG_COUT(value);
+
+                            return false;
+                        }
+
+                        if (tx->data != data) {
+                            DEBUG_COUT("data not equal in state block");
+                            DEBUG_COUT(addr);
+                            DEBUG_COUT(tx->data);
+                            DEBUG_COUT(data);
+                        }
+                    }
                 }
+            } else {
+                for (auto tx : common_block->get_txs()) {
+                    const std::string& addr_to = tx->addr_to;
+                    Wallet* wallet_to = wallet_map.get_wallet(addr_to);
 
-                uint64_t nonce = 0;
-                uint64_t value;
-                std::string data;
+                    if (!wallet_to) {
+                        DEBUG_COUT("invalid wallet:\t" + addr_to);
+                        continue;
+                    }
 
-                std::tie(value, nonce, data) = wallet_to->serialize();
+                    uint64_t nonce = 0;
+                    uint64_t value;
+                    std::string data;
 
-                if (tx->nonce != nonce) {
-                    DEBUG_COUT("nonce not equal in state block");
-                    DEBUG_COUT(addr_to);
+                    std::tie(value, nonce, data) = wallet_to->serialize();
 
-                    return false;
-                }
+                    if (tx->nonce != nonce) {
+                        DEBUG_COUT("nonce not equal in state block");
+                        DEBUG_COUT(addr_to);
 
-                if (tx->value != value) {
-                    DEBUG_COUT("balance not equal in state block");
-                    DEBUG_COUT(addr_to);
-                    DEBUG_COUT(tx->value);
-                    DEBUG_COUT(value);
+                        return false;
+                    }
 
-                    return false;
+                    if (tx->value != value) {
+                        DEBUG_COUT("balance not equal in state block");
+                        DEBUG_COUT(addr_to);
+                        DEBUG_COUT(tx->value);
+                        DEBUG_COUT(value);
+
+                        return false;
+                    }
                 }
             }
         } else {
@@ -1009,7 +1055,33 @@ bool BlockChain::can_apply_state_block(Block* block, bool check)
                     continue;
                 }
 
-                wallet_to->initialize(tx->value, tx->nonce, std::string(tx->data));
+                if (auto common_wallet = dynamic_cast<CommonWallet*>(wallet_to)) {
+                    //                    DEBUG_COUT("common_wallet->initialize(tx->value, tx->nonce, std::string(tx->data));");
+                    //                    DEBUG_COUT(addr_to);
+                    //                    DEBUG_COUT(tx->value);
+                    //                    DEBUG_COUT(tx->nonce);
+                    //                    DEBUG_COUT(std::string(tx->data));
+                    common_wallet->initialize(tx->value, tx->nonce, std::string(tx->data));
+                } else if (auto application = dynamic_cast<DecentralizedApplication*>(wallet_to)) {
+                    application->initialize(tx->value, tx->nonce, std::string(tx->data));
+                } else {
+                    DEBUG_COUT("unknown wallet type wrong type");
+                }
+            }
+        }
+
+        {
+            auto* father_of_wallets = dynamic_cast<CommonWallet*>(wallet_map.get_wallet(MASTER_WALLET_COIN_FORGING));
+            auto* lookup_addreses = new std::deque<std::pair<std::string, uint64_t>>(father_of_wallets->get_delegated_from_list());
+
+            DEBUG_COUT("lookup_addreses.size() = \t" + std::to_string(lookup_addreses->size()));
+
+            while (true) {
+                std::deque<std::pair<std::string, uint64_t>>* lookup_addreses_prev = wallet_request_addreses.load();
+                if (wallet_request_addreses.compare_exchange_strong(lookup_addreses_prev, lookup_addreses)) {
+                    delete lookup_addreses_prev;
+                    break;
+                }
             }
         }
     } else {
@@ -1131,19 +1203,6 @@ bool BlockChain::can_apply_forging_block(Block* block)
                 continue;
             }
             wallet->apply_delegates();
-        }
-
-        {
-            auto* father_of_wallets = dynamic_cast<CommonWallet*>(wallet_map.get_wallet(MASTER_WALLET_COIN_FORGING));
-            auto* lookup_addreses = new std::deque<std::pair<std::string, uint64_t>>(father_of_wallets->get_delegated_from_list());
-
-            while (true) {
-                std::deque<std::pair<std::string, uint64_t>>* lookup_addreses_prev = wallet_request_addreses.load();
-                if (wallet_request_addreses.compare_exchange_strong(lookup_addreses_prev, lookup_addreses)) {
-                    delete lookup_addreses_prev;
-                    break;
-                }
-            }
         }
 
         {
