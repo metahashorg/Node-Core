@@ -18,14 +18,33 @@ Block* parse_block(std::string_view block_sw)
     case BLOCK_TYPE:
     case BLOCK_TYPE_COMMON:
     case BLOCK_TYPE_STATE:
-    case BLOCK_TYPE_FORGING:
-        return (new CommonBlock())->parse(block_sw);
-        break;
-    case BLOCK_TYPE_TECH_BAD_TX:
-        return (new RejectedTXBlock())->parse(block_sw);
-        break;
-    case BLOCK_TYPE_TECH_APPROVE:
-        return (new ApproveBlock())->parse(block_sw);
+    case BLOCK_TYPE_FORGING: {
+        auto block = new CommonBlock();
+        if (block->parse(block_sw)) {
+            return block;
+        } else {
+            delete block;
+            return nullptr;
+        }
+    }
+    case BLOCK_TYPE_TECH_BAD_TX: {
+        auto block = new RejectedTXBlock();
+        if (block->parse(block_sw)) {
+            return block;
+        } else {
+            delete block;
+            return nullptr;
+        }
+    }
+    case BLOCK_TYPE_TECH_APPROVE: {
+        auto block = new ApproveBlock();
+        if (block->parse(block_sw)) {
+            return block;
+        } else {
+            delete block;
+            return nullptr;
+        }
+    }
     default:
         return nullptr;
     }
@@ -73,14 +92,13 @@ const std::vector<TX*>& CommonBlock::get_txs()
     return txs;
 }
 
-Block* CommonBlock::parse(std::string_view block_sw)
+bool CommonBlock::parse(std::string_view block_sw)
 {
     std::array<unsigned char, 32> tx_hash_calc = { { 0 } };
 
     if (block_sw.size() < 80) {
         DEBUG_COUT("if (size < 80)");
-        delete this;
-        return nullptr;
+        return false;
     }
 
     uint64_t cur_pos = 0;
@@ -109,8 +127,7 @@ Block* CommonBlock::parse(std::string_view block_sw)
         uint64_t varint_size = read_varint(tx_size, tx_size_arr);
         if (varint_size < 1) {
             DEBUG_COUT("VARINT READ ERROR");
-            delete this;
-            return nullptr;
+            return false;
         }
         cur_pos += varint_size;
     }
@@ -120,8 +137,7 @@ Block* CommonBlock::parse(std::string_view block_sw)
     while (tx_size > 0) {
         if (cur_pos + tx_size >= block_sw.size()) {
             DEBUG_COUT("TX BUFF ERROR");
-            delete this;
-            return nullptr;
+            return false;
         }
         std::string_view tx_sw(block_sw.begin() + cur_pos, tx_size);
         cur_pos += tx_size;
@@ -133,8 +149,7 @@ Block* CommonBlock::parse(std::string_view block_sw)
         } else {
             DEBUG_COUT("tx->parse");
             delete tx;
-            delete this;
-            return nullptr;
+            return false;
         }
 
         {
@@ -144,8 +159,7 @@ Block* CommonBlock::parse(std::string_view block_sw)
             uint64_t varint_size = read_varint(tx_size, tx_size_arr);
             if (varint_size < 1) {
                 DEBUG_COUT("VARINT READ ERROR");
-                delete this;
-                return nullptr;
+                return false;
             }
             cur_pos += varint_size;
         }
@@ -155,8 +169,7 @@ Block* CommonBlock::parse(std::string_view block_sw)
     tx_hash_calc = get_sha256(txs_sw);
     if (tx_hash_calc != tx_hash) {
         DEBUG_COUT("tx_hash_calc != tx_hash");
-        delete this;
-        return nullptr;
+        return false;
     }
 
     data.insert(data.end(), block_sw.begin(), block_sw.begin() + cur_pos);
@@ -169,7 +182,7 @@ Block* CommonBlock::parse(std::string_view block_sw)
             [](TX* lh, TX* rh) { return lh->nonce < rh->nonce; });
     }
 
-    return this;
+    return true;
 }
 
 void CommonBlock::clean()
@@ -193,12 +206,11 @@ const std::vector<ApproveRecord*>& ApproveBlock::get_txs()
     return txs;
 }
 
-Block* ApproveBlock::parse(std::string_view block_sw)
+bool ApproveBlock::parse(std::string_view block_sw)
 {
     if (block_sw.size() < 80) {
         DEBUG_COUT("if (size < 80)");
-        delete this;
-        return nullptr;
+        return false;
     }
 
     uint64_t cur_pos = 0;
@@ -222,8 +234,7 @@ Block* ApproveBlock::parse(std::string_view block_sw)
         uint64_t varint_size = read_varint(tx_size, tx_size_arr);
         if (varint_size < 1) {
             DEBUG_COUT("VARINT READ ERROR");
-            delete this;
-            return nullptr;
+            return false;
         }
         cur_pos += varint_size;
     }
@@ -231,8 +242,7 @@ Block* ApproveBlock::parse(std::string_view block_sw)
     while (tx_size > 0) {
         if (cur_pos + tx_size >= block_sw.size()) {
             DEBUG_COUT("TX BUFF ERROR");
-            delete this;
-            return nullptr;
+            return false;
         }
 
         std::string_view tx_as_sw(&block_sw[cur_pos], tx_size);
@@ -242,8 +252,7 @@ Block* ApproveBlock::parse(std::string_view block_sw)
         } else {
             DEBUG_COUT("TX PARSE ERROR");
             delete tx;
-            delete this;
-            return nullptr;
+            return false;
         }
         cur_pos += tx_size;
         {
@@ -253,8 +262,7 @@ Block* ApproveBlock::parse(std::string_view block_sw)
             uint64_t varint_size = read_varint(tx_size, tx_size_arr);
             if (varint_size < 1) {
                 DEBUG_COUT("VARINT READ ERROR");
-                delete this;
-                return nullptr;
+                return false;
             }
             cur_pos += varint_size;
         }
@@ -264,7 +272,7 @@ Block* ApproveBlock::parse(std::string_view block_sw)
 
     block_hash = get_sha256(data);
 
-    return this;
+    return true;
 }
 
 void ApproveBlock::clean()
@@ -274,6 +282,24 @@ void ApproveBlock::clean()
     }
     txs.resize(0);
     txs.shrink_to_fit();
+}
+bool ApproveBlock::make(uint64_t timestamp, const sha256_2& new_prev_hash, const std::vector<ApproveRecord*>& new_txs)
+{
+    std::vector<char> block_buff;
+    uint64_t b_type = BLOCK_TYPE_TECH_APPROVE;
+
+    block_buff.insert(block_buff.end(), reinterpret_cast<char*>(&b_type), (reinterpret_cast<char*>(&b_type) + sizeof(uint64_t)));
+    block_buff.insert(block_buff.end(), reinterpret_cast<char*>(&timestamp), (reinterpret_cast<char*>(&timestamp) + sizeof(uint64_t)));
+    block_buff.insert(block_buff.end(), new_prev_hash.begin(), new_prev_hash.end());
+    for (auto tx : new_txs) {
+        append_varint(block_buff, tx->data.size());
+        block_buff.insert(block_buff.end(), tx->data.begin(), tx->data.end());
+    }
+    append_varint(block_buff, 0);
+
+    std::string_view block_as_sw(block_buff.data(), block_buff.size());
+
+    return parse(block_as_sw);
 }
 
 RejectedTXBlock::~RejectedTXBlock()
@@ -303,12 +329,11 @@ const std::vector<RejectedTXInfo*>& RejectedTXBlock::get_txs()
     return txs;
 }
 
-Block* RejectedTXBlock::parse(std::string_view block_sw)
+bool RejectedTXBlock::parse(std::string_view block_sw)
 {
     if (block_sw.size() < 80) {
         DEBUG_COUT("if (size < 80)");
-        delete this;
-        return nullptr;
+        return false;
     }
 
     uint64_t sign_start = 0;
@@ -337,16 +362,14 @@ Block* RejectedTXBlock::parse(std::string_view block_sw)
         uint64_t varint_size = read_varint(sign_size, varint_arr);
         if (varint_size < 1) {
             DEBUG_COUT("corrupt varint size");
-            delete this;
-            return nullptr;
+            return false;
         }
         cur_pos += varint_size;
         sign_start = cur_pos;
 
         if (cur_pos + sign_size >= block_sw.size()) {
             DEBUG_COUT("corrupt sign size");
-            delete this;
-            return nullptr;
+            return false;
         }
         tmp_sign = std::string_view(&block_sw[cur_pos], sign_size);
         cur_pos += sign_size;
@@ -357,16 +380,14 @@ Block* RejectedTXBlock::parse(std::string_view block_sw)
         uint64_t varint_size = read_varint(pubk_size, varint_arr);
         if (varint_size < 1) {
             DEBUG_COUT("corrupt varint size");
-            delete this;
-            return nullptr;
+            return false;
         }
         cur_pos += varint_size;
         pubk_start = cur_pos;
 
         if (cur_pos + pubk_size >= block_sw.size()) {
             DEBUG_COUT("corrupt pubk size");
-            delete this;
-            return nullptr;
+            return false;
         }
         tmp_pubk = std::string_view(&block_sw[cur_pos], pubk_size);
         cur_pos += pubk_size;
@@ -378,8 +399,7 @@ Block* RejectedTXBlock::parse(std::string_view block_sw)
 
     if (!check_sign(tmp_data_for_sign, tmp_sign, tmp_pubk)) {
         DEBUG_COUT("Invalid Block Sign");
-        delete this;
-        return nullptr;
+        return false;
     }
 
     txs.reserve(block_sw.size() / 32);
@@ -392,8 +412,7 @@ Block* RejectedTXBlock::parse(std::string_view block_sw)
         uint64_t varint_size = read_varint(tx_size, tx_size_arr);
         if (varint_size < 1) {
             DEBUG_COUT("VARINT READ ERROR");
-            delete this;
-            return nullptr;
+            return false;
         }
         cur_pos += varint_size;
     }
@@ -401,8 +420,7 @@ Block* RejectedTXBlock::parse(std::string_view block_sw)
     while (tx_size > 0) {
         if (cur_pos + tx_size >= block_sw.size()) {
             DEBUG_COUT("TX BUFF ERROR");
-            delete this;
-            return nullptr;
+            return false;
         }
 
         std::string_view tx_as_sw(&block_sw[cur_pos], tx_size);
@@ -412,8 +430,7 @@ Block* RejectedTXBlock::parse(std::string_view block_sw)
         } else {
             DEBUG_COUT("TX PARSE ERROR");
             delete tx;
-            delete this;
-            return nullptr;
+            return false;
         }
         cur_pos += tx_size;
 
@@ -424,14 +441,14 @@ Block* RejectedTXBlock::parse(std::string_view block_sw)
             uint64_t varint_size = read_varint(tx_size, tx_size_arr);
             if (varint_size < 1) {
                 DEBUG_COUT("VARINT READ ERROR");
-                delete this;
-                return nullptr;
+                return false;
             }
             cur_pos += varint_size;
         }
     }
 
-    data.insert(data.end(), block_sw.begin(), block_sw.begin() + cur_pos);
+    data.clear();
+    data.insert(data.end(), block_sw.begin(), block_sw.end());
 
     sign = std::string_view(&data[sign_start], sign_size);
     pub_key = std::string_view(&data[pubk_start], pubk_size);
@@ -439,7 +456,7 @@ Block* RejectedTXBlock::parse(std::string_view block_sw)
 
     block_hash = get_sha256(data);
 
-    return this;
+    return true;
 }
 
 void RejectedTXBlock::clean()
@@ -449,4 +466,41 @@ void RejectedTXBlock::clean()
     }
     txs.resize(0);
     txs.shrink_to_fit();
+}
+
+bool RejectedTXBlock::make(
+    uint64_t timestamp,
+    const sha256_2& new_prev_hash,
+    const std::vector<RejectedTXInfo*>& new_txs,
+    const std::vector<char>& PrivKey,
+    const std::vector<char>& PubKey)
+{
+    std::vector<char> tx_buff;
+
+    {
+        for (auto tx : new_txs) {
+            append_varint(tx_buff, tx->data.size());
+            tx_buff.insert(tx_buff.end(), tx->data.begin(), tx->data.end());
+        }
+        append_varint(tx_buff, 0);
+    }
+
+    std::vector<char> sign_buff;
+    sign_data(tx_buff, sign_buff, PrivKey);
+
+    uint64_t b_type = BLOCK_TYPE_TECH_BAD_TX;
+    std::vector<char> block_buff;
+
+    block_buff.insert(block_buff.end(), reinterpret_cast<char*>(&b_type), (reinterpret_cast<char*>(&b_type) + sizeof(uint64_t)));
+    block_buff.insert(block_buff.end(), reinterpret_cast<char*>(&timestamp), (reinterpret_cast<char*>(&timestamp) + sizeof(uint64_t)));
+    block_buff.insert(block_buff.end(), new_prev_hash.begin(), new_prev_hash.end());
+    append_varint(block_buff, sign_buff.size());
+    block_buff.insert(block_buff.end(), sign_buff.begin(), sign_buff.end());
+    append_varint(block_buff, PubKey.size());
+    block_buff.insert(block_buff.end(), PubKey.begin(), PubKey.end());
+    block_buff.insert(block_buff.end(), tx_buff.begin(), tx_buff.end());
+
+    std::string_view block_as_sw(block_buff.data(), block_buff.size());
+
+    return parse(block_as_sw);
 }
