@@ -658,6 +658,7 @@ Block* BlockChain::make_common_block(uint64_t timestamp, std::vector<TX*>& trans
                 //                DEBUG_COUT("invalid addr_from\t" + bin2hex(tx->hash));
                 //                DEBUG_COUT(addr_from);
                 //                DEBUG_COUT(addr_to);
+                reject(tx, TX_REJECT_ZERO);
                 delete tx;
                 continue;
             }
@@ -669,14 +670,16 @@ Block* BlockChain::make_common_block(uint64_t timestamp, std::vector<TX*>& trans
                 //                DEBUG_COUT("invalid wallet\t" + bin2hex(tx->hash));
                 //                DEBUG_COUT(addr_from);
                 //                DEBUG_COUT(addr_to);
+                reject(tx, TX_REJECT_INVALID_WALLET);
                 delete tx;
                 continue;
             }
 
-            if (!wallet_from->sub(wallet_to, tx, fee + (tx->raw_tx.size() > 254 ? tx->raw_tx.size() - 254 : 0))) {
+            if (uint64_t status = wallet_from->sub(wallet_to, tx, fee + (tx->raw_tx.size() > 254 ? tx->raw_tx.size() - 254 : 0)) > 0) {
                 //                DEBUG_COUT("tx hash:\t" + bin2hex(tx->hash));
                 //                DEBUG_COUT("addr_from:\t" + addr_from);
                 //                DEBUG_COUT("addr_to:\t" + addr_to);
+                reject(tx, status);
                 delete tx;
                 continue;
             }
@@ -714,6 +717,12 @@ Block* BlockChain::make_common_block(uint64_t timestamp, std::vector<TX*>& trans
         return make_block(block_type, timestamp, prev_hash, txs_buff);
     }
     return nullptr;
+}
+void BlockChain::reject(const TX* tx, uint64_t reason)
+{
+    auto rejected_tx = new RejectedTXInfo();
+    rejected_tx->make(tx->hash, reason);
+    rejected_tx_list.push_back(rejected_tx);
 }
 
 Block* BlockChain::make_statistics_block(uint64_t timestamp)
@@ -913,7 +922,7 @@ bool BlockChain::can_apply_common_block(Block* block)
                 continue;
             }
 
-            if (!wallet_from->sub(wallet_to, tx, fee + (tx->raw_tx.size() > 255 ? tx->raw_tx.size() - 255 : 0))) {
+            if (wallet_from->sub(wallet_to, tx, fee + (tx->raw_tx.size() > 255 ? tx->raw_tx.size() - 255 : 0)) > 0) {
                 DEBUG_COUT("tx hash:\t" + bin2hex(tx->hash));
                 DEBUG_COUT("addr_from:\t" + addr_from);
                 DEBUG_COUT("addr_to:\t" + addr_to);
@@ -1203,4 +1212,15 @@ bool BlockChain::can_apply_forging_block(Block* block)
     }
 
     return true;
+}
+
+std::vector<RejectedTXInfo*>* BlockChain::make_rejected_tx_block(uint64_t)
+{
+    if (rejected_tx_list.empty()) {
+        return nullptr;
+    } else {
+        auto new_list = new std::vector<RejectedTXInfo*>(rejected_tx_list);
+        rejected_tx_list.clear();
+        return new_list;
+    }
 }
