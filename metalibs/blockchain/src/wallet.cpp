@@ -265,17 +265,18 @@ bool CommonWallet::try_undelegate(Wallet* other, TX const* tx)
 bool CommonWallet::register_node(Wallet*, const TX* tx)
 {
     const auto& method = tx->json_rpc->method;
+    const auto& type = tx->json_rpc->parameters["type"];
 
     uint64_t w_state = get_state();
-    if (tx->json_rpc->method == "mh-noderegistration") {
+    if (method == "mh-noderegistration") {
         w_state |= NODE_STATE_FLAG_PROXY_PRETEND;
-    } else if (tx->json_rpc->parameters["type"] == "InfrastructureTorrent") {
+    } else if (type == "InfrastructureTorrent") {
         w_state |= NODE_STATE_FLAG_TORRENT_PRETEND;
-    } else if (tx->json_rpc->parameters["type"] == "Proxy") {
+    } else if (type == "Proxy") {
         w_state |= NODE_STATE_FLAG_PROXY_PRETEND;
-    } else if (tx->json_rpc->parameters["type"] == "Auto"
-        || tx->json_rpc->parameters["type"] == "Proxy|InfrastructureTorrent"
-        || tx->json_rpc->parameters["type"] == "InfrastructureTorrent|Proxy") {
+    } else if (type == "Auto"
+        || type == "Proxy|InfrastructureTorrent"
+        || type == "InfrastructureTorrent|Proxy") {
         w_state |= NODE_STATE_FLAG_TORRENT_PRETEND;
         w_state |= NODE_STATE_FLAG_PROXY_PRETEND;
     } else {
@@ -385,6 +386,7 @@ std::tuple<uint64_t, uint64_t, std::string> CommonWallet::serialize()
 
 bool CommonWallet::initialize(uint64_t value, uint64_t nonce, const std::string& json)
 {
+    //    DEBUG_COUT("#");
     Wallet::initialize(value, nonce, "");
 
     uint64_t state = 0;
@@ -392,6 +394,9 @@ bool CommonWallet::initialize(uint64_t value, uint64_t nonce, const std::string&
 
     std::deque<std::pair<std::string, uint64_t>> delegated_from;
     std::deque<std::pair<std::string, uint64_t>> delegate_to;
+
+    uint64_t delegated_from_sum = 0;
+    uint64_t delegated_to_sum = 0;
 
     bool got_additions = false;
     if (!json.empty() && json.front() == '{' && json.back() == '}') {
@@ -416,6 +421,7 @@ bool CommonWallet::initialize(uint64_t value, uint64_t nonce, const std::string&
 
                     if (record.HasMember("a") && record["a"].IsString() && record.HasMember("v") && record["v"].IsUint64()) {
                         delegate_to.emplace_back(std::string(record["a"].GetString(), record["a"].GetStringLength()), record["v"].GetUint64());
+                        delegated_to_sum += record["v"].GetUint64();
                     } else {
                         DEBUG_COUT("invalid pair");
                         DEBUG_COUT(json);
@@ -431,6 +437,7 @@ bool CommonWallet::initialize(uint64_t value, uint64_t nonce, const std::string&
 
                         if (record.HasMember("a") && record["a"].IsString() && record.HasMember("v") && record["v"].IsUint64()) {
                             delegate_to.emplace_back(std::string(record["a"].GetString(), record["a"].GetStringLength()), record["v"].GetUint64());
+                            delegated_to_sum += record["v"].GetUint64();
                         } else {
                             DEBUG_COUT("invalid pair");
                             DEBUG_COUT(json);
@@ -446,6 +453,7 @@ bool CommonWallet::initialize(uint64_t value, uint64_t nonce, const std::string&
 
                         if (record.HasMember("a") && record["a"].IsString() && record.HasMember("v") && record["v"].IsUint64()) {
                             delegated_from.emplace_back(std::string(record["a"].GetString(), record["a"].GetStringLength()), record["v"].GetUint64());
+                            delegated_from_sum += record["v"].GetUint64();
                         } else {
                             DEBUG_COUT("invalid pair");
                             DEBUG_COUT(json);
@@ -477,6 +485,9 @@ bool CommonWallet::initialize(uint64_t value, uint64_t nonce, const std::string&
 
         addition->delegate_to = delegate_to;
         addition->delegate_to_daly_snapshot = delegate_to;
+
+        addition->delegated_to_sum = delegated_to_sum;
+        addition->delegated_from_sum = delegated_from_sum;
     }
 
     changed_wallets.insert(this);
@@ -585,6 +596,15 @@ void CommonWallet::clear()
 
     Wallet::clear();
 }
+void CommonWallet::set_trust(uint64_t new_trust)
+{
+    if (!addition) {
+        addition = new WalletAdditions();
+    }
+    addition->trust = new_trust;
+
+    changed_wallets.insert(this);
+}
 
 Wallet::Wallet(std::unordered_set<Wallet*>& _changed_wallets)
     : changed_wallets(_changed_wallets)
@@ -598,6 +618,7 @@ uint64_t Wallet::get_value()
 
 bool Wallet::initialize(uint64_t value, uint64_t nonce, const std::string&)
 {
+    //    DEBUG_COUT("#");
     balance = value;
     transaction_id = nonce;
 
@@ -907,13 +928,11 @@ Wallet* WalletMap::wallet_factory(const std::string& addr)
     switch (int_family) {
     case 0x00:
         return new CommonWallet(changed_wallets);
-        break;
     case 0x16:
         return new DecentralizedApplication(changed_wallets);
-        break;
+    default:
+        return new CommonWallet(changed_wallets);
     }
-
-    return new CommonWallet(changed_wallets);
 }
 
 void WalletMap::apply_changes()
