@@ -55,14 +55,18 @@ void parse_block_async(
         Block* block = parse_block(block_as_string);
 
         if (block) {
-            std::lock_guard<std::mutex> lock(block_lock);
-            if (!block_tree.insert({ block->get_block_hash(), block }).second) {
-                DEBUG_COUT("Duplicate block in chain\t" + bin2hex(block->get_block_hash()));
-                delete block;
-            } else if (!prev_tree.insert({ block->get_prev_hash(), block }).second) {
-                DEBUG_COUT("Branches in block chain\t" + bin2hex(block->get_prev_hash()) + "\t->\t" + bin2hex(block->get_block_hash()));
-                block_tree.erase(block->get_block_hash());
-                delete block;
+            if (dynamic_cast<CommonBlock*>(block)) {
+                std::lock_guard<std::mutex> lock(block_lock);
+                if (!block_tree.insert({ block->get_block_hash(), block }).second) {
+                    DEBUG_COUT("Duplicate block in chain\t" + bin2hex(block->get_block_hash()));
+                    delete block;
+                } else if (!prev_tree.insert({ block->get_prev_hash(), block }).second) {
+                    DEBUG_COUT("Branches in block chain\t" + bin2hex(block->get_prev_hash()) + "\t->\t" + bin2hex(block->get_block_hash()));
+                    block_tree.erase(block->get_block_hash());
+                    delete block;
+                }
+            } else {
+                DEBUG_COUT("Block is ok but not common");
             }
         } else {
             DEBUG_COUT("Block parse error");
@@ -436,14 +440,18 @@ void ControllerImplementation::main_loop()
                 for (uint i = 0; i < got_block; i++) {
                     Block* block = block_arr[i];
 
-                    if (blocks.find(block->get_prev_hash()) == blocks.end()) {
-                        need_actualize = true;
-                    }
+                    if (dynamic_cast<CommonBlock*>(block)) {
+                        if (blocks.find(block->get_prev_hash()) == blocks.end()) {
+                            need_actualize = true;
+                        }
 
-                    if (blocks.insert({ block->get_block_hash(), block }).second) {
-                        ;
-                    } else {
-                        delete block;
+                        if (blocks.insert({ block->get_block_hash(), block }).second) {
+                            ;
+                        } else {
+                            delete block;
+                        }
+                    } else if (dynamic_cast<RejectedTXBlock*>(block)) {
+                        write_block(block);
                     }
                 }
             }
@@ -601,7 +609,11 @@ void ControllerImplementation::parse_C_PRETEND_BLOCK(std::string_view pack)
     Block* block = parse_block(block_sw);
 
     if (block) {
-        block_queue.enqueue(block);
+        if (dynamic_cast<CommonBlock*>(block) || dynamic_cast<RejectedTXBlock*>(block)) {
+            block_queue.enqueue(block);
+        } else {
+            delete block;
+        }
     }
 }
 
@@ -831,13 +843,7 @@ uint64_t ControllerImplementation::min_approve()
 
 void ControllerImplementation::write_block(Block* block)
 {
-    prev_timestamp = block->get_block_timestamp();
-    last_applyed_block = block->get_block_hash();
-
-    prev_day = prev_timestamp / DAY_IN_SECONDS;
-    prev_state = block->get_block_type();
-
-    auto theTime = static_cast<time_t>(prev_timestamp);
+    auto theTime = static_cast<time_t>(block->get_block_timestamp());
     struct tm* aTime = localtime(&theTime);
 
     int day = aTime->tm_mday;
@@ -853,18 +859,76 @@ void ControllerImplementation::write_block(Block* block)
 
     DEBUG_COUT("file_path\t" + file_path);
 
-    uint64_t block_size = block->get_data().size() /* + approve_buff.size()*/;
+    if (dynamic_cast<CommonBlock*>(block)) {
+        DEBUG_COUT("CommonBlock");
 
-    std::ofstream myfile;
-    myfile.open(file_path.c_str(), std::ios::out | std::ios::app | std::ios::binary);
-    myfile.write(reinterpret_cast<char*>(&block_size), sizeof(uint64_t));
-    myfile.write(block->get_data().data(), static_cast<int64_t>(block->get_data().size()));
-    myfile.close();
+        prev_timestamp = block->get_block_timestamp();
+        last_applied_block = block->get_block_hash();
 
-    {
-        uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
-        auto common_block = dynamic_cast<CommonBlock*>(block);
-        DEBUG_COUT("block size and latency\t" + std::to_string(common_block->get_txs().size()) + "\t" + std::to_string(timestamp - prev_timestamp));
+        prev_day = prev_timestamp / DAY_IN_SECONDS;
+        prev_state = block->get_block_type();
+
+        uint64_t block_size = block->get_data().size() /* + approve_buff.size()*/;
+
+        std::ofstream myfile;
+        myfile.open(file_path.c_str(), std::ios::out | std::ios::app | std::ios::binary);
+        myfile.write(reinterpret_cast<char*>(&block_size), sizeof(uint64_t));
+        myfile.write(block->get_data().data(), static_cast<int64_t>(block->get_data().size()));
+        myfile.close();
+
+        {
+            auto approve_block = new ApproveBlock;
+            std::vector<ApproveRecord*> approve_list;
+            for (const auto& tx_pair : block_approve[block->get_block_hash()]) {
+                approve_list.push_back(tx_pair.second);
+            }
+            if (approve_block->make(block->get_block_timestamp(), block->get_block_hash(), approve_list)) {
+                uint64_t approve_block_size = approve_block->get_data().size() /* + approve_buff.size()*/;
+                std::ofstream out_file;
+                out_file.open(file_path.c_str(), std::ios::out | std::ios::app | std::ios::binary);
+                out_file.write(reinterpret_cast<char*>(&approve_block_size), sizeof(uint64_t));
+                out_file.write(approve_block->get_data().data(), static_cast<int64_t>(approve_block->get_data().size()));
+                out_file.close();
+                delete approve_block;
+            }
+        }
+
+        {
+            uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
+            DEBUG_COUT("block size and latency\t" + std::to_string(dynamic_cast<CommonBlock*>(block)->get_txs().size()) + "\t" + std::to_string(timestamp - prev_timestamp));
+        }
+
+        {
+            auto common_block = dynamic_cast<CommonBlock*>(block);
+            if (common_block && common_block->get_block_type() == BLOCK_TYPE_STATE) {
+                std::ofstream cache_file("last_state.json");
+                if (cache_file.is_open()) {
+                    rapidjson::StringBuffer s;
+                    rapidjson::Writer<rapidjson::StringBuffer> writer(s);
+                    writer.StartObject();
+                    {
+                        writer.String("hash");
+                        writer.String(bin2hex(common_block->get_block_hash()).c_str());
+                        writer.String("file");
+                        writer.String(file_path.c_str());
+                    }
+                    writer.EndObject();
+
+                    cache_file << std::string(s.GetString());
+                    cache_file.close();
+                }
+            }
+        }
+    } else if (dynamic_cast<RejectedTXBlock*>(block)) {
+        DEBUG_COUT("RejectedTXBlock");
+
+        uint64_t block_size = block->get_data().size() /* + approve_buff.size()*/;
+
+        std::ofstream out_file;
+        out_file.open(file_path.c_str(), std::ios::out | std::ios::app | std::ios::binary);
+        out_file.write(reinterpret_cast<char*>(&block_size), sizeof(uint64_t));
+        out_file.write(block->get_data().data(), static_cast<int64_t>(block->get_data().size()));
+        out_file.close();
     }
 }
 
@@ -893,40 +957,74 @@ bool ControllerImplementation::try_make_block()
             }
         }
 
-        switch (block_state) {
-        case BLOCK_TYPE_COMMON:
-            if (timestamp - statistics_timestamp > 600) {
-                block = BC->make_statistics_block(timestamp);
-                statistics_timestamp = timestamp;
-            } else {
-                if (!transactions.empty()) {
-                    block = BC->make_common_block(timestamp, transactions);
+        {
+            Block* block = nullptr;
+            switch (block_state) {
+            case BLOCK_TYPE_COMMON:
+                if (timestamp - statistics_timestamp > 600) {
+                    block = BC->make_statistics_block(timestamp);
+                    statistics_timestamp = timestamp;
+                } else {
+                    if (!transactions.empty()) {
+                        block = BC->make_common_block(timestamp, transactions);
+                    }
                 }
+                break;
+            case BLOCK_TYPE_FORGING:
+                DEBUG_COUT("BLOCK_TYPE_FORGING");
+                block = BC->make_forging_block(timestamp);
+                break;
+            case BLOCK_TYPE_STATE:
+                DEBUG_COUT("BLOCK_TYPE_STATE");
+                block = BC->make_state_block(timestamp);
+                break;
             }
-            break;
-        case BLOCK_TYPE_FORGING:
-            DEBUG_COUT("BLOCK_TYPE_FORGING");
-            block = BC->make_forging_block(timestamp);
-            break;
-        case BLOCK_TYPE_STATE:
-            DEBUG_COUT("BLOCK_TYPE_STATE");
-            block = BC->make_state_block(timestamp);
-            break;
+
+            if (block) {
+                if (BC->can_apply_block(block)) {
+                    last_created_block = block->get_block_hash();
+                    blocks.insert({ block->get_block_hash(), block });
+                    distribute(block);
+                    approve_block(block);
+                    return true;
+                }
+
+                /// FUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU
+                DEBUG_COUT("FUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU");
+                std::this_thread::sleep_for(std::chrono::seconds(3));
+                exit(1);
+            }
         }
 
-        if (block) {
-            if (BC->can_apply_block(block)) {
-                last_created_block = block->get_block_hash();
-                blocks.insert({ block->get_block_hash(), block });
-                distribute(block);
-                approve_block(block);
-                return true;
+        if (auto tx_list = BC->make_rejected_tx_block(timestamp)) {
+            auto reject_tx_block = new RejectedTXBlock;
+            if (reject_tx_block->make(timestamp, last_applied_block, *tx_list, PrivKey, PubKey)) {
+                distribute(reject_tx_block);
+                write_block(reject_tx_block);
+                delete reject_tx_block;
             }
+            {
+                for (auto tx : *tx_list) {
+                    delete tx;
+                }
+                delete tx_list;
+            }
+        }
+    } else if (timestamp - prev_timestamp > 30) {
+        Block* block = blocks[last_created_block];
+        if (block->get_prev_hash() == last_applied_block) {
+            if (BC->can_apply_block(block)) {
+                if (block->get_block_type() == BLOCK_TYPE_STATE) {
+                    make_clean();
+                }
 
-            /// FUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU
-            DEBUG_COUT("FUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU");
-            std::this_thread::sleep_for(std::chrono::seconds(3));
-            exit(1);
+                BC->apply_block(block);
+                write_block(block);
+            } else {
+                DEBUG_COUT("!BC->can_apply_block(block)");
+            }
+        } else {
+            DEBUG_COUT("block->get_prev_hash != last_applied_block");
         }
     }
     return false;

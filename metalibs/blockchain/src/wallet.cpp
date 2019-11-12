@@ -483,13 +483,13 @@ bool CommonWallet::initialize(uint64_t value, uint64_t nonce, const std::string&
     return true;
 }
 
-bool CommonWallet::sub(Wallet* other, TX const* tx, uint64_t real_fee)
+uint64_t CommonWallet::sub(Wallet* other, TX const* tx, uint64_t real_fee)
 {
     uint64_t total_sub = tx->value + real_fee;
 
     if (get_balance() < total_sub) {
         DEBUG_COUT("insuficent funds");
-        return false;
+        return TX_REJECT_INSUFFICIENT_FUNDS_EXT;
     }
 
     return Wallet::sub(other, tx, real_fee);
@@ -611,21 +611,21 @@ void Wallet::add(uint64_t value)
     changed_wallets.insert(this);
 }
 
-bool Wallet::sub(Wallet* other, const TX* tx, uint64_t real_fee)
+uint64_t Wallet::sub(Wallet* other, const TX* tx, uint64_t real_fee)
 {
     uint64_t total_sub = tx->value + real_fee;
 
     if (tx->fee < real_fee) {
         DEBUG_COUT("insufficient fee");
-        return false;
+        return TX_REJECT_INSUFFICIENT_FEE;
     }
     if (balance < total_sub) {
         DEBUG_COUT("insuficent funds");
-        return false;
+        return TX_REJECT_INSUFFICIENT_FUNDS;
     }
     if (transaction_id != tx->nonce) {
         DEBUG_COUT("invalid nonce");
-        return false;
+        return TX_REJECT_INVALID_NONCE;
     }
 
     balance -= total_sub;
@@ -634,13 +634,7 @@ bool Wallet::sub(Wallet* other, const TX* tx, uint64_t real_fee)
     other->add(tx->value);
 
     changed_wallets.insert(this);
-    return true;
-}
-
-bool Wallet::try_apply_method(Wallet* /*other*/, const TX* /*tx*/)
-{
-    DEBUG_COUT("do no thing");
-    return true;
+    return 0;
 }
 
 void Wallet::apply()

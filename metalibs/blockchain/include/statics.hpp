@@ -94,6 +94,14 @@ const uint64_t TX_STATE_FORGING_DAPP = 110;
 const uint64_t TX_STATE_STATE = 200;
 const uint64_t TX_STATE_TECH_NODE_STAT = 0x1101;
 
+// TX REJECT REASON
+const uint64_t TX_REJECT_ZERO = 0xff01;
+const uint64_t TX_REJECT_INSUFFICIENT_FEE = 0xff02;
+const uint64_t TX_REJECT_INSUFFICIENT_FUNDS = 0xff03;
+const uint64_t TX_REJECT_INVALID_NONCE = 0xff04;
+const uint64_t TX_REJECT_INSUFFICIENT_FUNDS_EXT = 0xff05;
+const uint64_t TX_REJECT_INVALID_WALLET = 0x0404;
+
 const uint64_t DAY_IN_SECONDS = 24 * 60 * 60;
 
 const std::string RPC_PING = "ping";

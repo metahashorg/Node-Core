@@ -79,7 +79,7 @@ public:
     virtual bool initialize(uint64_t, uint64_t, const std::string&);
 
     virtual void add(uint64_t value);
-    virtual bool sub(Wallet* other, TX const* tx, uint64_t real_fee);
+    virtual uint64_t sub(Wallet* other, TX const* tx, uint64_t real_fee);
 
     virtual bool try_apply_method(Wallet* other, TX const* tx);
 
@@ -126,7 +126,7 @@ public:
     std::tuple<uint64_t, uint64_t, std::string> serialize() override;
     bool initialize(uint64_t, uint64_t, const std::string& json) override;
 
-    bool sub(Wallet* other, TX const* tx, uint64_t real_fee) override;
+    uint64_t sub(Wallet* other, TX const* tx, uint64_t real_fee) override;
 
     bool try_apply_method(Wallet* other, TX const* tx) override;
 
