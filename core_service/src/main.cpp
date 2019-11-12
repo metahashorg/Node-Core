@@ -246,14 +246,15 @@ int main(int argc, char** argv)
     parse_settings(std::string(argv[1]), network, host, tx_port, path, known_hash, key, core_list);
 
     BlockChainController BlckChnCtrl(key, path, known_hash, core_list, { host, tx_port });
-    std::thread thrd(libevent, std::ref(BlckChnCtrl.get_wallet_statistics()), std::ref(BlckChnCtrl.get_wallet_request_addreses()), "wsstata.metahash.io", 80, "net-test");
-    std::thread trd([&BlckChnCtrl, network, host, tx_port]() {
+    std::thread(libevent, std::ref(BlckChnCtrl.get_wallet_statistics()), std::ref(BlckChnCtrl.get_wallet_request_addreses()), "wsstata.metahash.io", 80, "net-test").detach();
+    std::thread([&BlckChnCtrl, network, host, tx_port]() {
         //        mh::libevent::LibEvent levent;
         CurlFetch CF("172.104.236.166", 5797);
         const std::string host_name = host + "_" + std::to_string(tx_port);
         const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COMMIT_HASH);
 
-        while (true) {
+        bool forever = true;
+        while (forever) {
             std::this_thread::sleep_for(std::chrono::seconds(3));
             std::string ip = getMyIp();
             uint64_t timestamp = std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count();
@@ -318,7 +319,7 @@ int main(int argc, char** argv)
             std::string response;
             CF.post("save-metrics", req_post, response);
         }
-    });
+    }).detach();
 
     // http_server(TP, tx_port, [&BlckChnCtrl](HTTP_SERVER_IO* io_struct) {
     //     std::string_view pack_sw(io_struct->req_post);
@@ -382,7 +383,8 @@ __attribute__((__noreturn__)) void libevent(
 
     //    mh::libevent::LibEvent levent;
     CurlFetch CF(host, port);
-    while (true) {
+    bool endless_loop = true;
+    while (endless_loop) {
         std::deque<std::pair<std::string, uint64_t>>* p_addreses;
         while (true) {
             std::deque<std::pair<std::string, uint64_t>>* null_adr = nullptr;
@@ -415,7 +417,7 @@ __attribute__((__noreturn__)) void libevent(
             }
             request_string += "]}}";
 
-            // DEBUG_COUT(request_string);
+            DEBUG_COUT(std::to_string(request_string.size()));
 
             static const std::string path = "/";
             std::string response;
@@ -425,7 +427,7 @@ __attribute__((__noreturn__)) void libevent(
                 }
             }
 
-            // DEBUG_COUT(response);
+            DEBUG_COUT(std::to_string(response.size()));
 
             rapidjson::Document addr_stat;
             if (!addr_stat.Parse(response.c_str()).HasParseError()) {
@@ -492,6 +494,8 @@ __attribute__((__noreturn__)) void libevent(
                             }
                         }
 
+                        DEBUG_COUT("got info for \t" + std::to_string(got_statistics.size()) + "\taddresses");
+
                         while (true) {
                             std::map<std::string, std::pair<int, int>>* got_statistics_prev = statistics.load();
                             if (statistics.compare_exchange_strong(got_statistics_prev, p_got_statistics)) {
@@ -503,6 +507,9 @@ __attribute__((__noreturn__)) void libevent(
                         }
                     }
                 }
+            } else {
+                DEBUG_COUT("error in service response");
+                DEBUG_COUT(response);
             }
         } else {
             DEBUG_COUT("no adr list");
