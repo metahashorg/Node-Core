@@ -344,6 +344,7 @@ void ControllerImplementation::actualize_chain()
             std::copy_n(last_block_on_core.second.begin() + 32, 8, reinterpret_cast<char*>(&block_timestamp));
 
             if (block_timestamp > prev_timestamp && blocks.find(last_block_return) == blocks.end()) {
+                DEBUG_COUT("core\t" + last_block_on_core.first + "have more recent block\t" + bin2hex(last_block_return));
                 cores_with_missing_block.insert({ last_block_on_core.first, last_block_return });
             }
         }
@@ -353,6 +354,8 @@ void ControllerImplementation::actualize_chain()
         if (blocks.find(core_block.second) == blocks.end()) {
             std::string last_block_as_sting;
             std::copy_n(last_applied_block.begin(), 32, std::back_inserter(last_block_as_sting));
+
+            DEBUG_COUT("trying to get chain from:\t" + core_block.first);
             std::string return_data = cores.send_with_return_to_core(core_block.first, RPC_GET_CHAIN, last_block_as_sting);
 
             DEBUG_COUT("PARSE BLOCKCHAIN START");

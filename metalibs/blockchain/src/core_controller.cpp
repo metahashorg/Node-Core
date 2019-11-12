@@ -101,7 +101,7 @@ std::string CoreController::CoreConnection::send_with_return(const std::string& 
 
 void CoreController::CoreConnection::start_loop(moodycamel::ConcurrentQueue<CoreController::Message*>& message_queue)
 {
-    std::thread* p_thread = new std::thread([&message_queue, this]() {
+    std::thread([&message_queue, this]() {
         while (this->goon.load()) {
             CoreController::Message* msg = nullptr;
             if (message_queue.try_dequeue(msg)) {
@@ -144,7 +144,7 @@ void CoreController::CoreConnection::start_loop(moodycamel::ConcurrentQueue<Core
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
         }
-    });
+    }).detach();
 }
 
 CoreController::CoreController(const std::set<std::pair<std::string, int>>& core_list, std::pair<std::string, int> host_port)
@@ -298,7 +298,11 @@ std::string CoreController::send_with_return_to_core(
     core_lock.lock();
 
     uint64_t time_milli = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now()).time_since_epoch().count());
-    time_milli += 3000;
+    if (req == RPC_GET_CHAIN) {
+        time_milli += 30000;
+    } else {
+        time_milli += 3000;
+    }
 
     std::atomic<bool> got_resp = false;
     std::string resp_str;
