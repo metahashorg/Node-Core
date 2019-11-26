@@ -882,12 +882,16 @@ uint64_t ControllerImplementation::min_approve()
         curr_block = blocks[curr_block]->get_prev_hash();
     }
 
-    min_approve = min_approve * 75 / 100;
+    min_approve = min_approve * 51 / 100;
 
-    if (min_approve > 0) {
+    if (min_approve > 1) {
         return min_approve;
     } else {
-        return 1;
+        if (master) {
+            return 1;
+        } else {
+            return 2;
+        }
     }
 }
 
