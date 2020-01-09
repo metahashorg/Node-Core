@@ -170,7 +170,7 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
                     }
 
                     uint64_t min_for_reward = proxy_pair.second.torrent_statistics_count * 95 / 100;
-                    if (statistics_size < min_for_reward || average > 5000) {
+                    if (!statistics_size || statistics_size < min_for_reward || average > 5000) {
                         DEBUG_COUT("not enough tests for torrent:\t" + proxy_pair.first + "\t" + std::to_string(min_for_reward) + "\t" + std::to_string(statistics_size));
                     } else {
                         revard_set = true;
@@ -196,7 +196,7 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
                     }
 
                     uint64_t min_for_reward = proxy_statistics[proxy_pair.first].proxy_statistics_count * 95 / 100;
-                    if (statistics_size < min_for_reward || average < MINIMUM_AVERAGE_PROXY_RPS) {
+                    if (!statistics_size || statistics_size < min_for_reward || average < MINIMUM_AVERAGE_PROXY_RPS) {
                         DEBUG_COUT("not enough tests for proxy:\t" + proxy_pair.first + "\t" + std::to_string(min_for_reward) + "\t" + std::to_string(statistics_size));
                     } else {
                         revard_set = true;
