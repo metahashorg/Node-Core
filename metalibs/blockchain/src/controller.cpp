@@ -1054,7 +1054,7 @@ bool ControllerImplementation::try_make_block()
             delete tx_list;
 
             auto reject_tx_block = new RejectedTXBlock;
-            if (prev_rejected_ts != timestamp && reject_tx_block->make(timestamp, last_applied_block, rejected_tx_list, PrivKey, PubKey)) {
+            if (rejected_tx_list.size() && prev_rejected_ts != timestamp && reject_tx_block->make(timestamp, last_applied_block, rejected_tx_list, PrivKey, PubKey)) {
                 prev_rejected_ts = timestamp;
                 distribute(reject_tx_block);
                 write_block(reject_tx_block);
