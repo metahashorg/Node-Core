@@ -1050,18 +1050,20 @@ bool ControllerImplementation::try_make_block()
         }
 
         if (auto tx_list = BC->make_rejected_tx_block(timestamp)) {
+            rejected_tx_list.insert(rejected_tx_list.end(), tx_list->begin(), tx_list->end());
+            delete tx_list;
+
             auto reject_tx_block = new RejectedTXBlock;
-            if (reject_tx_block->make(timestamp, last_applied_block, *tx_list, PrivKey, PubKey)) {
+            if (prev_rejected_ts != timestamp && reject_tx_block->make(timestamp, last_applied_block, rejected_tx_list, PrivKey, PubKey)) {
+                prev_rejected_ts = timestamp;
                 distribute(reject_tx_block);
                 write_block(reject_tx_block);
-                delete reject_tx_block;
-            }
-            {
-                for (auto tx : *tx_list) {
+                for (auto* tx : rejected_tx_list) {
                     delete tx;
                 }
-                delete tx_list;
+                rejected_tx_list.clear();
             }
+            delete reject_tx_block;
         }
     } else if (timestamp - prev_timestamp > 30) {
         Block* block = blocks[last_created_block];

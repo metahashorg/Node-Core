@@ -51,6 +51,9 @@ struct ControllerImplementation {
     uint64_t prev_day = 0;
     uint64_t prev_state = 0;
 
+    std::vector<RejectedTXInfo*> rejected_tx_list;
+    uint64_t prev_rejected_ts = 0;
+
     std::string path;
 
     CoreController cores;
