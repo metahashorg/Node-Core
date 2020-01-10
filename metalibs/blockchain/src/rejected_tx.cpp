@@ -28,6 +28,9 @@ bool RejectedTXInfo::parse(std::string_view tx_sw)
         index += reason_varint_size;
     }
 
+    data.clear();
+    data.insert(data.end(), tx_sw.begin(), tx_sw.end());
+
     return (index == tx_sw.size());
 }
 

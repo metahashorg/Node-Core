@@ -669,9 +669,6 @@ Block* BlockChain::make_common_block(uint64_t timestamp, std::vector<TX*>& trans
                 continue;
             }
             if (addr_from == ZERO_WALLET) {
-                //                DEBUG_COUT("invalid addr_from\t" + bin2hex(tx->hash));
-                //                DEBUG_COUT(addr_from);
-                //                DEBUG_COUT(addr_to);
                 reject(tx, TX_REJECT_ZERO);
                 delete tx;
                 continue;
@@ -681,18 +678,12 @@ Block* BlockChain::make_common_block(uint64_t timestamp, std::vector<TX*>& trans
             Wallet* wallet_from = wallet_map.get_wallet(addr_from);
 
             if (!wallet_to || !wallet_from) {
-                //                DEBUG_COUT("invalid wallet\t" + bin2hex(tx->hash));
-                //                DEBUG_COUT(addr_from);
-                //                DEBUG_COUT(addr_to);
                 reject(tx, TX_REJECT_INVALID_WALLET);
                 delete tx;
                 continue;
             }
 
             if (uint64_t status = wallet_from->sub(wallet_to, tx, fee + (tx->raw_tx.size() > 254 ? tx->raw_tx.size() - 254 : 0)) > 0) {
-                //                DEBUG_COUT("tx hash:\t" + bin2hex(tx->hash));
-                //                DEBUG_COUT("addr_from:\t" + addr_from);
-                //                DEBUG_COUT("addr_to:\t" + addr_to);
                 reject(tx, status);
                 delete tx;
                 continue;
