@@ -17,6 +17,7 @@ private:
 
     const std::map<std::string, std::string> test_nodes = {
         { "0x00b888869e8d4a193e80c59f923fe9f93fd6552875c857edbe", "us" },
+        { "0x00c7343a54d1db1c6ece1302911f421775c6e1594b95a34126", "us" },
         { "0x00bc4787973cb36f47d4f274bc340cb3e1402030955c85e563", "cn" },
         { "0x00cacf8f42f4ffa95bc4a5eea3cf5986f56e13eed8ae012a67", "eu" }
     };
