@@ -82,8 +82,8 @@ ControllerImplementation::ControllerImplementation(
     const std::string& proved_hash,
     const std::set<std::pair<std::string, int>>& core_list,
     const std::pair<std::string, int> host_port)
-    : path(std::move(_path))
-    , BC(new BlockChain())
+    : BC(new BlockChain())
+    , path(std::move(_path))
     , cores(core_list, host_port)
 {
     std::this_thread::sleep_for(std::chrono::seconds(2));

@@ -267,7 +267,7 @@ bool CommonWallet::register_node(Wallet*, const TX* tx)
     const auto& method = tx->json_rpc->method;
 
     uint64_t w_state = get_state();
-    if (tx->json_rpc->method == "mh-noderegistration") {
+    if (method == "mh-noderegistration") {
         w_state |= NODE_STATE_FLAG_PROXY_PRETEND;
     } else if (tx->json_rpc->parameters["type"] == "InfrastructureTorrent") {
         w_state |= NODE_STATE_FLAG_TORRENT_PRETEND;

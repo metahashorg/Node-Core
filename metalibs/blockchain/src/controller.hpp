@@ -36,6 +36,8 @@ struct ControllerImplementation {
     std::vector<char> PrivKey;
     std::vector<char> PubKey;
     std::string Addres;
+    
+    std::string path;
 
     std::map<sha256_2, std::map<std::string, ApproveRecord*>> block_approve;
     std::map<sha256_2, std::map<std::string, ApproveRecord*>> block_disapprove;
@@ -51,7 +53,6 @@ struct ControllerImplementation {
     uint64_t prev_day = 0;
     uint64_t prev_state = 0;
 
-    std::string path;
 
     CoreController cores;
     uint64_t last_sync_timestamp = 0;

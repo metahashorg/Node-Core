@@ -68,8 +68,8 @@ bool CoreController::CoreConnection::curl_post(const std::string& request_method
 }
 
 CoreController::CoreConnection::CoreConnection(std::pair<std::string, int> _host)
-    : host_port(std::move(_host))
-    , curl(curl_easy_init())
+    : curl(curl_easy_init())
+    , host_port(std::move(_host))
 {
 }
 
@@ -101,7 +101,7 @@ std::string CoreController::CoreConnection::send_with_return(const std::string& 
 
 void CoreController::CoreConnection::start_loop(moodycamel::ConcurrentQueue<CoreController::Message*>& message_queue)
 {
-    std::thread* p_thread = new std::thread([&message_queue, this]() {
+    std::thread([&message_queue, this]() {
         while (this->goon.load()) {
             CoreController::Message* msg = nullptr;
             if (message_queue.try_dequeue(msg)) {
@@ -144,7 +144,7 @@ void CoreController::CoreConnection::start_loop(moodycamel::ConcurrentQueue<Core
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
         }
-    });
+    }).detach();
 }
 
 CoreController::CoreController(const std::set<std::pair<std::string, int>>& core_list, std::pair<std::string, int> host_port)
