@@ -2,6 +2,8 @@
 #define STATICS_HPP
 
 //#include <cinttypes>
+#include <map>
+#include <set>
 #include <string>
 
 #define MHC *(1000l * 1000l)
@@ -36,22 +38,20 @@ const uint64_t MINIMUM_COIN_FORGING_W = 100 MHC;
 const uint64_t MINIMUM_COIN_FORGING_C = 512 MHC;
 const uint64_t MINIMUM_COIN_FORGING_N = 512 MHC;
 
-
 const uint64_t DECADE_POOL = 4'600'000'000 MHC;
 //            start ts    pool
 const std::map<uint64_t, uint64_t> FORGING_POOL_PER_YEAR{
-/*2019*/    {1550000000, 1940822 MHC},
-/*2020*/    {1581600000, (DECADE_POOL * 138/1000) / 366},
-/*2021*/    {1613200000, (DECADE_POOL * 124/1000) / 365},
-/*2022*/    {1644790000, (DECADE_POOL * 112/1000) / 365},
-/*2023*/    {1676300000, (DECADE_POOL * 101/1000) / 365},
-/*2024*/    {1707800000, (DECADE_POOL * 91/1000) / 366},
-/*2025*/    {1739490000, (DECADE_POOL * 82/1000) / 365},
-/*2026*/    {1771000000, (DECADE_POOL * 73/1000) / 365},
-/*2027*/    {1802500000, (DECADE_POOL * 66/1000) / 365},
-/*2028*/    {1834090000, (DECADE_POOL * 59/1000) / 366},
+    /*2019*/ { 1550000000, 1940822 MHC },
+    /*2020*/ { 1581600000, (DECADE_POOL * 138 / 1000) / 366 },
+    /*2021*/ { 1613200000, (DECADE_POOL * 124 / 1000) / 365 },
+    /*2022*/ { 1644790000, (DECADE_POOL * 112 / 1000) / 365 },
+    /*2023*/ { 1676300000, (DECADE_POOL * 101 / 1000) / 365 },
+    /*2024*/ { 1707800000, (DECADE_POOL * 91 / 1000) / 366 },
+    /*2025*/ { 1739490000, (DECADE_POOL * 82 / 1000) / 365 },
+    /*2026*/ { 1771000000, (DECADE_POOL * 73 / 1000) / 365 },
+    /*2027*/ { 1802500000, (DECADE_POOL * 66 / 1000) / 365 },
+    /*2028*/ { 1834090000, (DECADE_POOL * 59 / 1000) / 366 },
 };
-
 
 // COMISSIONS FOR TRANSACTIONS
 const uint64_t COMISSION_COMMON_00_20 = 0 MHC;
@@ -73,7 +73,6 @@ const uint64_t COMISSION_DATA_61_80 = 200 MHC;
 const uint64_t COMISSION_DATA_81_99 = 2000 MHC;
 
 const uint64_t MAX_TRANSACTION_COUNT = 50 * 1024;
-
 
 // TX STATE
 const uint64_t TX_STATE_APPROVE = 1;

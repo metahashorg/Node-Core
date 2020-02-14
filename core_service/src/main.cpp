@@ -154,7 +154,7 @@ int main(int argc, char** argv)
     parse_settings(std::string(argv[1]), network, host, tx_port, path, known_hash, key, core_list);
 
     ThreadPool TP;
-    BlockChainController blockChainController(TP, key, path, known_hash, core_list, { host, tx_port });
+    BlockChainController blockChainController(TP, key, path, known_hash, core_list, { host, tx_port }, skip_last_forging_and_state);
 
     std::thread(libevent, std::ref(blockChainController.get_wallet_statistics()), std::ref(blockChainController.get_wallet_request_addreses()), "wsstata.metahash.io", 80, "net-test").detach();
     std::thread(sendStat, std::ref(network), std::ref(host), tx_port, std::ref(blockChainController)).detach();
@@ -191,7 +191,7 @@ int main(int argc, char** argv)
     //    });
     //    BS.start();
 
-    http_server(TP, tx_port, [/*&blockChainController*/](HTTP_SERVER_IO* io_struct) {
+    http_server(TP, tx_port, [&blockChainController](HTTP_SERVER_IO* io_struct) {
         //        return "Hello World";
         std::string_view pack_sw(io_struct->req_post);
 

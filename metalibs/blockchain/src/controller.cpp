@@ -68,9 +68,7 @@ void parse_block_async(
                     block_tree.erase(block->get_block_hash());
                     delete block;
                 }
-            } else {
-                DEBUG_COUT("Block is ok but not common");
-            }
+            } 
         } else {
             DEBUG_COUT("Block parse error");
         }
