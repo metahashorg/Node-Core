@@ -36,7 +36,7 @@ struct ControllerImplementation {
     std::vector<char> PrivKey;
     std::vector<char> PubKey;
     std::string Addres;
-    
+
     std::string path;
 
     std::map<sha256_2, std::map<std::string, ApproveRecord*>> block_approve;
@@ -53,12 +53,12 @@ struct ControllerImplementation {
     uint64_t prev_day = 0;
     uint64_t prev_state = 0;
 
-
     CoreController cores;
     uint64_t last_sync_timestamp = 0;
     uint64_t last_actualization_timestamp = 0;
 
     bool goon = true;
+    const bool test = false;
     //    std::thread* p_thread_main_loop = nullptr;
 
 public:
@@ -67,14 +67,15 @@ public:
         const std::string _path,
         const std::string& proved_hash,
         const std::set<std::pair<std::string, int>>& core_list,
-        const std::pair<std::string, int> host_port);
+        const std::pair<std::string, int> host_port,
+        bool test);
 
     std::string add_pack_to_queue(std::string_view, std::string_view);
 
     std::string get_str_address();
     std::string get_last_block_str();
 
-    std::atomic<std::map<std::string, std::pair<int, int>>*>& get_wallet_statistics();
+    std::atomic<std::map<std::string, std::pair<uint, uint>>*>& get_wallet_statistics();
     std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& get_wallet_request_addreses();
 
 private:

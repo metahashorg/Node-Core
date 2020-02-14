@@ -56,13 +56,20 @@ void parse_block_async(
         Block* block = parse_block(block_as_string);
 
         if (block) {
-            std::lock_guard<std::mutex> lock(block_lock);
-            if (!block_tree.insert({ block->get_block_hash(), block }).second) {
-                DEBUG_COUT("Duplicate block in chain\t" + bin2hex(block->get_block_hash()));
-                delete block;
-            } else if (!prev_tree.insert({ block->get_prev_hash(), block }).second) {
-                DEBUG_COUT("Branches in block chain\t" + bin2hex(block->get_prev_hash()) + "\t->\t" + bin2hex(block->get_block_hash()));
-                block_tree.erase(block->get_block_hash());
+            if (block->get_block_type() != BLOCK_TYPE_TECH_APPROVE
+                && block->get_block_type() != BLOCK_TYPE_TECH_BAD_TX) {
+
+                std::lock_guard<std::mutex> lock(block_lock);
+                if (!block_tree.insert({ block->get_block_hash(), block }).second) {
+                    DEBUG_COUT("Duplicate block in chain\t" + bin2hex(block->get_block_hash()));
+                    delete block;
+                } else if (!prev_tree.insert({ block->get_prev_hash(), block }).second) {
+                    DEBUG_COUT("Branches in block chain\t" + bin2hex(block->get_prev_hash()) + "\t->\t" + bin2hex(block->get_block_hash()));
+                    block_tree.erase(block->get_block_hash());
+                    delete block;
+                }
+
+            } else {
                 delete block;
             }
         } else {
@@ -81,10 +88,12 @@ ControllerImplementation::ControllerImplementation(
     const std::string _path,
     const std::string& proved_hash,
     const std::set<std::pair<std::string, int>>& core_list,
-    const std::pair<std::string, int> host_port)
+    const std::pair<std::string, int> host_port,
+    bool test)
     : BC(new BlockChain())
     , path(std::move(_path))
     , cores(core_list, host_port)
+    , test(test)
 {
     std::this_thread::sleep_for(std::chrono::seconds(2));
     {
@@ -219,6 +228,30 @@ void ControllerImplementation::apply_block_chain(std::map<sha256_2, Block*>& blo
             Block* block = prev_tree[curr_block];
             block_chain.push_back(block);
             curr_block = block->get_block_hash();
+        }
+    }
+
+    if (test) {
+        for (auto block_it = block_chain.begin(); block_it != block_chain.end(); block_it++) {
+            if ((*block_it)->get_block_type() == BLOCK_TYPE_FORGING) {
+                DEBUG_COUT("Found forging block");
+                bool last = true;
+                auto find_block = block_it;
+                for (find_block++; find_block != block_chain.end(); find_block++) {
+                    if ((*find_block)->get_block_type() == BLOCK_TYPE_FORGING) {
+                        DEBUG_COUT("Not last one");
+                        last = false;
+                        break;
+                    }
+                }
+                if (last) {
+                        DEBUG_COUT("Last one");
+                    for (auto delete_block = block_it; delete_block != block_chain.end();) {
+                        delete_block = block_chain.erase(delete_block);
+                    }
+                    break;
+                }
+            }
         }
     }
 
@@ -400,7 +433,7 @@ std::string ControllerImplementation::get_last_block_str()
     return bin2hex(last_applyed_block);
 }
 
-std::atomic<std::map<std::string, std::pair<int, int>>*>& ControllerImplementation::get_wallet_statistics()
+std::atomic<std::map<std::string, std::pair<uint, uint>>*>& ControllerImplementation::get_wallet_statistics()
 {
 
     return BC->get_wallet_statistics();

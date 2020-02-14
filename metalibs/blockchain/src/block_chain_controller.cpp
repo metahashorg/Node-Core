@@ -9,8 +9,9 @@ BlockChainController::BlockChainController(
     const std::string& path,
     const std::string& proved_hash,
     const std::set<std::pair<std::string, int>>& core_list,
-    const std::pair<std::string, int>& host_port)
-    : CI(new ControllerImplementation(priv_key_line, path, proved_hash, core_list, host_port))
+    const std::pair<std::string, int>& host_port,
+    bool test)
+    : CI(new ControllerImplementation(priv_key_line, path, proved_hash, core_list, host_port, test))
 {
 }
 
@@ -29,7 +30,7 @@ std::string BlockChainController::get_last_block_str()
     return CI->get_last_block_str();
 }
 
-std::atomic<std::map<std::string, std::pair<int, int>>*>& BlockChainController::get_wallet_statistics()
+std::atomic<std::map<std::string, std::pair<uint, uint>>*>& BlockChainController::get_wallet_statistics()
 {
     return CI->get_wallet_statistics();
 }

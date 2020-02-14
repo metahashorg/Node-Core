@@ -216,7 +216,7 @@ void parse_settings(
 }
 
 void libevent(
-    std::atomic<std::map<std::string, std::pair<int, int>>*>& statistics,
+    std::atomic<std::map<std::string, std::pair<uint, uint>>*>& statistics,
     std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& request_addreses,
     const std::string& host, int port,
     const std::string& network);
@@ -235,20 +235,29 @@ int main(int argc, char** argv)
     std::string key;
     std::set<std::pair<std::string, int>> core_list;
 
+    bool skip_last_forging_and_state = false;
+
     if (argc < 2) {
         DEBUG_COUT("Need Configuration File As Parameter");
         print_config_file_params_and_exit();
     }
 
+    for (int i = 1; i < argc; i++) {
+        if (std::string(argv[i]) == "test") {
+            DEBUG_COUT("TEST MODE");
+            skip_last_forging_and_state = true;
+        }
+    }
+
     parse_settings(std::string(argv[1]), network, host, tx_port, path, known_hash, key, core_list);
 
-    BlockChainController BlckChnCtrl(key, path, known_hash, core_list, { host, tx_port });
+    BlockChainController BlckChnCtrl(key, path, known_hash, core_list, { host, tx_port }, skip_last_forging_and_state);
     std::thread thrd(libevent, std::ref(BlckChnCtrl.get_wallet_statistics()), std::ref(BlckChnCtrl.get_wallet_request_addreses()), "wsstata.metahash.io", 80, "net-test");
     std::thread trd([&BlckChnCtrl, network, host, tx_port]() {
         //        mh::libevent::LibEvent levent;
         CurlFetch CF("172.104.236.166", 5797);
         const std::string host_name = host + "_" + std::to_string(tx_port);
-        const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COMMIT_HASH);
+        const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COUNT) + "." + std::string(GIT_COMMIT_HASH);
 
         while (true) {
             std::this_thread::sleep_for(std::chrono::seconds(3));
@@ -343,7 +352,7 @@ int main(int argc, char** argv)
 }
 
 __attribute__((__noreturn__)) void libevent(
-    std::atomic<std::map<std::string, std::pair<int, int>>*>& statistics,
+    std::atomic<std::map<std::string, std::pair<uint, uint>>*>& statistics,
     std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& request_addreses,
     const std::string& host, int port,
     const std::string& network)
@@ -431,7 +440,7 @@ __attribute__((__noreturn__)) void libevent(
                         std::set<uint64_t> ips;
                         std::set<std::string> hwids_ticket;
                         std::set<std::string> hwids_online;
-                        auto* p_got_statistics = new std::map<std::string, std::pair<int, int>>();
+                        auto* p_got_statistics = new std::map<std::string, std::pair<uint, uint>>();
                         auto& got_statistics = *p_got_statistics;
 
                         for (const auto& addr_pair : addreses) {
@@ -470,7 +479,7 @@ __attribute__((__noreturn__)) void libevent(
                         }
 
                         while (true) {
-                            std::map<std::string, std::pair<int, int>>* got_statistics_prev = statistics.load();
+                            std::map<std::string, std::pair<uint, uint>>* got_statistics_prev = statistics.load();
                             if (statistics.compare_exchange_strong(got_statistics_prev, p_got_statistics)) {
 
                                 delete got_statistics_prev;
