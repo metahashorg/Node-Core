@@ -92,6 +92,7 @@ ControllerImplementation::ControllerImplementation(
     bool test)
     : BC(new BlockChain())
     , path(_path)
+    , TP(TP)
     , cores(core_list, host_port)
     , test(test)
 {

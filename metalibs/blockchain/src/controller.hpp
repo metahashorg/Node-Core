@@ -29,6 +29,7 @@ struct ControllerImplementation {
     moodycamel::ConcurrentQueue<ApproveRecord*> approve_queue;
 
     BlockChain* BC;
+    ThreadPool& TP;
 
     std::vector<TX*> transactions;
     std::unordered_map<sha256_2, Block*, sha256_2_hasher> blocks;
@@ -37,14 +38,12 @@ struct ControllerImplementation {
     std::vector<char> PubKey;
     std::string Addres;
 
-    std::string path;
-
     std::map<sha256_2, std::map<std::string, ApproveRecord*>> block_approve;
     std::map<sha256_2, std::map<std::string, ApproveRecord*>> block_disapprove;
 
     bool master = false;
 
-    sha256_2 last_applyed_block = { { 0 } };
+    sha256_2 last_applied_block = { { 0 } };
     sha256_2 last_created_block = { { 0 } };
     sha256_2 proved_block = { { 0 } };
 
@@ -52,6 +51,8 @@ struct ControllerImplementation {
     uint64_t prev_timestamp = 0;
     uint64_t prev_day = 0;
     uint64_t prev_state = 0;
+
+    std::string path;
 
     CoreController cores;
     uint64_t last_sync_timestamp = 0;
@@ -63,11 +64,12 @@ struct ControllerImplementation {
 
 public:
     ControllerImplementation(
+        ThreadPool& TP,
         const std::string& priv_key_line,
-        const std::string _path,
+        const std::string& _path,
         const std::string& proved_hash,
         const std::set<std::pair<std::string, int>>& core_list,
-        const std::pair<std::string, int> host_port,
+        const std::pair<std::string, int>& host_port,
         bool test);
 
     std::string add_pack_to_queue(std::string_view, std::string_view);

@@ -22,13 +22,13 @@ public:
 
     virtual ~Block() = default;
 
-    const std::vector<char>& get_data();
-    uint64_t get_block_type();
-    uint64_t get_block_timestamp();
-    sha256_2 get_prev_hash();
-    sha256_2 get_block_hash();
+    virtual const std::vector<char>& get_data();
+    virtual uint64_t get_block_type();
+    virtual uint64_t get_block_timestamp();
+    virtual sha256_2 get_prev_hash();
+    virtual sha256_2 get_block_hash();
 
-    virtual Block* parse(std::string_view block_sw) = 0;
+    virtual bool parse(std::string_view block_sw) = 0;
     virtual void clean() = 0;
 };
 
@@ -45,10 +45,10 @@ public:
     CommonBlock& operator=(CommonBlock&& other) = delete;
     ~CommonBlock() override;
 
-    sha256_2 get_prev_hash();
+    sha256_2 get_prev_hash() override;
     const std::vector<TX*>& get_txs();
 
-    Block* parse(std::string_view block_sw) override;
+    bool parse(std::string_view block_sw) override;
     void clean() override;
 };
 
@@ -66,7 +66,8 @@ public:
 
     const std::vector<ApproveRecord*>& get_txs();
 
-    Block* parse(std::string_view block_sw) override;
+    bool parse(std::string_view block_sw) override;
+    bool make(uint64_t, const sha256_2&, const std::vector<ApproveRecord*>&);
     void clean() override;
 };
 
@@ -91,7 +92,9 @@ public:
 
     const std::vector<RejectedTXInfo*>& get_txs();
 
-    Block* parse(std::string_view block_sw) override;
+    bool parse(std::string_view block_sw) override;
+    bool make(uint64_t timestamp, const sha256_2& new_prev_hash, const std::vector<RejectedTXInfo*>& new_txs, const std::vector<char>& PrivKey, const std::vector<char>& PubKey);
+
     void clean() override;
 };
 

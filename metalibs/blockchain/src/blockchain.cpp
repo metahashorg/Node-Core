@@ -23,6 +23,16 @@ bool BlockChain::apply_block(Block* block)
         prev_hash = block->get_block_hash();
         if (block->get_block_type() == BLOCK_TYPE_STATE) {
             state_hash_xx64 = get_xxhash64(block->get_data());
+            {
+#include <ctime>
+                std::time_t now = block->get_block_timestamp();
+                std::tm* ptm = std::localtime(&now);
+                char buffer[32] = { 0 };
+                // Format: Mo, 15.06.2009 20:20:00
+                std::strftime(buffer, 32, "%a, %d.%m.%Y %H:%M:%S", ptm);
+
+                DEBUG_COUT(buffer);
+            }
         }
         return true;
     }
