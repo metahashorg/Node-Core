@@ -11,6 +11,9 @@
 #include <experimental/filesystem>
 #include <fstream>
 #include <list>
+#include <rapidjson/document.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
 
 namespace fs = std::experimental::filesystem;
 std::set<std::string> get_files_in_dir(std::string& path)
@@ -21,8 +24,8 @@ std::set<std::string> get_files_in_dir(std::string& path)
     const uint file_name_size = 4 + 2 + 2 + 4;
 
     for (const auto& p : fs::directory_iterator(path)) {
-        const auto& path = p.path();
-        auto filename = path.filename().string();
+        const auto& file_path = p.path();
+        auto filename = file_path.filename().string();
 
         if (filename.length() == file_name_size &&
             // Year
@@ -33,8 +36,7 @@ std::set<std::string> get_files_in_dir(std::string& path)
             std::isdigit(filename[6]) && std::isdigit(filename[7]) &&
             // Extension
             filename.compare(8, 4, std::string{ ".blk" }) == 0) {
-            //            std::cout << path.string() << std::endl;
-            files.insert(path.string());
+            files.insert(file_path.string());
         }
     }
 
@@ -56,9 +58,7 @@ void parse_block_async(
         Block* block = parse_block(block_as_string);
 
         if (block) {
-            if (block->get_block_type() != BLOCK_TYPE_TECH_APPROVE
-                && block->get_block_type() != BLOCK_TYPE_TECH_BAD_TX) {
-
+            if (dynamic_cast<CommonBlock*>(block)) {
                 std::lock_guard<std::mutex> lock(block_lock);
                 if (!block_tree.insert({ block->get_block_hash(), block }).second) {
                     DEBUG_COUT("Duplicate block in chain\t" + bin2hex(block->get_block_hash()));
@@ -68,9 +68,8 @@ void parse_block_async(
                     block_tree.erase(block->get_block_hash());
                     delete block;
                 }
-
             } else {
-                delete block;
+                DEBUG_COUT("Block is ok but not common");
             }
         } else {
             DEBUG_COUT("Block parse error");
@@ -84,14 +83,15 @@ void parse_block_async(
 }
 
 ControllerImplementation::ControllerImplementation(
+    ThreadPool& TP,
     const std::string& priv_key_line,
-    const std::string _path,
+    const std::string& _path,
     const std::string& proved_hash,
     const std::set<std::pair<std::string, int>>& core_list,
-    const std::pair<std::string, int> host_port,
+    const std::pair<std::string, int>& host_port,
     bool test)
     : BC(new BlockChain())
-    , path(std::move(_path))
+    , path(_path)
     , cores(core_list, host_port)
     , test(test)
 {
@@ -116,11 +116,7 @@ ControllerImplementation::ControllerImplementation(
         std::copy_n(bin_proved_hash.begin(), 32, proved_block.begin());
     }
 
-    if (Addres == "0x00a88a888d16a23991e73b4081b745eec0f56cdc7063baa360") {
-        master = true;
-    } else {
-        master = false;
-    }
+    master = Addres == "0x00a88a888d16a23991e73b4081b745eec0f56cdc7063baa360";
 
     read_and_apply_local_chain();
 
@@ -132,15 +128,50 @@ void ControllerImplementation::read_and_apply_local_chain()
     std::mutex block_lock;
     std::atomic<long int> jobs(0);
 
+    std::string last_file;
+
+    std::ifstream last_known_state_file("last_state.json");
+    if (last_known_state_file.is_open()) {
+        std::string content((std::istreambuf_iterator<char>(last_known_state_file)), (std::istreambuf_iterator<char>()));
+
+        rapidjson::Document last_known_state_json;
+        if (!last_known_state_json.Parse(content.c_str()).HasParseError()) {
+
+            if (last_known_state_json.HasMember("hash") && last_known_state_json["hash"].IsString()
+                && last_known_state_json.HasMember("file") && last_known_state_json["file"].IsString())
+
+            {
+                std::string last_block = std::string(last_known_state_json["hash"].GetString(), last_known_state_json["hash"].GetStringLength());
+                last_file = std::string(last_known_state_json["file"].GetString(), last_known_state_json["file"].GetStringLength());
+
+                DEBUG_COUT("got last state info. file:\t" + last_file + "\t and block:\t" + last_block);
+
+                {
+                    std::vector<unsigned char> bin_proved_hash = hex2bin(last_block);
+                    std::copy_n(bin_proved_hash.begin(), 32, proved_block.begin());
+                }
+            }
+        }
+
+        last_known_state_file.close();
+    }
+
     std::map<sha256_2, Block*> block_tree;
     std::map<sha256_2, Block*> prev_tree;
 
     char uint64_buff[8];
     std::set<std::string> files = get_files_in_dir(path);
 
-    ThreadPool TP;
-
+    bool skip = !last_file.empty();
     for (const std::string& file : files) {
+        if (skip) {
+            if (fs::path(last_file).filename().string() != fs::path(file).filename().string()) {
+                continue;
+            }
+
+            skip = false;
+        }
+
         std::ifstream ifile(file.c_str(), std::ios::in | std::ios::binary);
 
         if (ifile.is_open()) {
@@ -184,21 +215,34 @@ void ControllerImplementation::read_and_apply_local_chain()
 
 void ControllerImplementation::apply_block_chain(std::map<sha256_2, Block*>& block_tree, std::map<sha256_2, Block*>& prev_tree, const std::string& source, bool need_write)
 {
+    static const sha256_2 zero_block = { { 0 } };
 
-    sha256_2 zero_block = { { 0 } };
-    sha256_2 that_one_block = last_applyed_block != zero_block ? last_applyed_block : proved_block;
+    bool do_clean_and_return = false;
+    if (last_applied_block == zero_block) {
+        if (proved_block == zero_block) {
+            if (prev_tree.find(zero_block) == prev_tree.end()) {
+                DEBUG_COUT("blockchain from " + source + " have no blocks to connect with my chain to zero_block\t" + bin2hex(zero_block));
+                do_clean_and_return = true;
+            }
+        } else if (block_tree.find(proved_block) == block_tree.end()) {
+            DEBUG_COUT("blockchain from " + source + " have no blocks to connect with my chain to proved_block\t" + bin2hex(proved_block));
+            do_clean_and_return = true;
+        }
+    } else if (prev_tree.find(last_applied_block) == prev_tree.end()) {
+        DEBUG_COUT("blockchain from " + source + " have no blocks to connect with my chain to last_applied_block\t" + bin2hex(last_applied_block));
+        do_clean_and_return = true;
+    }
 
-    if (block_tree.find(that_one_block) == block_tree.end() && proved_block != zero_block) {
+    if (do_clean_and_return) {
         for (auto& map_pair : block_tree) {
             delete map_pair.second;
         }
-        DEBUG_COUT("blockchain from " + source + " have no blocks to connect with my chain");
         return;
     }
 
     std::list<Block*> block_chain;
 
-    if (last_applyed_block == zero_block && proved_block != zero_block) {
+    if (last_applied_block == zero_block && proved_block != zero_block) {
         sha256_2 curr_block = proved_block;
 
         bool got_start = false;
@@ -222,7 +266,7 @@ void ControllerImplementation::apply_block_chain(std::map<sha256_2, Block*>& blo
     }
 
     {
-        sha256_2 curr_block = that_one_block;
+        sha256_2 curr_block = last_applied_block != zero_block ? last_applied_block : proved_block;
 
         while (prev_tree.find(curr_block) != prev_tree.end()) {
             Block* block = prev_tree[curr_block];
@@ -255,7 +299,7 @@ void ControllerImplementation::apply_block_chain(std::map<sha256_2, Block*>& blo
         }
     }
 
-    for (Block* block : block_chain) {
+    for (auto block : block_chain) {
         if (!BC->apply_block(block)) {
             DEBUG_COUT("blockchain from " + source + " have have errors in block " + bin2hex(block->get_block_hash()));
             break;
@@ -278,36 +322,29 @@ void ControllerImplementation::apply_block_chain(std::map<sha256_2, Block*>& blo
             prev_day = prev_timestamp / DAY_IN_SECONDS;
         }
 
-        last_applyed_block = block->get_block_hash();
+        last_applied_block = block->get_block_hash();
         last_created_block = block->get_block_hash();
-        blocks.insert({ last_applyed_block, block });
+        blocks.insert({ last_applied_block, block });
 
         block->clean();
     }
 
     DEBUG_COUT("START");
-    // {
-    //     std::atomic<int> jobs = 0;
-    //     for (auto lh_block_pair : block_tree) {
-    //         jobs++;
-    //         TP.runAsync([lh_block_pair, this, &jobs]() {
-    //             bool is_in = false;
-    //             for (auto rh_block_pair : blocks) {
-    //                 if (lh_block_pair.second == rh_block_pair.second) {
-    //                     is_in = true;
-    //                     break;
-    //                 }
-    //             }
-    //             if (!is_in) {
-    //                 delete lh_block_pair.second;
-    //             }
-    //             jobs--;
-    //         });
-    //     }
-    //     while (jobs.load()) {
-    //         std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    //     }
-    // }
+    {
+        std::atomic<int> jobs = 0;
+        for (const auto [hash, block] : block_tree) {
+            jobs++;
+            TP.runAsync([hash, block, this, &jobs]() {
+                if (blocks.find(hash) == blocks.end()) {
+                    delete block;
+                }
+                jobs--;
+            });
+        }
+        while (jobs.load()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    }
     DEBUG_COUT("STOP");
 }
 
@@ -331,6 +368,7 @@ void ControllerImplementation::actualize_chain()
             std::copy_n(last_block_on_core.second.begin() + 32, 8, reinterpret_cast<char*>(&block_timestamp));
 
             if (block_timestamp > prev_timestamp && blocks.find(last_block_return) == blocks.end()) {
+                DEBUG_COUT("core\t" + last_block_on_core.first + "have more recent block\t" + bin2hex(last_block_return));
                 cores_with_missing_block.insert({ last_block_on_core.first, last_block_return });
             }
         }
@@ -339,7 +377,9 @@ void ControllerImplementation::actualize_chain()
     for (const auto& core_block : cores_with_missing_block) {
         if (blocks.find(core_block.second) == blocks.end()) {
             std::string last_block_as_sting;
-            std::copy_n(last_applyed_block.begin(), 32, std::back_inserter(last_block_as_sting));
+            std::copy_n(last_applied_block.begin(), 32, std::back_inserter(last_block_as_sting));
+
+            DEBUG_COUT("trying to get chain from:\t" + core_block.first);
             std::string return_data = cores.send_with_return_to_core(core_block.first, RPC_GET_CHAIN, last_block_as_sting);
 
             DEBUG_COUT("PARSE BLOCKCHAIN START");
@@ -350,7 +390,6 @@ void ControllerImplementation::actualize_chain()
             std::map<sha256_2, Block*> block_tree;
             std::map<sha256_2, Block*> prev_tree;
             {
-                ThreadPool TP;
                 uint64_t position = 0;
                 while (position + 8 < return_data.size()) {
                     uint64_t block_size = *(reinterpret_cast<uint64_t*>(&return_data[position]));
@@ -430,7 +469,7 @@ std::string ControllerImplementation::get_str_address()
 
 std::string ControllerImplementation::get_last_block_str()
 {
-    return bin2hex(last_applyed_block);
+    return bin2hex(last_applied_block);
 }
 
 std::atomic<std::map<std::string, std::pair<uint, uint>>*>& ControllerImplementation::get_wallet_statistics()
@@ -446,6 +485,7 @@ std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& ControllerImplementa
 
 void ControllerImplementation::main_loop()
 {
+    std::this_thread::sleep_for(std::chrono::seconds(15));
     while (goon) {
 
         const uint64_t get_arr_size = 128;
@@ -453,7 +493,7 @@ void ControllerImplementation::main_loop()
 
         bool no_sleep = false;
 
-        if (transactions.size() < 200) {
+        if (transactions.size() < 1024) {
             static TX* tx_arr[get_arr_size];
             uint64_t got_tx = tx_queue.try_dequeue_bulk(tx_arr, get_arr_size);
 
@@ -473,14 +513,18 @@ void ControllerImplementation::main_loop()
                 for (uint i = 0; i < got_block; i++) {
                     Block* block = block_arr[i];
 
-                    if (blocks.find(block->get_prev_hash()) == blocks.end()) {
-                        need_actualize = true;
-                    }
+                    if (dynamic_cast<CommonBlock*>(block)) {
+                        if (blocks.find(block->get_prev_hash()) == blocks.end()) {
+                            need_actualize = true;
+                        }
 
-                    if (blocks.insert({ block->get_block_hash(), block }).second) {
-                        ;
-                    } else {
-                        delete block;
+                        if (blocks.insert({ block->get_block_hash(), block }).second) {
+                            ;
+                        } else {
+                            delete block;
+                        }
+                    } else if (dynamic_cast<RejectedTXBlock*>(block)) {
+                        write_block(block);
                     }
                 }
             }
@@ -490,7 +534,7 @@ void ControllerImplementation::main_loop()
                     && block_disapprove[block_pair.first].find(Addres) == block_disapprove[block_pair.first].end()) {
 
                     Block* block = block_pair.second;
-                    if (block->get_prev_hash() == last_applyed_block) {
+                    if (block->get_prev_hash() == last_applied_block) {
                         if (BC->can_apply_block(block)) {
                             approve_block(block);
                         } else {
@@ -638,7 +682,11 @@ void ControllerImplementation::parse_C_PRETEND_BLOCK(std::string_view pack)
     Block* block = parse_block(block_sw);
 
     if (block) {
-        block_queue.enqueue(block);
+        if (dynamic_cast<CommonBlock*>(block) || dynamic_cast<RejectedTXBlock*>(block)) {
+            block_queue.enqueue(block);
+        } else {
+            delete block;
+        }
     }
 }
 
@@ -669,7 +717,7 @@ void ControllerImplementation::parse_C_DISAPPROVE(std::string_view pack)
 std::string ControllerImplementation::parse_S_LAST_BLOCK(std::string_view)
 {
     std::string last_block;
-    last_block.insert(last_block.end(), last_applyed_block.begin(), last_applyed_block.end());
+    last_block.insert(last_block.end(), last_applied_block.begin(), last_applied_block.end());
     char* p_timestamp = reinterpret_cast<char*>(&prev_timestamp);
     last_block.insert(last_block.end(), p_timestamp, p_timestamp + 8);
     return last_block;
@@ -702,7 +750,7 @@ std::string ControllerImplementation::parse_S_GET_BLOCK(std::string_view pack)
 std::string ControllerImplementation::parse_S_GET_CHAIN(std::string_view pack)
 {
     sha256_2 prev_block = { { 0 } };
-    DEBUG_COUT(std::to_string(pack.size()));
+    //    DEBUG_COUT(std::to_string(pack.size()));
 
     if (pack.size() < 32) {
         return "";
@@ -711,10 +759,10 @@ std::string ControllerImplementation::parse_S_GET_CHAIN(std::string_view pack)
     std::copy_n(pack.begin(), 32, prev_block.begin());
 
     std::string chain;
-    sha256_2 got_block = master ? last_created_block : last_applyed_block;
+    sha256_2 got_block = master ? last_created_block : last_applied_block;
 
-    DEBUG_COUT(bin2hex(prev_block));
-    DEBUG_COUT(bin2hex(got_block));
+    //    DEBUG_COUT(bin2hex(prev_block));
+    //    DEBUG_COUT(bin2hex(got_block));
 
     while (got_block != prev_block && blocks.find(got_block) != blocks.end()) {
         auto& block_data = blocks[got_block]->get_data();
@@ -792,7 +840,7 @@ void ControllerImplementation::apply_approve(ApproveRecord* p_ar)
 
             if (blocks.find(block_hash) != blocks.end()) {
                 Block* block = blocks[block_hash];
-                if (block->get_prev_hash() == last_applyed_block) {
+                if (block->get_prev_hash() == last_applied_block) {
                     if (BC->can_apply_block(block)) {
                         if (block->get_block_type() == BLOCK_TYPE_STATE) {
                             make_clean();
@@ -804,7 +852,7 @@ void ControllerImplementation::apply_approve(ApproveRecord* p_ar)
                         DEBUG_COUT("!BC->can_apply_block(block)");
                     }
                 } else {
-                    DEBUG_COUT("block->get_prev_hash != last_applyed_block");
+                    DEBUG_COUT("block->get_prev_hash != last_applied_block");
                 }
             } else {
                 DEBUG_COUT("blocks.find(block_hash) == blocks.end()");
@@ -838,7 +886,7 @@ uint64_t ControllerImplementation::min_approve()
 {
     uint64_t min_approve = 0;
 
-    sha256_2 curr_block = last_applyed_block;
+    sha256_2 curr_block = blocks[last_applied_block]->get_prev_hash();
     uint i = 0;
 
     while (blocks.find(curr_block) != blocks.end() && i < 5) {
@@ -847,7 +895,7 @@ uint64_t ControllerImplementation::min_approve()
         uint64_t curr_block_approve = block_approve[curr_block].size() + block_disapprove[curr_block].size();
 
         if (min_approve) {
-            if (curr_block_approve < min_approve) {
+            if (min_approve > curr_block_approve) {
                 min_approve = curr_block_approve;
             }
         } else {
@@ -859,21 +907,20 @@ uint64_t ControllerImplementation::min_approve()
 
     min_approve = min_approve * 51 / 100;
 
-    if (min_approve) {
+    if (min_approve > 1) {
         return min_approve;
+    } else {
+        if (master) {
+            return 1;
+        } else {
+            return 2;
+        }
     }
-    return 1;
 }
 
 void ControllerImplementation::write_block(Block* block)
 {
-    prev_timestamp = block->get_block_timestamp();
-    last_applyed_block = block->get_block_hash();
-
-    prev_day = prev_timestamp / DAY_IN_SECONDS;
-    prev_state = block->get_block_type();
-
-    auto theTime = static_cast<time_t>(prev_timestamp);
+    auto theTime = static_cast<time_t>(block->get_block_timestamp());
     struct tm* aTime = localtime(&theTime);
 
     int day = aTime->tm_mday;
@@ -889,31 +936,87 @@ void ControllerImplementation::write_block(Block* block)
 
     DEBUG_COUT("file_path\t" + file_path);
 
-    uint64_t block_size = block->get_data().size() /* + approve_buff.size()*/;
+    if (dynamic_cast<CommonBlock*>(block)) {
+        DEBUG_COUT("CommonBlock");
 
-    std::ofstream myfile;
-    myfile.open(file_path.c_str(), std::ios::out | std::ios::app | std::ios::binary);
-    myfile.write(reinterpret_cast<char*>(&block_size), sizeof(uint64_t));
-    myfile.write(block->get_data().data(), static_cast<int64_t>(block->get_data().size()));
-    myfile.close();
+        prev_timestamp = block->get_block_timestamp();
+        last_applied_block = block->get_block_hash();
 
-    {
-        uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
-        auto common_block = dynamic_cast<CommonBlock*>(block);
-        DEBUG_COUT("block size and latency\t" + std::to_string(common_block->get_txs().size()) + "\t" + std::to_string(timestamp - prev_timestamp));
+        prev_day = prev_timestamp / DAY_IN_SECONDS;
+        prev_state = block->get_block_type();
+
+        uint64_t block_size = block->get_data().size() /* + approve_buff.size()*/;
+
+        std::ofstream myfile;
+        myfile.open(file_path.c_str(), std::ios::out | std::ios::app | std::ios::binary);
+        myfile.write(reinterpret_cast<char*>(&block_size), sizeof(uint64_t));
+        myfile.write(block->get_data().data(), static_cast<int64_t>(block->get_data().size()));
+        myfile.close();
+
+        {
+            auto approve_block = new ApproveBlock;
+            std::vector<ApproveRecord*> approve_list;
+            for (const auto& tx_pair : block_approve[block->get_block_hash()]) {
+                approve_list.push_back(tx_pair.second);
+            }
+            if (approve_block->make(block->get_block_timestamp(), block->get_block_hash(), approve_list)) {
+                uint64_t approve_block_size = approve_block->get_data().size() /* + approve_buff.size()*/;
+                std::ofstream out_file;
+                out_file.open(file_path.c_str(), std::ios::out | std::ios::app | std::ios::binary);
+                out_file.write(reinterpret_cast<char*>(&approve_block_size), sizeof(uint64_t));
+                out_file.write(approve_block->get_data().data(), static_cast<int64_t>(approve_block->get_data().size()));
+                out_file.close();
+                delete approve_block;
+            }
+        }
+
+        {
+            uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
+            DEBUG_COUT("block size and latency\t" + std::to_string(dynamic_cast<CommonBlock*>(block)->get_txs().size()) + "\t" + std::to_string(timestamp - prev_timestamp));
+        }
+
+        {
+            auto common_block = dynamic_cast<CommonBlock*>(block);
+            if (common_block && common_block->get_block_type() == BLOCK_TYPE_STATE) {
+                std::ofstream cache_file("last_state.json");
+                if (cache_file.is_open()) {
+                    rapidjson::StringBuffer s;
+                    rapidjson::Writer<rapidjson::StringBuffer> writer(s);
+                    writer.StartObject();
+                    {
+                        writer.String("hash");
+                        writer.String(bin2hex(common_block->get_block_hash()).c_str());
+                        writer.String("file");
+                        writer.String(file_path.c_str());
+                    }
+                    writer.EndObject();
+
+                    cache_file << std::string(s.GetString());
+                    cache_file.close();
+                }
+            }
+        }
+    } else if (dynamic_cast<RejectedTXBlock*>(block)) {
+        DEBUG_COUT("RejectedTXBlock");
+
+        uint64_t block_size = block->get_data().size() /* + approve_buff.size()*/;
+
+        std::ofstream out_file;
+        out_file.open(file_path.c_str(), std::ios::out | std::ios::app | std::ios::binary);
+        out_file.write(reinterpret_cast<char*>(&block_size), sizeof(uint64_t));
+        out_file.write(block->get_data().data(), static_cast<int64_t>(block->get_data().size()));
+        out_file.close();
     }
 }
 
 bool ControllerImplementation::try_make_block()
 {
-    if (last_applyed_block == last_created_block) {
-        uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
-
+    uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
+    if (last_applied_block == last_created_block) {
         if (prev_timestamp >= timestamp) {
             return false;
         }
 
-        Block* block = nullptr;
         uint64_t block_state = BLOCK_TYPE_COMMON;
 
         uint64_t current_day = (timestamp + 1) / DAY_IN_SECONDS;
@@ -930,40 +1033,74 @@ bool ControllerImplementation::try_make_block()
             }
         }
 
-        switch (block_state) {
-        case BLOCK_TYPE_COMMON:
-            if (timestamp - statistics_timestamp > 600) {
-                block = BC->make_statistics_block(timestamp);
-                statistics_timestamp = timestamp;
-            } else {
-                if (!transactions.empty()) {
-                    block = BC->make_common_block(timestamp, transactions);
+        {
+            Block* block = nullptr;
+            switch (block_state) {
+            case BLOCK_TYPE_COMMON:
+                if (timestamp - statistics_timestamp > 600) {
+                    block = BC->make_statistics_block(timestamp);
+                    statistics_timestamp = timestamp;
+                } else {
+                    if (!transactions.empty()) {
+                        block = BC->make_common_block(timestamp, transactions);
+                    }
                 }
+                break;
+            case BLOCK_TYPE_FORGING:
+                DEBUG_COUT("BLOCK_TYPE_FORGING");
+                block = BC->make_forging_block(timestamp);
+                break;
+            case BLOCK_TYPE_STATE:
+                DEBUG_COUT("BLOCK_TYPE_STATE");
+                block = BC->make_state_block(timestamp);
+                break;
             }
-            break;
-        case BLOCK_TYPE_FORGING:
-            DEBUG_COUT("BLOCK_TYPE_FORGING");
-            block = BC->make_forging_block(timestamp);
-            break;
-        case BLOCK_TYPE_STATE:
-            DEBUG_COUT("BLOCK_TYPE_STATE");
-            block = BC->make_state_block(timestamp);
-            break;
+
+            if (block) {
+                if (BC->can_apply_block(block)) {
+                    last_created_block = block->get_block_hash();
+                    blocks.insert({ block->get_block_hash(), block });
+                    distribute(block);
+                    approve_block(block);
+                    return true;
+                }
+
+                /// FUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU
+                DEBUG_COUT("FUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU");
+                std::this_thread::sleep_for(std::chrono::seconds(3));
+                exit(1);
+            }
         }
 
-        if (block) {
-            if (BC->can_apply_block(block)) {
-                last_created_block = block->get_block_hash();
-                blocks.insert({ block->get_block_hash(), block });
-                distribute(block);
-                approve_block(block);
-                return true;
+        if (auto tx_list = BC->make_rejected_tx_block(timestamp)) {
+            auto reject_tx_block = new RejectedTXBlock;
+            if (reject_tx_block->make(timestamp, last_applied_block, *tx_list, PrivKey, PubKey)) {
+                distribute(reject_tx_block);
+                write_block(reject_tx_block);
+                delete reject_tx_block;
             }
+            {
+                for (auto tx : *tx_list) {
+                    delete tx;
+                }
+                delete tx_list;
+            }
+        }
+    } else if (timestamp - prev_timestamp > 30) {
+        Block* block = blocks[last_created_block];
+        if (block->get_prev_hash() == last_applied_block) {
+            if (BC->can_apply_block(block)) {
+                if (block->get_block_type() == BLOCK_TYPE_STATE) {
+                    make_clean();
+                }
 
-            /// FUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU
-            DEBUG_COUT("FUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU");
-            std::this_thread::sleep_for(std::chrono::seconds(3));
-            exit(1);
+                BC->apply_block(block);
+                write_block(block);
+            } else {
+                DEBUG_COUT("!BC->can_apply_block(block)");
+            }
+        } else {
+            DEBUG_COUT("block->get_prev_hash != last_applied_block");
         }
     }
     return false;

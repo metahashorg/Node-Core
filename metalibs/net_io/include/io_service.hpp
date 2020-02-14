@@ -25,7 +25,9 @@ public:
 
     void stop();
 
-    int make_socket_non_blocking(int sfd);
+    static  int make_socket_non_blocking(int sfd);
+
+    ThreadPool & get_tp();
 
 private:
     void io_worker();

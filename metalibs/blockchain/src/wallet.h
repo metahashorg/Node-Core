@@ -65,7 +65,7 @@ protected:
     uint64_t real_balance = 0;
 
 public:
-    Wallet(std::unordered_set<Wallet*>&);
+    explicit Wallet(std::unordered_set<Wallet*>&);
     Wallet(const Wallet&) = delete;
     Wallet(Wallet&&) = delete;
     Wallet& operator=(const Wallet& other) = delete;
@@ -79,9 +79,9 @@ public:
     virtual bool initialize(uint64_t, uint64_t, const std::string&);
 
     virtual void add(uint64_t value);
-    virtual bool sub(Wallet* other, TX const* tx, uint64_t real_fee);
+    virtual uint64_t sub(Wallet* other, TX const* tx, uint64_t real_fee);
 
-    virtual bool try_apply_method(Wallet* other, TX const* tx);
+    virtual bool try_apply_method(Wallet* other, TX const* tx){};
 
     virtual void apply();
     virtual void clear();
@@ -100,7 +100,7 @@ private:
     uint64_t get_balance();
 
 public:
-    CommonWallet(std::unordered_set<Wallet*>&);
+    explicit CommonWallet(std::unordered_set<Wallet*>&);
     CommonWallet(const CommonWallet&) = delete;
     CommonWallet(CommonWallet&&) = delete;
     CommonWallet& operator=(const CommonWallet& other) = delete;
@@ -126,7 +126,7 @@ public:
     std::tuple<uint64_t, uint64_t, std::string> serialize() override;
     bool initialize(uint64_t, uint64_t, const std::string& json) override;
 
-    bool sub(Wallet* other, TX const* tx, uint64_t real_fee) override;
+    uint64_t sub(Wallet* other, TX const* tx, uint64_t real_fee) override;
 
     bool try_apply_method(Wallet* other, TX const* tx) override;
 
@@ -145,7 +145,7 @@ private:
     std::map<std::string, uint64_t> real_host;
 
 public:
-    DecentralizedApplication(std::unordered_set<Wallet*>&);
+    explicit DecentralizedApplication(std::unordered_set<Wallet*>&);
     DecentralizedApplication(const DecentralizedApplication&) = delete;
     DecentralizedApplication(DecentralizedApplication&&) = delete;
     DecentralizedApplication& operator=(const DecentralizedApplication& other) = delete;

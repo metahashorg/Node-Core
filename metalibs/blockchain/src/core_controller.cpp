@@ -68,8 +68,8 @@ bool CoreController::CoreConnection::curl_post(const std::string& request_method
 }
 
 CoreController::CoreConnection::CoreConnection(std::pair<std::string, int> _host)
-    : curl(curl_easy_init())
-    , host_port(std::move(_host))
+    : host_port(std::move(_host))
+    , curl(curl_easy_init())
 {
 }
 
@@ -298,7 +298,11 @@ std::string CoreController::send_with_return_to_core(
     core_lock.lock();
 
     uint64_t time_milli = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now()).time_since_epoch().count());
-    time_milli += 3000;
+    if (req == RPC_GET_CHAIN) {
+        time_milli += 30000;
+    } else {
+        time_milli += 3000;
+    }
 
     std::atomic<bool> got_resp = false;
     std::string resp_str;

@@ -17,19 +17,25 @@ void SOCKET_IO_DATA::read_data()
         while (true) {
             ssize_t count = read(sock, buff.data(), buff.size());
 
-            if (count == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-                break;
-            }
-
-            if (count < 0) {
+            if (count > 0) {
+                read_buff.insert(read_buff.end(), buff.begin(), buff.begin() + count);
+                if (read_complete()) {
+                    break;
+                }
+            } else if (count == 0) {
                 p_TP->runSheduled(1, &SOCKET_IO_DATA::close_connection, this);
-                break;
-            }
-
-            read_buff.insert(read_buff.end(), buff.begin(), buff.begin() + count);
-
-            if (read_complete()) {
-                break;
+                return;
+            } else {
+                int error = errno;
+                switch (error) {
+                case EAGAIN:
+                    //            case EWOULDBLOCK:
+                case EINTR:
+                    break;
+                default:
+                    p_TP->runSheduled(1, &SOCKET_IO_DATA::close_connection, this);
+                    return;
+                }
             }
         }
 
@@ -51,22 +57,29 @@ void SOCKET_IO_DATA::write_data()
         while (!write_buff.empty()) {
             ssize_t count = write(sock, &write_buff[write_data_complete], write_buff.size() - write_data_complete);
 
-            if (count == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-                break;
-            }
+            if (count > 0) {
+                write_data_complete += count;
 
-            if (count < 0) {
+                if (write_buff.size() == write_data_complete) {
+                    write_buff.clear();
+                    write_data_complete = 0;
+                    write_complete();
+                    break;
+                }
+            } else if (count == 0) {
                 p_TP->runSheduled(1, &SOCKET_IO_DATA::close_connection, this);
-                break;
-            }
-
-            write_data_complete += count;
-
-            if (write_buff.size() == write_data_complete) {
-                write_buff.clear();
-                write_data_complete = 0;
-                write_complete();
-                break;
+                return;
+            } else {
+                int error = errno;
+                switch (error) {
+                case EAGAIN:
+                    //            case EWOULDBLOCK:
+                case EINTR:
+                    break;
+                default:
+                    p_TP->runSheduled(1, &SOCKET_IO_DATA::close_connection, this);
+                    return;
+                }
             }
         }
 
@@ -120,8 +133,6 @@ void SOCKET_IO_DATA::close_connection()
     }
     if (try_lock()) {
         socket_closed();
-
-        shutdown(sock, SHUT_RDWR);
         close(sock);
 
         sock = 0;

@@ -30,6 +30,7 @@ private:
     std::map<std::string, std::map<std::string, ProxyStat>> node_statistics;
 
     std::vector<TX*> statistics_tx_list;
+    std::vector<RejectedTXInfo*> rejected_tx_list;
 
     std::atomic<std::map<std::string, std::pair<uint, uint>>*> wallet_statistics = nullptr;
     std::atomic<std::deque<std::pair<std::string, uint64_t>>*> wallet_request_addreses = nullptr;
@@ -49,6 +50,8 @@ public:
 
     Block* make_statistics_block(uint64_t timestamp);
 
+    std::vector<RejectedTXInfo*>* make_rejected_tx_block(uint64_t timestamp);
+
     std::atomic<std::map<std::string, std::pair<uint, uint>>*>& get_wallet_statistics();
     std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& get_wallet_request_addreses();
 
@@ -57,12 +60,12 @@ private:
 
     uint64_t get_fee(uint64_t cnt) const;
     uint64_t FORGING_POOL(uint64_t ts) const;
-
+    
     bool try_apply_block(Block* block, bool apply);
-    bool can_apply_old_block(Block* block);
     bool can_apply_common_block(Block* block);
     bool can_apply_state_block(Block* block, bool);
     bool can_apply_forging_block(Block* block);
+    void reject(const TX* tx, uint64_t reason);
 };
 
 #endif // CHAIN_H

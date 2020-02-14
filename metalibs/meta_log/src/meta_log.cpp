@@ -11,7 +11,8 @@ moodycamel::ConcurrentQueue<std::stringstream*>* __output_queue = new moodycamel
 std::thread* __cout_printer = new std::thread([]() {
     moodycamel::ConsumerToken ct(*__output_queue);
 
-    while (true) {
+    bool do_forever = true;
+    while (do_forever) {
         std::stringstream* p_ssout;
         if (__output_queue->try_dequeue(ct, p_ssout)) {
 
@@ -35,10 +36,12 @@ void print_to_stream_date_and_place(std::stringstream* p_ss, const std::string& 
     auto ymd = date::year_month_day{ dp };
     auto time = date::make_time(std::chrono::duration_cast<std::chrono::milliseconds>(tp - dp));
 
+    uint64_t micro = std::chrono::duration_cast<std::chrono::microseconds>(tp - dp).count() % 1000000l;
+
     (*p_ss) << ymd.year() << "/" << ymd.month() << "/" << ymd.day() << " "
             << std::setfill(' ') << std::setw(2) << time.hours().count() << ":"
             << std::setfill('0') << std::setw(2) << time.minutes().count() << ":"
             << std::setfill('0') << std::setw(2) << time.seconds().count() << ":"
-            << std::setfill('0') << std::setw(3) << time.subseconds().count() << " "
+            << std::setfill('0') << std::setw(6) << micro << " "
             << filename << ":" << line << ":" << function << "$\t";
 }

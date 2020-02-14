@@ -1,8 +1,7 @@
 #ifndef STATICS_HPP
 #define STATICS_HPP
 
-#include <map>
-#include <set>
+//#include <cinttypes>
 #include <string>
 
 #define MHC *(1000l * 1000l)
@@ -75,14 +74,6 @@ const uint64_t COMISSION_DATA_81_99 = 2000 MHC;
 
 const uint64_t MAX_TRANSACTION_COUNT = 50 * 1024;
 
-// BLOCK STATE IN CORE PROCESSIONG
-const uint8_t BLOCK_STATE_EMPTY = 0x00;
-const uint8_t BLOCK_STATE_PARSE = 0x10;
-const uint8_t BLOCK_STATE_PARSED = 0x20;
-const uint8_t BLOCK_STATE_CHECK = 0x30;
-const uint8_t BLOCK_STATE_CHECKED = 0x40;
-const uint8_t BLOCK_STATE_WRITE = 0x50;
-const uint8_t BLOCK_STATE_WRITED = 0x60;
 
 // TX STATE
 const uint64_t TX_STATE_APPROVE = 1;
@@ -97,6 +88,14 @@ const uint64_t TX_STATE_FORGING_R = 104;
 const uint64_t TX_STATE_FORGING_DAPP = 110;
 const uint64_t TX_STATE_STATE = 200;
 const uint64_t TX_STATE_TECH_NODE_STAT = 0x1101;
+
+// TX REJECT REASON
+const uint64_t TX_REJECT_ZERO = 0xff01;
+const uint64_t TX_REJECT_INSUFFICIENT_FEE = 0xff02;
+const uint64_t TX_REJECT_INSUFFICIENT_FUNDS = 0xff03;
+const uint64_t TX_REJECT_INVALID_NONCE = 0xff04;
+const uint64_t TX_REJECT_INSUFFICIENT_FUNDS_EXT = 0xff05;
+const uint64_t TX_REJECT_INVALID_WALLET = 0x0404;
 
 const uint64_t DAY_IN_SECONDS = 24 * 60 * 60;
 
