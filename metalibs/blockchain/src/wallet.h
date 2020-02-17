@@ -40,20 +40,6 @@ private:
     Wallet* wallet_factory(const std::string&);
 };
 
-struct WalletAdditions {
-    uint64_t delegated_from_sum = 0; // сумма средств делегированных этому кошельку
-    uint64_t delegated_to_sum = 0; // сумма средств делегированных этим кошельком
-
-    uint64_t state = 0;
-    uint64_t trust = 2;
-
-    std::deque<std::pair<std::string, uint64_t>> delegated_from; // монеты делегированные с других кошельков
-    std::deque<std::pair<std::string, uint64_t>> delegate_to; // монеты делегированные другим кошелькам
-
-    std::deque<std::pair<std::string, uint64_t>> delegated_from_daly_snapshot; // монеты делегированные с других кошельков
-    std::deque<std::pair<std::string, uint64_t>> delegate_to_daly_snapshot; // монеты делегированные другим кошелькам
-};
-
 class Wallet {
 protected:
     std::unordered_set<Wallet*>& changed_wallets;
@@ -89,6 +75,20 @@ public:
 
 class CommonWallet : public Wallet {
 private:
+    struct WalletAdditions {
+        uint64_t delegated_from_sum = 0; // сумма средств делегированных этому кошельку
+        uint64_t delegated_to_sum = 0; // сумма средств делегированных этим кошельком
+
+        uint64_t state = 0;
+        uint64_t trust = 2;
+
+        std::deque<std::pair<std::string, uint64_t>> delegated_from; // монеты делегированные с других кошельков
+        std::deque<std::pair<std::string, uint64_t>> delegate_to; // монеты делегированные другим кошелькам
+
+        std::deque<std::pair<std::string, uint64_t>> delegated_from_daly_snapshot; // монеты делегированные с других кошельков
+        std::deque<std::pair<std::string, uint64_t>> delegate_to_daly_snapshot; // монеты делегированные другим кошелькам
+    };
+
     WalletAdditions* addition = nullptr;
     WalletAdditions* real_addition = nullptr;
 
