@@ -1,7 +1,7 @@
 add_subdirectory(thread_pool)
 add_subdirectory(crypto_lib)
 add_subdirectory(blockchain)
-add_subdirectory(net_io)
+# add_subdirectory(net_io)
 add_subdirectory(meta_log)
 add_subdirectory(mhcurl)
 add_subdirectory(help_lib)

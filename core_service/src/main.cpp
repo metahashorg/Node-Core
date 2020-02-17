@@ -18,7 +18,7 @@
 #include "version.h"
 
 #include <blockchain.h>
-#include <http_io_data.hpp>
+// #include <http_io_data.hpp>
 #include <meta_log.hpp>
 #include <open_ssl_decor.h>
 #include <statics.hpp>
