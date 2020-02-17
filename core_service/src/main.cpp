@@ -356,6 +356,7 @@ __attribute__((__noreturn__)) void sendStat(const std::string& network, std::str
         std::string response;
         CF.post("save-metrics", req_post, response);
     }
+    exit(0);
 }
 
 __attribute__((__noreturn__)) void libevent(
@@ -509,4 +510,5 @@ __attribute__((__noreturn__)) void libevent(
 
         std::this_thread::sleep_for(std::chrono::minutes(15));
     }
+    exit(0);
 }
