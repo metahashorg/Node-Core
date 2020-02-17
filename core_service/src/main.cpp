@@ -91,7 +91,9 @@ void SIGPIPE_handler(int /*s*/)
 
 [[noreturn]] void print_config_file_params_and_exit()
 {
+    static const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COMMIT_HASH);
     DEBUG_COUT("");
+    DEBUG_COUT(version);
     DEBUG_COUT("Configureation file parameters:");
     DEBUG_COUT("Line 1: network name [net-main|net-dev|net-test]");
     DEBUG_COUT("Line 2: listening host port(127.0.0.1 9999)");
