@@ -42,7 +42,7 @@ const uint64_t DECADE_POOL = 4'600'000'000 MHC;
 //            start ts    pool
 const std::map<uint64_t, uint64_t> FORGING_POOL_PER_YEAR{
     /*2019*/ { 1550000000, 1940822 MHC },
-    /*2020*/ { 1581600000, (DECADE_POOL * 138 / 1000) / 366 },
+    /*2020*/ { 1581900000, (DECADE_POOL * 138 / 1000) / 366 },
     /*2021*/ { 1613200000, (DECADE_POOL * 124 / 1000) / 365 },
     /*2022*/ { 1644790000, (DECADE_POOL * 112 / 1000) / 365 },
     /*2023*/ { 1676300000, (DECADE_POOL * 101 / 1000) / 365 },

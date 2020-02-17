@@ -35,17 +35,6 @@ bool BlockChain::apply_block(Block* block)
             }
         }
 
-        {
-#include <ctime>
-            std::time_t now = block->get_block_timestamp();
-            std::tm* ptm = std::localtime(&now);
-            char buffer[32] = { 0 };
-            // Format: Mo, 15.06.2009 20:20:00
-            std::strftime(buffer, 32, "%a, %d.%m.%Y %H:%M:%S", ptm);
-
-            DEBUG_COUT(buffer);
-        }
-
         return true;
     }
     DEBUG_COUT("block is corrupt");

@@ -75,22 +75,19 @@ void SIGPIPE_handler(int /*s*/)
     DEBUG_COUT("Caught SIGPIPE");
 };
 
-[[noreturn]] void SIGSEGV_handler(int /*s*/)
-{
+[[noreturn]] void SIGSEGV_handler(int /*s*/) {
     DEBUG_COUT("Caught SIGSEGV");
     std::this_thread::sleep_for(std::chrono::seconds(2));
     exit(1);
 };
 
-[[noreturn]] void SIGTERM_handler(int /*s*/)
-{
+[[noreturn]] void SIGTERM_handler(int /*s*/) {
     DEBUG_COUT("Caught SIGTERM");
     std::this_thread::sleep_for(std::chrono::seconds(2));
     exit(0);
 };
 
-[[noreturn]] void print_config_file_params_and_exit()
-{
+[[noreturn]] void print_config_file_params_and_exit() {
     static const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COMMIT_HASH);
     DEBUG_COUT("");
     DEBUG_COUT(version);
@@ -161,43 +158,10 @@ int main(int argc, char** argv)
     std::thread(libevent, std::ref(blockChainController.get_wallet_statistics()), std::ref(blockChainController.get_wallet_request_addreses()), "wsstata.metahash.io", 80, "net-test").detach();
     std::thread(sendStat, std::ref(network), std::ref(host), tx_port, std::ref(blockChainController)).detach();
 
-    //    BLOCK_SERVER BS(tx_port, [&blockChainController](const std::string& req_post, const std::string& req_url) {
-    //        std::string_view pack_sw(req_post);
-    //
-    //        std::string path = req_url;
-    //        path.erase(std::remove(path.begin(), path.end(), '/'), path.end());
-    //        std::string_view url_sw(path);
-    //
-    //        if (path == "getinfo") {
-    //            static const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COMMIT_HASH);
-    //            rapidjson::StringBuffer s;
-    //            rapidjson::Writer<rapidjson::StringBuffer> writer(s);
-    //            writer.StartObject();
-    //            {
-    //                writer.String("result");
-    //                writer.StartObject();
-    //                {
-    //                    writer.String("version");
-    //                    writer.String(version.c_str());
-    //                    writer.String("mh_addr");
-    //                    writer.String(blockChainController.get_str_address().c_str());
-    //                }
-    //                writer.EndObject();
-    //            }
-    //            writer.EndObject();
-    //            return std::string(s.GetString());
-    //        } else {
-    //            //        DEBUG_COUT(url_sw);
-    //            return blockChainController.add_pack_to_queue(pack_sw, url_sw);
-    //        }
-    //    });
-    //    BS.start();
+    BLOCK_SERVER BS(tx_port, [&blockChainController](const std::string& req_post, const std::string& req_url) {
+        std::string_view pack_sw(req_post);
 
-    http_server(TP, tx_port, [&blockChainController](HTTP_SERVER_IO* io_struct) {
-        //        return "Hello World";
-        std::string_view pack_sw(io_struct->req_post);
-
-        std::string path = io_struct->req_path;
+        std::string path = req_url;
         path.erase(std::remove(path.begin(), path.end(), '/'), path.end());
         std::string_view url_sw(path);
 
@@ -220,9 +184,42 @@ int main(int argc, char** argv)
             writer.EndObject();
             return std::string(s.GetString());
         } else {
+            //        DEBUG_COUT(url_sw);
             return blockChainController.add_pack_to_queue(pack_sw, url_sw);
         }
     });
+    BS.start();
+
+    // http_server(TP, tx_port, [&blockChainController](HTTP_SERVER_IO* io_struct) {
+    //     //        return "Hello World";
+    //     std::string_view pack_sw(io_struct->req_post);
+
+    //     std::string path = io_struct->req_path;
+    //     path.erase(std::remove(path.begin(), path.end(), '/'), path.end());
+    //     std::string_view url_sw(path);
+
+    //     if (path == "getinfo") {
+    //         static const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COMMIT_HASH);
+    //         rapidjson::StringBuffer s;
+    //         rapidjson::Writer<rapidjson::StringBuffer> writer(s);
+    //         writer.StartObject();
+    //         {
+    //             writer.String("result");
+    //             writer.StartObject();
+    //             {
+    //                 writer.String("version");
+    //                 writer.String(version.c_str());
+    //                 writer.String("mh_addr");
+    //                 writer.String(blockChainController.get_str_address().c_str());
+    //             }
+    //             writer.EndObject();
+    //         }
+    //         writer.EndObject();
+    //         return std::string(s.GetString());
+    //     } else {
+    //         return blockChainController.add_pack_to_queue(pack_sw, url_sw);
+    //     }
+    // });
 }
 
 __attribute__((__noreturn__)) void sendStat(const std::string& network, std::string& host, int tx_port, BlockChainController& BlckChnCtrl)

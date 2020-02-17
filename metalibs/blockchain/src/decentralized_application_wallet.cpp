@@ -103,6 +103,10 @@ bool DecentralizedApplication::initialize(uint64_t value, uint64_t nonce, const 
     return true;
 }
 
+bool DecentralizedApplication::try_apply_method(Wallet* other, TX const* tx)
+{
+}
+
 bool DecentralizedApplication::try_dapp_create(const TX* tx)
 {
     const auto& addr_to = tx->addr_to;

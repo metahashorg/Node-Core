@@ -67,7 +67,7 @@ public:
     virtual void add(uint64_t value);
     virtual uint64_t sub(Wallet* other, TX const* tx, uint64_t real_fee);
 
-    virtual bool try_apply_method(Wallet* other, TX const* tx){};
+    virtual bool try_apply_method(Wallet* other, TX const* tx) = 0;
 
     virtual void apply();
     virtual void clear();
@@ -156,6 +156,8 @@ public:
 
     std::tuple<uint64_t, uint64_t, std::string> serialize() override;
     bool initialize(uint64_t, uint64_t, const std::string&) override;
+
+    bool try_apply_method(Wallet* other, TX const* tx) override;
 
     bool try_dapp_create(TX const* tx);
     bool try_dapp_modify(TX const* tx);

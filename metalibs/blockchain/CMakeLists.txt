@@ -1,18 +1,20 @@
 project(metachain VERSION 0.5 LANGUAGES CXX)
 
 add_library(${PROJECT_NAME}
+        src/approve_block.cpp
         src/approve_record.cpp
+        src/block_chain_controller.cpp
         src/block.cpp
         src/blockchain.cpp
-        src/block_chain_controller.cpp
+        src/common_block.cpp
+        src/common_wallet.cpp
         src/controller.cpp
         src/core_controller.cpp
+        src/decentralized_application_wallet.cpp
+        src/rejected_block.cpp
         src/rejected_tx.cpp
         src/transaction.cpp
-        src/wallet.cpp
-        src/rejected_block.cpp
-        src/approve_block.cpp
-        src/common_block.cpp)
+        src/wallet.cpp)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
