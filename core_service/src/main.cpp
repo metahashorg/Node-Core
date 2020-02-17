@@ -229,7 +229,7 @@ __attribute__((__noreturn__)) void sendStat(const std::string& network, std::str
 {
     CurlFetch CF("172.104.236.166", 5797);
     //    const std::string host_name = host + "_" + std::to_string(tx_port);
-        const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COUNT) + "." + std::string(GIT_COMMIT_HASH);
+    const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COUNT) + "." + std::string(GIT_COMMIT_HASH);
 
     bool forever = true;
     while (forever) {
@@ -297,6 +297,7 @@ __attribute__((__noreturn__)) void sendStat(const std::string& network, std::str
         std::string response;
         CF.post("save-metrics", req_post, response);
     }
+    exit(0);
 }
 
 __attribute__((__noreturn__)) void libevent(
@@ -450,6 +451,7 @@ __attribute__((__noreturn__)) void libevent(
 
         std::this_thread::sleep_for(std::chrono::minutes(15));
     }
+    exit(0);
 }
 
 void parse_settings(

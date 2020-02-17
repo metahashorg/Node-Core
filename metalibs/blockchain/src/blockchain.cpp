@@ -34,6 +34,18 @@ bool BlockChain::apply_block(Block* block)
                 DEBUG_COUT(buffer);
             }
         }
+
+        {
+#include <ctime>
+            std::time_t now = block->get_block_timestamp();
+            std::tm* ptm = std::localtime(&now);
+            char buffer[32] = { 0 };
+            // Format: Mo, 15.06.2009 20:20:00
+            std::strftime(buffer, 32, "%a, %d.%m.%Y %H:%M:%S", ptm);
+
+            DEBUG_COUT(buffer);
+        }
+
         return true;
     }
     DEBUG_COUT("block is corrupt");
@@ -654,9 +666,6 @@ Block* BlockChain::make_common_block(uint64_t timestamp, std::vector<TX*>& trans
                 continue;
             }
             if (addr_from == ZERO_WALLET) {
-                //                DEBUG_COUT("invalid addr_from\t" + bin2hex(tx->hash));
-                //                DEBUG_COUT(addr_from);
-                //                DEBUG_COUT(addr_to);
                 reject(tx, TX_REJECT_ZERO);
                 delete tx;
                 continue;
@@ -666,18 +675,12 @@ Block* BlockChain::make_common_block(uint64_t timestamp, std::vector<TX*>& trans
             Wallet* wallet_from = wallet_map.get_wallet(addr_from);
 
             if (!wallet_to || !wallet_from) {
-                //                DEBUG_COUT("invalid wallet\t" + bin2hex(tx->hash));
-                //                DEBUG_COUT(addr_from);
-                //                DEBUG_COUT(addr_to);
                 reject(tx, TX_REJECT_INVALID_WALLET);
                 delete tx;
                 continue;
             }
 
             if (uint64_t status = wallet_from->sub(wallet_to, tx, fee + (tx->raw_tx.size() > 254 ? tx->raw_tx.size() - 254 : 0)) > 0) {
-                //                DEBUG_COUT("tx hash:\t" + bin2hex(tx->hash));
-                //                DEBUG_COUT("addr_from:\t" + addr_from);
-                //                DEBUG_COUT("addr_to:\t" + addr_to);
                 reject(tx, status);
                 delete tx;
                 continue;
@@ -848,6 +851,7 @@ bool BlockChain::try_apply_block(Block* block, bool apply)
 
     if (status && apply) {
         wallet_map.apply_changes();
+
         return true;
     }
 

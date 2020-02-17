@@ -1,20 +1,23 @@
 project(metachain VERSION 0.5 LANGUAGES CXX)
 
 add_library(${PROJECT_NAME}
-    src/approve_record.cpp
-    src/block.cpp
-    src/blockchain.cpp
-    src/block_chain_controller.cpp
-    src/controller.cpp
-    src/core_controller.cpp
-    src/rejected_tx.cpp
-    src/transaction.cpp
-    src/wallet.cpp)
+        src/approve_record.cpp
+        src/block.cpp
+        src/blockchain.cpp
+        src/block_chain_controller.cpp
+        src/controller.cpp
+        src/core_controller.cpp
+        src/rejected_tx.cpp
+        src/transaction.cpp
+        src/wallet.cpp
+        src/rejected_block.cpp
+        src/approve_block.cpp
+        src/common_block.cpp)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
-    PRIVATE src)
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+        PRIVATE src)
 
 target_link_libraries(${PROJECT_NAME} ${OPENSSL_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} curl)

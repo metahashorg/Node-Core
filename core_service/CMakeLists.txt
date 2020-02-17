@@ -3,18 +3,18 @@ project(core_service VERSION 0.3 LANGUAGES CXX)
 ################################################################################
 # Get the current working branch
 execute_process(
-  COMMAND git rev-parse --abbrev-ref HEAD
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-  OUTPUT_VARIABLE GIT_BRANCH
-  OUTPUT_STRIP_TRAILING_WHITESPACE
+        COMMAND git rev-parse --abbrev-ref HEAD
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE GIT_BRANCH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
 # Get the latest abbreviated commit hash of the working branch
 execute_process(
-  COMMAND git log -1 --format=%h
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-  OUTPUT_VARIABLE GIT_COMMIT_HASH
-  OUTPUT_STRIP_TRAILING_WHITESPACE
+        COMMAND git log -1 --format=%h
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE GIT_COMMIT_HASH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
 execute_process(
@@ -35,8 +35,8 @@ add_definitions("-DGIT_BRANCH=${GIT_BRANCH}")
 add_definitions("-DGIT_COUNT=${GIT_COUNT}")
 
 configure_file(
-  ${PROJECT_SOURCE_DIR}/src/version.h.in
-  ${PROJECT_BINARY_DIR}/generated/version.h
+        ${PROJECT_SOURCE_DIR}/src/version.h.in
+        ${PROJECT_BINARY_DIR}/generated/version.h
 )
 
 include_directories(${PROJECT_BINARY_DIR}/generated)
@@ -44,11 +44,12 @@ include_directories(${PROJECT_BINARY_DIR}/generated)
 ################################################################################
 
 add_executable(${PROJECT_NAME}
-    src/main.cpp
-   src/blockserver.cpp
-)
+        src/main.cpp
+        src/blockserver.cpp
+        )
 
 target_link_libraries(${PROJECT_NAME} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(${PROJECT_NAME} tcmalloc)
 target_link_libraries(${PROJECT_NAME} stdc++fs)
 target_link_libraries(${PROJECT_NAME} meta_log)
 target_link_libraries(${PROJECT_NAME} metachain)
