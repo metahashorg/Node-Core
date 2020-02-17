@@ -74,5 +74,3 @@ sha256_2 Block::get_block_hash()
 {
     return block_hash;
 }
-
-

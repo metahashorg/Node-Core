@@ -33,7 +33,7 @@ private:
     void listener();
 
 public:
-    SocketServer(ThreadPool& _TP, IO_SERVICE& _io_service, int _port, std::function<SOCKET_IO_DATA*()> _allocator);
+    SocketServer(IO_SERVICE& _io_service, int _port, std::function<SOCKET_IO_DATA*()> _allocator);
 
     void start();
 

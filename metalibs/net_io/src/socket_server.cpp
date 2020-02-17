@@ -89,6 +89,7 @@ SOCKET_IO_DATA* SocketServer::new_msg(int sock)
     msg->_fn_on_write = _fn_on_write;
     msg->_fn_on_close = _fn_on_close;
 
+    TP.runAsync(&IO_SERVICE::add_sock, &io_service, msg);
     TP.runAsync(&SOCKET_IO_DATA::check_timeout, msg, default_timeout_ms);
 
     return msg;
@@ -106,8 +107,6 @@ void SocketServer::listener()
             int infd = accept(server_socket, nullptr, nullptr);
             if (infd < 0) {
                 if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-                    /* We have processed all incoming
-                             connections. */
                     break;
                 }
                 perror("accept");
@@ -116,8 +115,7 @@ void SocketServer::listener()
 
             DEBUG_COUT(std::to_string(infd) + "\t-\tACCEPT CONNECTION");
 
-            SOCKET_IO_DATA* msg = new_msg(infd);
-            TP.runAsync(&IO_SERVICE::add_sock, &io_service, msg);
+            TP.runAsync(&SocketServer::new_msg, this, infd);
         }
     }
 
@@ -128,8 +126,8 @@ void SocketServer::listener()
     }
 }
 
-SocketServer::SocketServer(ThreadPool& _TP, IO_SERVICE& _io_service, int _port, std::function<SOCKET_IO_DATA*()> _allocator)
-    : TP(_TP)
+SocketServer::SocketServer(IO_SERVICE& _io_service, int _port, std::function<SOCKET_IO_DATA*()> _allocator)
+    : TP(_io_service.get_tp())
     , io_service(_io_service)
     , goon(true)
     , allocator(std::move(_allocator))

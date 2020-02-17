@@ -1,4 +1,4 @@
-project(core_service VERSION 0.3.1 LANGUAGES CXX)
+project(core_service VERSION 0.3 LANGUAGES CXX)
 
 ################################################################################
 # Get the current working branch
@@ -17,15 +17,22 @@ execute_process(
         OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
+execute_process(
+  COMMAND git rev-list --count HEAD
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  OUTPUT_VARIABLE GIT_COUNT
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
 message(STATUS "Git current branch: ${GIT_BRANCH}")
 message(STATUS "Git commit hash: ${GIT_COMMIT_HASH}")
+message(STATUS "Git commit hash: ${GIT_COUNT}")
 
 message(STATUS "Generating version.h")
 
-message(STATUS "core_service PROJECT_BINARY_DIR = ${PROJECT_BINARY_DIR}")
-
 add_definitions("-DGIT_COMMIT_HASH=${GIT_COMMIT_HASH}")
 add_definitions("-DGIT_BRANCH=${GIT_BRANCH}")
+add_definitions("-DGIT_COUNT=${GIT_COUNT}")
 
 configure_file(
         ${PROJECT_SOURCE_DIR}/src/version.h.in

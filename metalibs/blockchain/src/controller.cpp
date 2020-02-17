@@ -68,8 +68,6 @@ void parse_block_async(
                     block_tree.erase(block->get_block_hash());
                     delete block;
                 }
-            } else {
-                DEBUG_COUT("Block is ok but not common");
             }
         } else {
             DEBUG_COUT("Block parse error");
@@ -83,14 +81,18 @@ void parse_block_async(
 }
 
 ControllerImplementation::ControllerImplementation(
+    ThreadPool& TP,
     const std::string& priv_key_line,
     const std::string& _path,
     const std::string& proved_hash,
     const std::set<std::pair<std::string, int>>& core_list,
-    const std::pair<std::string, int>& host_port)
-    : path(_path)
-    , BC(new BlockChain())
+    const std::pair<std::string, int>& host_port,
+    bool test)
+    : BC(new BlockChain())
+    , path(_path)
+    , TP(TP)
     , cores(core_list, host_port)
+    , test(test)
 {
     std::this_thread::sleep_for(std::chrono::seconds(2));
     {
@@ -158,8 +160,6 @@ void ControllerImplementation::read_and_apply_local_chain()
 
     char uint64_buff[8];
     std::set<std::string> files = get_files_in_dir(path);
-
-    ThreadPool TP;
 
     bool skip = !last_file.empty();
     for (const std::string& file : files) {
@@ -273,6 +273,29 @@ void ControllerImplementation::apply_block_chain(std::map<sha256_2, Block*>& blo
             curr_block = block->get_block_hash();
         }
     }
+    if (test) {
+        for (auto block_it = block_chain.begin(); block_it != block_chain.end(); block_it++) {
+            if ((*block_it)->get_block_type() == BLOCK_TYPE_FORGING) {
+                DEBUG_COUT("Found forging block");
+                bool last = true;
+                auto find_block = block_it;
+                for (find_block++; find_block != block_chain.end(); find_block++) {
+                    if ((*find_block)->get_block_type() == BLOCK_TYPE_FORGING) {
+                        DEBUG_COUT("Not last one");
+                        last = false;
+                        break;
+                    }
+                }
+                if (last) {
+                    DEBUG_COUT("Last one");
+                    for (auto delete_block = block_it; delete_block != block_chain.end();) {
+                        delete_block = block_chain.erase(delete_block);
+                    }
+                    break;
+                }
+            }
+        }
+    }
 
     for (auto block : block_chain) {
         if (!BC->apply_block(block)) {
@@ -306,7 +329,6 @@ void ControllerImplementation::apply_block_chain(std::map<sha256_2, Block*>& blo
 
     DEBUG_COUT("START");
     {
-        ThreadPool TP;
         std::atomic<int> jobs = 0;
         for (const auto [hash, block] : block_tree) {
             jobs++;
@@ -366,7 +388,6 @@ void ControllerImplementation::actualize_chain()
             std::map<sha256_2, Block*> block_tree;
             std::map<sha256_2, Block*> prev_tree;
             {
-                ThreadPool TP;
                 uint64_t position = 0;
                 while (position + 8 < return_data.size()) {
                     uint64_t block_size = *(reinterpret_cast<uint64_t*>(&return_data[position]));
@@ -449,7 +470,7 @@ std::string ControllerImplementation::get_last_block_str()
     return bin2hex(last_applied_block);
 }
 
-std::atomic<std::map<std::string, std::pair<int, int>>*>& ControllerImplementation::get_wallet_statistics()
+std::atomic<std::map<std::string, std::pair<uint, uint>>*>& ControllerImplementation::get_wallet_statistics()
 {
 
     return BC->get_wallet_statistics();

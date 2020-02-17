@@ -23,6 +23,16 @@ bool BlockChain::apply_block(Block* block)
         prev_hash = block->get_block_hash();
         if (block->get_block_type() == BLOCK_TYPE_STATE) {
             state_hash_xx64 = get_xxhash64(block->get_data());
+            {
+#include <ctime>
+                std::time_t now = block->get_block_timestamp();
+                std::tm* ptm = std::localtime(&now);
+                char buffer[32] = { 0 };
+                // Format: Mo, 15.06.2009 20:20:00
+                std::strftime(buffer, 32, "%a, %d.%m.%Y %H:%M:%S", ptm);
+
+                DEBUG_COUT(buffer);
+            }
         }
 
         {
@@ -71,255 +81,242 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
     std::vector<char> txs_buff;
 
     Wallet* state_fee = wallet_map.get_wallet(STATE_FEE_WALLET);
+
     {
-        static const uint64_t ROLE_UINT_PROXY = 1;
-        static const uint64_t ROLE_UINT_TORRENT = 2;
-
-        std::map<std::string, uint64_t> node_delegates;
         std::map<std::string, uint64_t> delegates;
-        std::map<std::string, std::map<std::string, uint64_t>> geo_delegates = {
-            { "us", std::map<std::string, uint64_t>() },
-            { "eu", std::map<std::string, uint64_t>() },
-            { "cn", std::map<std::string, uint64_t>() }
-        };
+        //          ROLE                   GEO                  NODE     DELEGATED
+        std::map<std::string, std::map<std::string, std::map<std::string, uint64_t>>> type_geo_node_delegates;
 
         {
-            DEBUG_COUT("proxy_statistics");
-            std::string msg;
-            for (auto& proxy_pair : proxy_statistics) {
-                bool print = false;
-                std::string addr_msg = "\"" + proxy_pair.first;
-                for (const auto& geo_name : test_nodes) {
-                    if (!proxy_pair.second.proxy_rps[geo_name.first].empty()) {
-                        print = true;
-                    }
-                    addr_msg += ";" + geo_name.first;
-                    addr_msg += ";" + std::to_string(proxy_pair.second.proxy_rps[geo_name.first].size());
-                    {
-                        auto& stat_v = proxy_pair.second.proxy_rps[geo_name.first];
-                        auto geo_average = !stat_v.empty() ? std::accumulate(stat_v.begin(), stat_v.end(), 0) / stat_v.size() : 0;
-                        addr_msg += ";" + std::to_string(geo_average);
-                    }
-                }
-                if (print) {
-                    msg += addr_msg;
-                }
-            }
-            DEBUG_COUT(msg);
-        }
+            std::map<std::string, std::string> msgs;
+            std::vector<char> addr_msg;
 
-        {
-            DEBUG_COUT("torrent_statistics");
-            std::string msg;
-            for (auto& proxy_pair : proxy_statistics) {
-                bool print = false;
-                std::string addr_msg = "\"" + proxy_pair.first;
-                for (const auto& geo_name : test_nodes) {
-                    if (!proxy_pair.second.torrent_ping[geo_name.first].empty()) {
-                        print = true;
+            for (auto&& [type, nodes] : node_statistics) {
+                for (auto&& [addr, node_stat] : nodes) {
+                    // if (node_stat.count) {
+                    auto&& str_count = std::to_string(node_stat.count);
+
+                    addr_msg.clear();
+                    addr_msg.push_back('\"');
+                    addr_msg.insert(addr_msg.end(), addr.begin(), addr.end());
+                    addr_msg.push_back(';');
+                    addr_msg.insert(addr_msg.end(), str_count.begin(), str_count.end());
+
+                    for (auto&& [geo_name, geo_stat] : node_stat.stats) {
+                        auto&& str_cnt = std::to_string(geo_stat.first);
+                        auto&& str_sum = std::to_string(geo_stat.second);
+
+                        addr_msg.push_back(';');
+                        addr_msg.insert(addr_msg.end(), geo_name.begin(), geo_name.end());
+                        addr_msg.push_back(';');
+                        addr_msg.insert(addr_msg.end(), str_cnt.begin(), str_cnt.end());
+                        addr_msg.push_back(';');
+                        addr_msg.insert(addr_msg.end(), str_sum.begin(), str_sum.end());
                     }
-                    addr_msg += ";" + geo_name.first;
-                    addr_msg += ";" + std::to_string(proxy_pair.second.torrent_ping[geo_name.first].size());
-                    {
-                        auto& stat_v = proxy_pair.second.torrent_ping[geo_name.first];
-                        auto geo_average = !stat_v.empty() ? std::accumulate(stat_v.begin(), stat_v.end(), 0) / stat_v.size() : UINT64_MAX;
-                        addr_msg += ";" + std::to_string(geo_average);
-                    }
-                }
-                if (print) {
-                    msg += addr_msg;
-                }
+
+                    msgs[type].insert(msgs[type].end(), addr_msg.begin(), addr_msg.end());
+                    addr_msg.clear();
+                    // }
+                };
             }
-            DEBUG_COUT(msg);
+            for (auto&& [type, info] : msgs) {
+                DEBUG_COUT(type);
+                DEBUG_COUT(info);
+            }
         }
 
         {
 
-            for (auto& proxy_pair : proxy_statistics) {
-                auto* wallet = dynamic_cast<CommonWallet*>(wallet_map.get_wallet(proxy_pair.first));
-                if (!wallet) {
-                    DEBUG_COUT("Invalid wallet");
+            //TODO Add Cores
+            for (auto&& [type, nodes] : node_statistics) {
+                if (ROLES.find(type) == ROLES.end()) {
+                    DEBUG_COUT("Unknown role:\t" + type);
                     continue;
                 }
+                for (auto&& [addr, node_stat] : nodes) {
+                    auto* wallet = dynamic_cast<CommonWallet*>(wallet_map.get_wallet(addr));
+                    if (wallet) {
+                        const auto w_state = wallet->get_state();
+                        const auto state_mask = NODE_STATE_FLAG_FORGING.at(type);
 
-                uint64_t wallet_state(wallet->get_state());
+                        if ((w_state & state_mask) == state_mask) {
+                            std::string geo;
+                            uint64_t success_size = 0;
+                            uint64_t average = 0;
 
-                bool revard_set = false;
-                std::string geo;
-                uint64_t MAXIMUM_NODE_VALUE = 0;
-                uint64_t role;
+                            for (auto&& [geo_name, geo_stat] : node_stat.stats) {
 
-                DEBUG_COUT(proxy_pair.first + "\t" + int2bin(wallet_state));
+                                success_size += geo_stat.second;
+                                uint64_t geo_average = geo_stat.second / geo_stat.first;
 
-                if (!revard_set && (wallet_state & NODE_STATE_FLAG_TORRENT_FORGING) == NODE_STATE_FLAG_TORRENT_FORGING) {
-                    MAXIMUM_NODE_VALUE = NODE_TORRENT_HARD_CAP;
-                    role = ROLE_UINT_TORRENT;
-                    uint64_t average = UINT64_MAX;
-                    uint64_t statistics_size = 0;
+                                if (geo_average > average) {
+                                    average = geo_average;
+                                    geo = geo_name;
+                                }
+                            }
 
-                    for (const auto& geo_name : test_nodes) {
-                        auto& stat_v = proxy_pair.second.torrent_ping[geo_name.first];
-                        auto geo_average = !stat_v.empty() ? std::accumulate(stat_v.begin(), stat_v.end(), 0) / stat_v.size() : UINT64_MAX;
+                            uint64_t min_for_reward = node_stat.count * 95 / 100;
+                            if (success_size && success_size > min_for_reward && average >= MINIMUM_AVERAGE_PROXY_RPS) {
+                                DEBUG_COUT(addr + "\t" + std::to_string(average) + "\t" + geo + "\t" + type + "\t" + int2bin(w_state) + "\t" + int2bin(state_mask));
 
-                        statistics_size += stat_v.size();
+                                uint64_t node_total_delegate = 0;
+                                for (auto&& [d_addr, d_value] : wallet->get_delegated_from_list()) {
 
-                        if (geo_average < average) {
-                            average = geo_average;
-                            geo = geo_name.second;
+                                    uint64_t node_wallet_delegate;
+                                    if (node_total_delegate + d_value > NODE_HARD_CAP.at(type)) {
+                                        node_wallet_delegate = NODE_HARD_CAP.at(type) - node_total_delegate;
+                                    } else {
+                                        node_wallet_delegate = d_value;
+                                    }
+
+                                    delegates[d_addr] += node_wallet_delegate;
+
+                                    node_total_delegate += node_wallet_delegate;
+                                    if (node_total_delegate >= NODE_HARD_CAP.at(type)) {
+                                        break;
+                                    }
+                                }
+
+                                if (node_total_delegate <= NODE_HARD_CAP.at(type)) {
+                                    type_geo_node_delegates[type][geo][addr] = node_total_delegate;
+                                } else {
+                                    type_geo_node_delegates[type][geo][addr] = NODE_HARD_CAP.at(type);
+                                }
+
+                            } else {
+                                DEBUG_COUT("not enough tests for " + type + ":\t" + addr + "\t" + std::to_string(min_for_reward) + "\t" + std::to_string(success_size));
+                            }
                         }
-                    }
-
-                    uint64_t min_for_reward = proxy_pair.second.torrent_statistics_count * 95 / 100;
-                    if (!statistics_size || statistics_size < min_for_reward || average > 5000) {
-                        DEBUG_COUT("not enough tests for torrent:\t" + proxy_pair.first + "\t" + std::to_string(min_for_reward) + "\t" + std::to_string(statistics_size));
                     } else {
-                        revard_set = true;
-                        DEBUG_COUT(proxy_pair.first + "\t" + std::to_string(average) + "\t" + geo + "\ttorrent");
-                    }
-                }
-                if (!revard_set && (wallet_state & NODE_STATE_FLAG_PROXY_FORGING) == NODE_STATE_FLAG_PROXY_FORGING) {
-                    MAXIMUM_NODE_VALUE = NODE_PROXY_HARD_CAP;
-                    role = ROLE_UINT_PROXY;
-                    uint64_t average = 0;
-                    uint64_t statistics_size = 0;
-
-                    for (const auto& geo_name : test_nodes) {
-                        auto& stat_v = proxy_pair.second.proxy_rps[geo_name.first];
-                        auto geo_average = !stat_v.empty() ? std::accumulate(stat_v.begin(), stat_v.end(), 0) / stat_v.size() : 0;
-
-                        statistics_size += stat_v.size();
-
-                        if (geo_average > average) {
-                            average = geo_average;
-                            geo = geo_name.second;
-                        }
-                    }
-
-                    uint64_t min_for_reward = proxy_statistics[proxy_pair.first].proxy_statistics_count * 95 / 100;
-                    if (!statistics_size || statistics_size < min_for_reward || average < MINIMUM_AVERAGE_PROXY_RPS) {
-                        DEBUG_COUT("not enough tests for proxy:\t" + proxy_pair.first + "\t" + std::to_string(min_for_reward) + "\t" + std::to_string(statistics_size));
-                    } else {
-                        revard_set = true;
-                        DEBUG_COUT(proxy_pair.first + "\t" + std::to_string(average) + "\t" + geo + "\tproxy");
-                    }
-                }
-                if (revard_set && node_delegates.find(proxy_pair.first) == node_delegates.end()) {
-                    uint64_t node_total_delegate = 0;
-                    for (auto& delegate_pair : wallet->get_delegated_from_list()) {
-                        uint64_t node_wallet_delegate;
-
-                        if (node_total_delegate + delegate_pair.second > MAXIMUM_NODE_VALUE) {
-                            node_wallet_delegate = MAXIMUM_NODE_VALUE - node_total_delegate;
-                        } else {
-                            node_wallet_delegate = delegate_pair.second;
-                        }
-
-                        delegates[delegate_pair.first] += node_wallet_delegate;
-
-                        node_total_delegate += node_wallet_delegate;
-                        if (node_total_delegate >= MAXIMUM_NODE_VALUE) {
-                            break;
-                        }
-                    }
-
-                    geo_delegates[geo].insert({ proxy_pair.first, role });
-
-                    if (node_total_delegate <= MAXIMUM_NODE_VALUE) {
-                        node_delegates.insert({ proxy_pair.first, node_total_delegate });
-                    } else {
-                        node_delegates.insert({ proxy_pair.first, MAXIMUM_NODE_VALUE });
+                        DEBUG_COUT("Invalid wallet:\t" + addr);
                     }
                 }
             }
         }
 
-        if (!node_delegates.empty()) {
+        if (!type_geo_node_delegates.empty()) {
+            std::set<std::string> reward_nodes;
+            static const std::vector<std::string> types_by_value{
+                "Proxy",
+                "InfrastructureTorrent",
+                "Torrent",
+                "Verifier"
+                //TODO Core
+                // ,"Core"
+            };
+
             uint64_t forging_node_units = 0;
-            std::map<uint64_t, std::map<std::string, uint64_t>> geo_total_units = {
-                { ROLE_UINT_TORRENT,
+            std::map<std::string, std::map<std::string, uint64_t>> geo_total_units = {
+                { "Proxy",
                     { { "us", 0 },
                         { "eu", 0 },
                         { "cn", 0 } } },
-                { ROLE_UINT_PROXY,
+                { "InfrastructureTorrent",
+                    { { "us", 0 },
+                        { "eu", 0 },
+                        { "cn", 0 } } },
+                { "Torrent",
+                    { { "us", 0 },
+                        { "eu", 0 },
+                        { "cn", 0 } } },
+                { "Verifier",
                     { { "us", 0 },
                         { "eu", 0 },
                         { "cn", 0 } } }
+                //TODO Core
+                // ,{ "Core",
+                //     { { "us", 0 }}}
             };
 
-            for (const auto& geo_pair : geo_delegates) {
-                const auto& geo_name = geo_pair.first;
-                for (const auto& node : geo_pair.second) {
-                    const auto& node_name = node.first;
-                    const auto& node_role = node.second;
-                    uint64_t node_delegate = node_delegates[node_name];
+            for (const auto& type : types_by_value) {
+                for (auto&& [geo_name, geo_nodes] : type_geo_node_delegates[type]) {
+                    for (auto&& [node_name, node_delegate] : geo_nodes) {
+                        geo_total_units[type][geo_name] += node_delegate;
+                        forging_node_units += node_delegate;
 
-                    geo_total_units[node_role][geo_name] += node_delegate;
-                    forging_node_units += node_delegate;
-
-                    DEBUG_COUT(node_name + "\t" + std::to_string(node_role) + "\t" + geo_name + "\t" + std::to_string(node_delegate));
+                        DEBUG_COUT(node_name + "\t" + type + "\t" + geo_name + "\t" + std::to_string(node_delegate));
+                    }
                 }
             }
 
-            const uint64_t pool = (FORGING_POOL + state_fee->get_value());
-            uint64_t forging_node_total = (pool * 28) / 100;
+            const uint64_t pool = (FORGING_POOL(timestamp) + state_fee->get_value());
+            //TODO Core
+            // uint64_t forging_node_total = (pool * 10) / 100;
+            uint64_t forging_node_total = (pool * 16) / 100;
 
-            std::map<uint64_t, std::map<std::string, uint64_t>> geo_total = {
-                { ROLE_UINT_TORRENT,
+            std::map<std::string, std::map<std::string, uint64_t>> geo_total = {
+                { "Proxy",
                     { { "us", (pool * 2) / 100 },
                         { "eu", (pool * 2) / 100 },
                         { "cn", (pool * 2) / 100 } } },
-                { ROLE_UINT_PROXY,
+                { "InfrastructureTorrent",
+                    { { "us", (pool * 2) / 100 },
+                        { "eu", (pool * 2) / 100 },
+                        { "cn", (pool * 2) / 100 } } },
+                { "Torrent",
+                    { { "us", (pool * 2) / 100 },
+                        { "eu", (pool * 2) / 100 },
+                        { "cn", (pool * 2) / 100 } } },
+                { "Verifier",
                     { { "us", (pool * 2) / 100 },
                         { "eu", (pool * 2) / 100 },
                         { "cn", (pool * 2) / 100 } } }
+                //TODO Core
+                // ,{ "Core",
+                //     { { "us", (pool * 6) / 100 } } }
             };
 
             const double forging_node_per_unit = double(forging_node_total) / double(forging_node_units);
-            const std::map<uint64_t, std::map<std::string, double>> geo_per_unit = {
-                { ROLE_UINT_TORRENT,
-                    { { "us", double(geo_total[ROLE_UINT_TORRENT]["us"]) / double(geo_total_units[ROLE_UINT_TORRENT]["us"]) },
-                        { "eu", double(geo_total[ROLE_UINT_TORRENT]["eu"]) / double(geo_total_units[ROLE_UINT_TORRENT]["eu"]) },
-                        { "cn", double(geo_total[ROLE_UINT_TORRENT]["cn"]) / double(geo_total_units[ROLE_UINT_TORRENT]["cn"]) } } },
-                { ROLE_UINT_PROXY,
-                    { { "us", double(geo_total[ROLE_UINT_PROXY]["us"]) / double(geo_total_units[ROLE_UINT_PROXY]["us"]) },
-                        { "eu", double(geo_total[ROLE_UINT_PROXY]["eu"]) / double(geo_total_units[ROLE_UINT_PROXY]["eu"]) },
-                        { "cn", double(geo_total[ROLE_UINT_PROXY]["cn"]) / double(geo_total_units[ROLE_UINT_PROXY]["cn"]) } } }
+            const std::map<std::string, std::map<std::string, double>> geo_per_unit = {
+                { "Proxy",
+                    { { "us", double(geo_total["Proxy"]["us"]) / double(geo_total_units["Proxy"]["us"]) },
+                        { "eu", double(geo_total["Proxy"]["eu"]) / double(geo_total_units["Proxy"]["eu"]) },
+                        { "cn", double(geo_total["Proxy"]["cn"]) / double(geo_total_units["Proxy"]["cn"]) } } },
+                { "InfrastructureTorrent",
+                    { { "us", double(geo_total["InfrastructureTorrent"]["us"]) / double(geo_total_units["InfrastructureTorrent"]["us"]) },
+                        { "eu", double(geo_total["InfrastructureTorrent"]["eu"]) / double(geo_total_units["InfrastructureTorrent"]["eu"]) },
+                        { "cn", double(geo_total["InfrastructureTorrent"]["cn"]) / double(geo_total_units["InfrastructureTorrent"]["cn"]) } } },
+                { "Torrent",
+                    { { "us", double(geo_total["Torrent"]["us"]) / double(geo_total_units["Torrent"]["us"]) },
+                        { "eu", double(geo_total["Torrent"]["eu"]) / double(geo_total_units["Torrent"]["eu"]) },
+                        { "cn", double(geo_total["Torrent"]["cn"]) / double(geo_total_units["Torrent"]["cn"]) } } },
+                { "Verifier",
+                    { { "us", double(geo_total["Verifier"]["us"]) / double(geo_total_units["Verifier"]["us"]) },
+                        { "eu", double(geo_total["Verifier"]["eu"]) / double(geo_total_units["Verifier"]["eu"]) },
+                        { "cn", double(geo_total["Verifier"]["cn"]) / double(geo_total_units["Verifier"]["cn"]) } } }
             };
 
-            for (const auto& geo_pair : geo_delegates) {
-                const auto& geo_name = geo_pair.first;
-                DEBUG_COUT("GEO:\t" + geo_name);
-                for (const auto& node : geo_pair.second) {
-                    const auto& node_name = node.first;
-                    const auto& node_role = node.second;
-                    uint64_t node_delegate = node_delegates[node_name];
+            for (auto&& [node_role, role_stat] : type_geo_node_delegates) {
+                for (auto&& [geo_name, geo_nodes] : role_stat) {
+                    for (auto&& [node_name, node_delegate] : geo_nodes) {
 
-                    auto forging_node_reward = uint64_t(double(node_delegate) * forging_node_per_unit);
-                    auto forging_node_reward_geo = uint64_t(double(node_delegate) * geo_per_unit.at(node_role).at(geo_name));
+                        auto forging_node_reward = uint64_t(double(node_delegate) * forging_node_per_unit);
+                        auto forging_node_reward_geo = uint64_t(double(node_delegate) * geo_per_unit.at(node_role).at(geo_name));
 
-                    DEBUG_COUT("NODE_FORGING:\t" + node_name + "\t" + std::to_string(node_role) + "\t" + geo_name + "\t" + std::to_string(forging_node_reward) + "\t" + std::to_string(forging_node_reward_geo));
+                        DEBUG_COUT("NODE_FORGING:\t" + node_name + "\t" + node_role + "\t" + geo_name + "\t" + std::to_string(forging_node_reward) + "\t" + std::to_string(forging_node_reward_geo));
 
-                    if (forging_node_total < forging_node_reward) {
-                        DEBUG_COUT("Not enough money for reward in total");
-                        DEBUG_COUT(std::to_string(forging_node_total));
-                        DEBUG_COUT(std::to_string(forging_node_reward));
-                        continue;
-                    }
-                    if (geo_total[node_role][geo_name] < forging_node_reward_geo) {
-                        DEBUG_COUT("Not enough money for reward in geo");
-                        DEBUG_COUT(std::to_string(geo_total[node_role][geo_name]));
-                        DEBUG_COUT(std::to_string(forging_node_reward_geo));
-                        continue;
-                    }
+                        if (forging_node_total < forging_node_reward) {
+                            DEBUG_COUT("Not enough money for reward in total");
+                            DEBUG_COUT(std::to_string(forging_node_total));
+                            DEBUG_COUT(std::to_string(forging_node_reward));
+                            continue;
+                        }
+                        if (geo_total[node_role][geo_name] < forging_node_reward_geo) {
+                            DEBUG_COUT("Not enough money for reward in geo");
+                            DEBUG_COUT(std::to_string(geo_total[node_role][geo_name]));
+                            DEBUG_COUT(std::to_string(forging_node_reward_geo));
+                            continue;
+                        }
 
-                    geo_total[node_role][geo_name] -= forging_node_reward_geo;
-                    forging_node_total -= forging_node_reward;
+                        geo_total[node_role][geo_name] -= forging_node_reward_geo;
+                        forging_node_total -= forging_node_reward;
 
-                    std::vector<char> state_tx = make_forging_tx(node_name, forging_node_reward + forging_node_reward_geo, {}, TX_STATE_FORGING_N);
+                        std::vector<char> state_tx = make_forging_tx(node_name, forging_node_reward + forging_node_reward_geo, {}, TX_STATE_FORGING_N);
 
-                    if (!state_tx.empty()) {
-                        append_varint(txs_buff, state_tx.size());
-                        txs_buff.insert(txs_buff.end(), state_tx.begin(), state_tx.end());
+                        if (!state_tx.empty()) {
+                            append_varint(txs_buff, state_tx.size());
+                            txs_buff.insert(txs_buff.end(), state_tx.begin(), state_tx.end());
+                        }
                     }
                 }
             }
@@ -331,7 +328,7 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
         }
 
         if (forging_coin_units) {
-            uint64_t forging_coin_total = ((FORGING_POOL + state_fee->get_value()) * 5) / 10;
+            uint64_t forging_coin_total = ((FORGING_POOL(timestamp) + state_fee->get_value()) * 5) / 10;
             double forging_coin_per_one = double(forging_coin_total) / double(forging_coin_units);
 
             for (auto& delegate_pair : delegates) {
@@ -357,9 +354,9 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
     {
         auto* father_of_wallets = dynamic_cast<CommonWallet*>(wallet_map.get_wallet(MASTER_WALLET_COIN_FORGING));
 
-        std::map<std::string, std::pair<int, int>>* address_statistics;
+        std::map<std::string, std::pair<uint, uint>>* address_statistics;
         while (true) {
-            std::map<std::string, std::pair<int, int>>* null_stat = nullptr;
+            std::map<std::string, std::pair<uint, uint>>* null_stat = nullptr;
             address_statistics = wallet_statistics.load();
             if (wallet_statistics.compare_exchange_strong(address_statistics, null_stat)) {
                 break;
@@ -419,7 +416,7 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
                 forging_shares_total += addr_pair.second;
             }
 
-            const uint64_t forging_count_total = ((FORGING_POOL + state_fee->get_value()) * 1) / 10;
+            const uint64_t forging_count_total = ((FORGING_POOL(timestamp) + state_fee->get_value()) * 1) / 10;
 
             const uint64_t FORGING_PASSIVE_REWARD = forging_count_total / 10;
 
@@ -461,7 +458,7 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
                 DEBUG_COUT(msg);
             }
 
-            const uint64_t forging_count_total = ((FORGING_POOL + state_fee->get_value()) * 1) / 10;
+            const uint64_t forging_count_total = ((FORGING_POOL(timestamp) + state_fee->get_value()) * 1) / 10;
 
             const uint64_t FORGING_RANDOM_REWARD_1 = forging_count_total * 4 / 10;
             const uint64_t FORGING_RANDOM_REWARD_2 = forging_count_total * 1 / 10;
@@ -758,7 +755,7 @@ Block* BlockChain::make_statistics_block(uint64_t timestamp)
     return nullptr;
 }
 
-std::atomic<std::map<std::string, std::pair<int, int>>*>& BlockChain::get_wallet_statistics()
+std::atomic<std::map<std::string, std::pair<uint, uint>>*>& BlockChain::get_wallet_statistics()
 {
     return wallet_statistics;
 }
@@ -788,7 +785,7 @@ Block* BlockChain::make_block(uint64_t b_type, uint64_t b_time, sha256_2 prev_b_
     return nullptr;
 }
 
-uint64_t BlockChain::get_fee(uint64_t cnt)
+uint64_t BlockChain::get_fee(uint64_t cnt) const
 {
     static const uint64_t MAX_TRANSACTION_COUNT_20_of_100 = (MAX_TRANSACTION_COUNT * 20 / 100);
     if (cnt <= MAX_TRANSACTION_COUNT_20_of_100) {
@@ -804,6 +801,19 @@ uint64_t BlockChain::get_fee(uint64_t cnt)
         return COMISSION_COMMON_61_80;
     }
     return COMISSION_COMMON_81_99;
+}
+
+uint64_t BlockChain::FORGING_POOL(uint64_t ts) const
+{
+    uint64_t return_pool = 0;
+    for (const auto [start_ts, pool] : FORGING_POOL_PER_YEAR) {
+        if (ts > start_ts) {
+            return_pool = pool;
+        } else {
+            break;
+        }
+    }
+    return return_pool;
 }
 
 bool BlockChain::try_apply_block(Block* block, bool apply)
@@ -880,48 +890,51 @@ bool BlockChain::can_apply_common_block(Block* block)
                 wallet_from->sub(wallet_to, tx, 0);
                 continue;
             }
-            if (tx->state == TX_STATE_TECH_NODE_STAT && tx->json_rpc) {
-                if (tx->json_rpc->parameters["type"] == "InfrastructureTorrent") {
-                    auto& mhaddr = tx->json_rpc->parameters["address"];
-                    proxy_statistics[mhaddr].torrent_statistics_count++;
-                    uint64_t latency = 0;
-                    try {
-                        latency = std::stol(tx->json_rpc->parameters["latency"]);
-                    } catch (...) {
-                        latency = 0;
-                    }
 
-                    if (latency > 0 && latency < (1000l * 1000l)) {
-                        proxy_statistics[mhaddr].torrent_ping[addr_from].push_back(latency);
-                    }
-                } else if (tx->json_rpc->parameters["type"] == "Proxy") {
-                    auto& mhaddr = tx->json_rpc->parameters["address"];
-                    proxy_statistics[mhaddr].proxy_statistics_count++;
-                    uint64_t rps = 0;
-                    try {
-                        rps = std::stol(tx->json_rpc->parameters["rps"]);
-                    } catch (...) {
-                        rps = 0;
-                    }
+            if (tx->state == TX_STATE_TECH_NODE_STAT && tx->json_rpc && test_nodes.find(addr_from) != test_nodes.end()) {
+                const auto& type = tx->json_rpc->parameters["type"];
+                if (type == "Proxy"
+                    || type == "InfrastructureTorrent"
+                    || type == "Torrent"
+                    || type == "Verifier") {
 
-                    if (rps > MINIMUM_PROXY_RPS && rps < (1000l * 1000l)) {
-                        proxy_statistics[mhaddr].proxy_rps[addr_from].push_back(rps);
+                    const auto& mhaddr = tx->json_rpc->parameters["address"];
+                    node_statistics[type][mhaddr].count++;
+
+                    if (tx->json_rpc->parameters["success"] != "false") {
+                        uint64_t stat_value = 0;
+                        if (type == "Proxy") {
+                            try {
+                                stat_value = std::stol(tx->json_rpc->parameters["rps"]);
+                            } catch (...) {
+                                stat_value = 0;
+                            }
+                        } else {
+                            try {
+                                stat_value = std::stol(tx->json_rpc->parameters["latency"]);
+                            } catch (...) {
+                                stat_value = 1'000'000;
+                            }
+                            stat_value = stat_value < 1'000'000 ? 1'000'000 - stat_value : 0;
+                        }
+                        node_statistics[type][mhaddr].stats[test_nodes.at(addr_from)].first += 1;
+                        node_statistics[type][mhaddr].stats[test_nodes.at(addr_from)].second += stat_value;
                     }
                 } else {
                     auto& mhaddr = tx->json_rpc->parameters["mhaddr"];
-                    proxy_statistics[mhaddr].proxy_statistics_count++;
+                    node_statistics["Proxy"][mhaddr].count++;
 
                     if (tx->json_rpc->parameters["success"] != "false") {
-
                         uint64_t rps = 0;
                         try {
                             rps = std::stol(tx->json_rpc->parameters["rps"]);
                         } catch (...) {
-                            rps = 0;
+                            rps = 1;
                         }
 
                         if (rps > MINIMUM_PROXY_RPS && rps < (1000l * 1000l)) {
-                            proxy_statistics[mhaddr].proxy_rps[addr_from].push_back(rps);
+                            node_statistics["Proxy"][mhaddr].stats[test_nodes.at(addr_from)].first += 1;
+                            node_statistics["Proxy"][mhaddr].stats[test_nodes.at(addr_from)].second += 1'000'000'000 / rps;
                         }
                     }
                 }
@@ -1090,6 +1103,7 @@ bool BlockChain::can_apply_forging_block(Block* block)
     if (common_block) {
         Wallet* state_fee = wallet_map.get_wallet(STATE_FEE_WALLET);
         uint64_t total_forging = 0;
+        uint64_t timestamp = common_block->get_block_timestamp();
 
         std::set<std::string> forging_nodes_add_trust;
 
@@ -1147,10 +1161,10 @@ bool BlockChain::can_apply_forging_block(Block* block)
             }
         }
 
-        if (total_forging <= FORGING_POOL + state_fee->get_value()) {
-            state_fee->initialize((state_fee->get_value() + FORGING_POOL) - total_forging, 0, "");
+        if (total_forging <= FORGING_POOL(timestamp) + state_fee->get_value()) {
+            state_fee->initialize((state_fee->get_value() + FORGING_POOL(timestamp)) - total_forging, 0, "");
         } else {
-            if (total_forging > ((FORGING_POOL * 110) / 100 + state_fee->get_value())) {
+            if (total_forging > ((FORGING_POOL(timestamp) * 110) / 100 + state_fee->get_value())) {
                 DEBUG_COUT("#############################################");
                 DEBUG_COUT("############## POSSIBLE ERROR ###############");
                 DEBUG_COUT("#############################################");
@@ -1158,12 +1172,12 @@ bool BlockChain::can_apply_forging_block(Block* block)
                 DEBUG_COUT("total_forging");
                 DEBUG_COUT(std::to_string(total_forging));
                 DEBUG_COUT("FORGING_POOL");
-                DEBUG_COUT(std::to_string(FORGING_POOL));
+                DEBUG_COUT(std::to_string(FORGING_POOL(timestamp)));
                 DEBUG_COUT("state_fee");
                 DEBUG_COUT(std::to_string(state_fee->get_value()));
                 state_fee->initialize(0, 0, "");
             } else {
-                state_fee->initialize(((FORGING_POOL * 110) / 100 + state_fee->get_value()) - total_forging, 0, "");
+                state_fee->initialize(((FORGING_POOL(timestamp) * 110) / 100 + state_fee->get_value()) - total_forging, 0, "");
             }
         }
 
@@ -1177,7 +1191,14 @@ bool BlockChain::can_apply_forging_block(Block* block)
 
             uint64_t w_state = wallet->get_state();
 
-            if ((w_state & NODE_STATE_FLAG_TORRENT_FORGING) || (w_state & NODE_STATE_FLAG_PROXY_FORGING)) {
+            bool doing_forging = false;
+            for (auto&& [role, mask] : NODE_STATE_FLAG_FORGING) {
+                if ((w_state & mask) == mask) {
+                    doing_forging = true;
+                }
+            }
+
+            if (doing_forging) {
                 if (forging_nodes_add_trust.find(wallet_pair.first) != forging_nodes_add_trust.end()) {
                     wallet->add_trust();
                 } else {
@@ -1197,6 +1218,37 @@ bool BlockChain::can_apply_forging_block(Block* block)
         }
 
         {
+            auto* father_of_wallets = dynamic_cast<CommonWallet*>(wallet_map.get_wallet(MASTER_WALLET_COIN_FORGING));
+            auto* lookup_addreses = new std::deque<std::pair<std::string, uint64_t>>(father_of_wallets->get_delegated_from_list());
+
+            while (true) {
+                std::deque<std::pair<std::string, uint64_t>>* lookup_addreses_prev = wallet_request_addreses.load();
+                if (wallet_request_addreses.compare_exchange_strong(lookup_addreses_prev, lookup_addreses)) {
+                    delete lookup_addreses_prev;
+                    break;
+                }
+            }
+        }
+
+        {
+            auto&& check_caps = [](uint64_t& state, const auto seed_sum, const auto delegated_sum, const std::string& role) {
+                if (state & NODE_STATE_FLAG_PRETEND.at(role)) {
+                    if (delegated_sum >= NODE_SOFT_CAP.at(role)) {
+                        state |= NODE_STATE_FLAG_SOFT_CAP.at(role);
+                    } else {
+                        state &= ~NODE_STATE_FLAG_SOFT_CAP.at(role);
+                    }
+                    if (seed_sum >= NODE_SEED_CAP.at(role)) {
+                        state |= NODE_STATE_FLAG_SEED_CAP.at(role);
+                    } else {
+                        state &= ~NODE_STATE_FLAG_SEED_CAP.at(role);
+                    }
+                } else {
+                    state &= ~NODE_STATE_FLAG_SOFT_CAP.at(role);
+                    state &= ~NODE_STATE_FLAG_SEED_CAP.at(role);
+                }
+            };
+
             auto* father_of_nodes = dynamic_cast<CommonWallet*>(wallet_map.get_wallet(MASTER_WALLET_NODE_FORGING));
             std::set<std::string> nodes;
             for (auto& delegate_pair : father_of_nodes->get_delegated_from_list()) {
@@ -1208,7 +1260,7 @@ bool BlockChain::can_apply_forging_block(Block* block)
                 }
 
                 uint64_t w_state = wallet->get_state();
-                w_state |= NODE_STATE_FLAG_PRETEND;
+                w_state |= NODE_STATE_FLAG_PRETEND_COMMON;
                 wallet->set_state(w_state);
                 nodes.insert(delegate_pair.first);
             }
@@ -1221,32 +1273,24 @@ bool BlockChain::can_apply_forging_block(Block* block)
                 }
 
                 uint64_t w_state = wallet->get_state();
-                if (w_state & NODE_STATE_FLAG_PRETEND) {
+                if (w_state & NODE_STATE_FLAG_PRETEND_COMMON) {
                     if (nodes.find(wallet_pair.first) == nodes.end()) {
-                        w_state &= ~NODE_STATE_FLAG_PRETEND;
+                        w_state &= ~NODE_STATE_FLAG_PRETEND_COMMON;
                     }
                 }
-                uint64_t delegated_sum = wallet->get_delegated_from_sum();
-                if (delegated_sum >= NODE_PROXY_SOFT_CAP) {
-                    w_state |= NODE_STATE_FLAG_PROXY_SOFT_CAP;
-                } else {
-                    w_state &= ~NODE_STATE_FLAG_PROXY_SOFT_CAP;
-                }
-                if (delegated_sum >= NODE_TORRENT_SOFT_CAP) {
-                    w_state |= NODE_STATE_FLAG_TORRENT_SOFT_CAP;
-                } else {
-                    w_state &= ~NODE_STATE_FLAG_TORRENT_SOFT_CAP;
-                }
-                {
-                    w_state &= ~NODE_STATE_FLAG_TORRENT_SEED_CAP;
+
+                if (w_state & NODE_STATE_FLAG_PRETEND_COMMON) {
+                    uint64_t delegated_sum = wallet->get_delegated_from_sum();
+
                     uint64_t seed_sum = 0;
                     for (auto& delegate_pair : wallet->get_delegated_from_list()) {
                         if (delegate_pair.first == wallet_pair.first) {
                             seed_sum += delegate_pair.second;
                         }
                     }
-                    if (seed_sum >= NODE_TORRENT_SEED_CAP) {
-                        w_state |= NODE_STATE_FLAG_TORRENT_SEED_CAP;
+
+                    for (auto&& role : ROLES) {
+                        check_caps(w_state, seed_sum, delegated_sum, role);
                     }
                 }
 
@@ -1254,7 +1298,7 @@ bool BlockChain::can_apply_forging_block(Block* block)
             }
         }
 
-        proxy_statistics.clear();
+        node_statistics.clear();
 
     } else {
         DEBUG_COUT("block wrong type");

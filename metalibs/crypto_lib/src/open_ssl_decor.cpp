@@ -88,7 +88,7 @@ std::vector<unsigned char> EncodeField(const std::vector<unsigned char>& field)
     std::vector<unsigned char> rslt;
 
     uint64_t fs = field.size();
-    if (fs == 1 && field.at(0) >= 0 && (uint8_t)field.at(0) <= 0x7F) {
+    if (fs == 1 && (uint8_t)field.at(0) <= 0x7F) {
         if (field.at(0) == 0) {
             rslt.push_back(0x80);
         } else {

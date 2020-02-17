@@ -4,8 +4,8 @@
 #include <atomic>
 #include <cmath>
 #include <condition_variable>
+#include <deque>
 #include <functional>
-#include <map>
 #include <memory>
 #include <shared_mutex>
 // #include <signal.h>
@@ -66,20 +66,21 @@ public:
     {
         auto* task = new fn_type(std::bind(_fn, _args...));
 
-        FunctionQueue.enqueue(task);
+        functionQueue.enqueue(task);
     }
 
     template <class _FN, class... _ARGS>
     void runSheduled(uint64_t timeout_ms, _FN _fn, _ARGS... _args)
     {
+        uint64_t stop = timeout_ms + static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now()).time_since_epoch().count());
         auto* task = new fn_type(std::bind(_fn, _args...));
 
-        set_timer(timeout_ms, task);
+        scheduledQueue.enqueue({ stop, task });
     }
 
     void runTask(fn_type* task)
     {
-        FunctionQueue.enqueue(task);
+        functionQueue.enqueue(task);
     }
 
 private:
@@ -87,10 +88,13 @@ private:
     const size_t thread_count;
 
     std::atomic<bool> goon = true;
-    moodycamel::ConcurrentQueue<fn_type*> FunctionQueue;
+    moodycamel::ConcurrentQueue<fn_type*> functionQueue;
     std::vector<std::thread> workers;
 
-    void set_timer(uint64_t timeout_ms, fn_type* task);
+    moodycamel::ConcurrentQueue<std::pair<uint64_t, fn_type*>> scheduledQueue;
+    std::deque<std::pair<uint64_t, fn_type*>> scheduled_tasks;
+    uint64_t last_scheduler_check = 0;
+    std::atomic<bool> scheduler_locked = false;
 
     void worker_thread(size_t thread_id)
     {
@@ -98,10 +102,46 @@ private:
             set_affinity(thread_id);
         }
 
-        moodycamel::ConsumerToken function_consumer(FunctionQueue);
+        moodycamel::ConsumerToken function_consumer(functionQueue);
+        std::pair<uint64_t, fn_type*> tasks_got[1000];
 
         while (goon.load()) {
-            if (fn_type * fn; FunctionQueue.try_dequeue(function_consumer, fn)) {
+            uint64_t time_ms = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now()).time_since_epoch().count());
+
+            if (time_ms > last_scheduler_check) {
+                bool should_be_locked = false;
+                bool would_be_locked = true;
+                if (scheduler_locked.compare_exchange_strong(should_be_locked, would_be_locked)) {
+                    last_scheduler_check = time_ms;
+                    std::deque<fn_type*> ready_tasks;
+
+                    {
+                        uint64_t got_;
+                        got_ = scheduledQueue.try_dequeue_bulk(&tasks_got[0], 1000);
+
+                        scheduled_tasks.insert(scheduled_tasks.end(), &tasks_got[0], &tasks_got[0] + got_);
+
+                        std::sort(scheduled_tasks.begin(), scheduled_tasks.end(), [](std::pair<uint64_t, fn_type*>& lh, std::pair<uint64_t, fn_type*>& rh) {
+                            return lh.first < rh.first;
+                        });
+
+                        for (auto it = scheduled_tasks.begin(); it != scheduled_tasks.end();) {
+                            if (time_ms < it->first) {
+                                break;
+                            }
+
+                            ready_tasks.push_back(it->second);
+                            scheduled_tasks.pop_front();
+                            it = scheduled_tasks.begin();
+                        }
+                    }
+
+                    functionQueue.enqueue_bulk(ready_tasks.begin(), ready_tasks.size());
+                    scheduler_locked.store(false);
+                }
+            }
+
+            if (fn_type * fn; functionQueue.try_dequeue(function_consumer, fn)) {
                 (*fn)();
                 delete fn;
                 continue;
@@ -120,10 +160,6 @@ private:
 
         pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
     }
-};
-
-class EventPool {
-    int epoll_io_fd = 0;
 };
 
 #endif /* ThreadPool_h */
