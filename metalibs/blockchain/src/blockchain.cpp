@@ -75,6 +75,7 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
         std::map<std::string, uint64_t> delegates;
         //          ROLE                   GEO                  NODE     DELEGATED
         std::map<std::string, std::map<std::string, std::map<std::string, uint64_t>>> type_geo_node_delegates;
+        std::set<std::string> revard_nodes;
 
         {
             std::map<std::string, std::string> msgs;
@@ -145,7 +146,11 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
                             }
 
                             uint64_t min_for_reward = node_stat.count * 95 / 100;
-                            if (success_size && success_size > min_for_reward && average >= MINIMUM_AVERAGE_PROXY_RPS) {
+                            if (success_size
+                                && success_size > min_for_reward
+                                && average >= MINIMUM_AVERAGE_PROXY_RPS
+                                && revard_nodes.insert(addr).second) {
+                                    
                                 DEBUG_COUT(addr + "\t" + std::to_string(average) + "\t" + geo + "\t" + type + "\t" + int2bin(w_state) + "\t" + int2bin(state_mask));
 
                                 uint64_t node_total_delegate = 0;
