@@ -4,6 +4,7 @@
 #include <vector>
 
 #include <meta_log.hpp>
+#include <open_ssl_decor.h>
 
 #include "core_controller.hpp"
 #include "statics.hpp"
@@ -41,14 +42,27 @@ size_t writefunc(void* ptr, size_t size, size_t nmemb, std::string* p_resp)
     return size * nmemb;
 }
 
-bool CoreController::CoreConnection::curl_post(const std::string& request_method, const std::string& reques_string, std::string& response)
+bool CoreController::CoreConnection::curl_post(
+    const std::string& request_method,
+    const std::string& reques_string,
+    const std::string& sign,
+    const std::string& bubk,
+    std::string& response)
 {
     if (!curl) {
         curl = curl_easy_init();
     }
 
+    struct curl_slist* chunk = NULL;
+    std::string sign_header = "Sign: " + sign;
+    std::string pubk_header = "PublicKey: " + bubk;
+    chunk = curl_slist_append(chunk, sign_header.c_str());
+    chunk = curl_slist_append(chunk, pubk_header.c_str());
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+
     std::string full_url = "http://" + host_port.first + "/" + request_method;
     curl_easy_setopt(curl, CURLOPT_URL, full_url.c_str());
+
     curl_easy_setopt(curl, CURLOPT_PORT, host_port.second);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, reques_string.size());
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, reques_string.data());
@@ -56,6 +70,8 @@ bool CoreController::CoreConnection::curl_post(const std::string& request_method
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
     int ret = curl_easy_perform(curl);
+
+    curl_slist_free_all(chunk);
 
     if (!ret) {
         return true;
@@ -73,7 +89,11 @@ CoreController::CoreConnection::CoreConnection(std::pair<std::string, int> _host
 {
 }
 
-std::string CoreController::CoreConnection::send_with_return(const std::string& request_method, const std::string& reques_string)
+std::string CoreController::CoreConnection::send_with_return(
+    const std::string& request_method,
+    const std::string& reques_string,
+    const std::string& sign,
+    const std::string& bubk)
 {
     std::string response;
 
@@ -82,9 +102,8 @@ std::string CoreController::CoreConnection::send_with_return(const std::string& 
     while (status <= 0) {
         counter++;
 
-        //        status = event.post_keep_alive(host_port.first, host_port.second, host_port.first, request_method, reques_string, response, 1000);
         response.clear();
-        bool success = curl_post(request_method, reques_string, response);
+        bool success = curl_post(request_method, reques_string, sign, bubk, response);
 
         if (success) {
             break;
@@ -110,7 +129,7 @@ void CoreController::CoreConnection::start_loop(moodycamel::ConcurrentQueue<Core
 
                 while (true) {
                     response.clear();
-                    bool success = curl_post(msg->url, msg->msg, response);
+                    bool success = curl_post(msg->url, msg->msg, msg->sign, msg->pubk, response);
                     if (success) {
                         if (msg->get_resp) {
                             msg->resp->clear();
@@ -144,15 +163,31 @@ void CoreController::CoreConnection::start_loop(moodycamel::ConcurrentQueue<Core
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
         }
-    }).detach();
+    })
+        .detach();
 }
 
-CoreController::CoreController(const std::set<std::pair<std::string, int>>& core_list, std::pair<std::string, int> host_port)
+CoreController::CoreController(
+    const std::set<std::pair<std::string, int>>& core_list,
+    std::pair<std::string, int> host_port,
+    const std::string& priv_key_line)
     : my_host_port(std::move(host_port))
 {
+    {
+        bin_priv = hex2bin(priv_key_line);
+        if (!generate_public_key(bin_pubk, bin_priv)) {
+            DEBUG_COUT("ERROR INVALID PRIVATE KEY");
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+            exit(1);
+        }
+
+        str_pubk = "0x" + bin2hex(bin_pubk);
+    }
+
     for (const auto& host : core_list) {
         known_core_list.emplace(host, host);
     }
+
     sync_core_lists();
 }
 
@@ -162,7 +197,7 @@ void CoreController::sync_core_lists()
     while (got_new) {
         auto resp = send_with_return(RPC_GET_CORE_LIST, "");
 
-        core_lock.lock();
+        std::lock_guard lock(core_lock);
         for (const auto& resp_pair : resp) {
             auto hosts = parse_core_list(resp_pair.second);
 
@@ -188,8 +223,9 @@ void CoreController::sync_core_lists()
 
             if (!connected) {
                 std::string my_addr = my_host_port.first + ":" + std::to_string(my_host_port.second);
+                auto&& [sign, pubk] = sign_string(my_addr);
 
-                std::string addr = host.second.send_with_return(RPC_GET_CORE_ADDR, my_addr);
+                std::string addr = host.second.send_with_return(RPC_GET_CORE_ADDR, my_addr, sign, pubk);
 
                 DEBUG_COUT("Got address " + addr + " from " + host.first.first + ":" + std::to_string(host.first.second));
 
@@ -203,7 +239,6 @@ void CoreController::sync_core_lists()
                 }
             }
         }
-        core_lock.unlock();
     }
 }
 
@@ -232,19 +267,23 @@ std::string CoreController::get_core_list()
 
 void CoreController::send_no_return(const std::string& req, const std::string& data)
 {
+    auto&& [sign, pubk] = sign_string(data);
+
     std::lock_guard lock(core_lock);
 
     std::set<std::string> addresses;
 
     for (const auto& core_pair : cores) {
         if (addresses.insert(core_pair.first).second) {
-            message_queue[core_pair.first].enqueue(new Message{ req, data, 0, nullptr, nullptr });
+            message_queue[core_pair.first].enqueue(new Message{ req, data, sign, pubk, 0, nullptr, nullptr });
         }
     }
 }
 
 std::map<std::string, std::string> CoreController::send_with_return(const std::string& req, const std::string& data)
 {
+    auto&& [sign, pubk] = sign_string(data);
+
     core_lock.lock();
 
     std::map<std::string, std::string> resp_strings;
@@ -258,7 +297,7 @@ std::map<std::string, std::string> CoreController::send_with_return(const std::s
     for (const auto& core_pair : cores) {
         if (addresses.insert(core_pair.first).second) {
             responses[core_pair.first].first = false;
-            message_queue[core_pair.first].enqueue(new Message{ req, data, time_milli, &(responses[core_pair.first].first), &(responses[core_pair.first].second) });
+            message_queue[core_pair.first].enqueue(new Message{ req, data, sign, pubk, time_milli, &(responses[core_pair.first].first), &(responses[core_pair.first].second) });
         }
     }
 
@@ -280,11 +319,13 @@ void CoreController::send_no_return_to_core(
     const std::string& req,
     const std::string& data)
 {
+    auto&& [sign, pubk] = sign_string(data);
+
     std::lock_guard lock(core_lock);
 
     for (const auto& core_pair : cores) {
         if (core_pair.first == addr) {
-            message_queue[core_pair.first].enqueue(new Message{ req, data, 0, nullptr, nullptr });
+            message_queue[core_pair.first].enqueue(new Message{ req, data, sign, pubk, 0, nullptr, nullptr });
             return;
         }
     }
@@ -295,6 +336,8 @@ std::string CoreController::send_with_return_to_core(
     const std::string& req,
     const std::string& data)
 {
+    auto&& [sign, pubk] = sign_string(data);
+
     core_lock.lock();
 
     uint64_t time_milli = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now()).time_since_epoch().count());
@@ -309,7 +352,7 @@ std::string CoreController::send_with_return_to_core(
 
     for (const auto& core_pair : cores) {
         if (core_pair.first == addr) {
-            message_queue[core_pair.first].enqueue(new Message{ req, data, time_milli, &got_resp, &resp_str });
+            message_queue[core_pair.first].enqueue(new Message{ req, data, sign, pubk, time_milli, &got_resp, &resp_str });
             break;
         }
     }
@@ -321,4 +364,11 @@ std::string CoreController::send_with_return_to_core(
     }
 
     return resp_str;
+}
+
+std::pair<std::string, std::string> CoreController::sign_string(const std::string& data)
+{
+    std::vector<char> bin_sign;
+    sign_data(data, bin_sign, bin_priv);
+    return { "0x" + bin2hex(bin_sign), str_pubk };
 }

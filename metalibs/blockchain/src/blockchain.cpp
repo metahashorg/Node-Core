@@ -150,7 +150,7 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
                                 && success_size > min_for_reward
                                 && average >= MINIMUM_AVERAGE_PROXY_RPS
                                 && revard_nodes.insert(addr).second) {
-                                    
+
                                 DEBUG_COUT(addr + "\t" + std::to_string(average) + "\t" + geo + "\t" + type + "\t" + int2bin(w_state) + "\t" + int2bin(state_mask));
 
                                 uint64_t node_total_delegate = 0;
@@ -757,6 +757,25 @@ std::atomic<std::map<std::string, std::pair<uint, uint>>*>& BlockChain::get_wall
 std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& BlockChain::get_wallet_request_addreses()
 {
     return wallet_request_addreses;
+}
+
+uint8_t BlockChain::check_addr(const std::string& addr)
+{
+    auto* wallet = dynamic_cast<CommonWallet*>(wallet_map.get_wallet(addr));
+    if (wallet) {
+        const auto w_state = wallet->get_state();
+
+        if ((w_state & NODE_STATE_FLAG_VERIFIER_FORGING) == NODE_STATE_FLAG_VERIFIER_FORGING) {
+            return 50;
+        }
+        if ((w_state & NODE_STATE_FLAG_CORE_FORGING) == NODE_STATE_FLAG_CORE_FORGING) {
+            if (addr == "0x00a88a888d16a23991e73b4081b745eec0f56cdc7063baa360") {
+                return 150;
+            }
+            return 100;
+        }
+    }
+    return 0;
 }
 
 Block* BlockChain::make_block(uint64_t b_type, uint64_t b_time, sha256_2 prev_b_hash, std::vector<char>& tx_buff)

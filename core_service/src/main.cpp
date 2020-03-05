@@ -73,19 +73,19 @@ std::string getMyIp()
 void SIGPIPE_handler(int /*s*/)
 {
     DEBUG_COUT("Caught SIGPIPE");
-};
+}
 
 [[noreturn]] void SIGSEGV_handler(int /*s*/) {
     DEBUG_COUT("Caught SIGSEGV");
     std::this_thread::sleep_for(std::chrono::seconds(2));
     exit(1);
-};
+}
 
 [[noreturn]] void SIGTERM_handler(int /*s*/) {
     DEBUG_COUT("Caught SIGTERM");
     std::this_thread::sleep_for(std::chrono::seconds(2));
     exit(0);
-};
+}
 
 [[noreturn]] void print_config_file_params_and_exit() {
     static const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COMMIT_HASH);
@@ -102,7 +102,7 @@ void SIGPIPE_handler(int /*s*/)
     DEBUG_COUT("Caught SIGTERM");
     std::this_thread::sleep_for(std::chrono::seconds(2));
     exit(1);
-};
+}
 
 void parse_settings(
     const std::string& file_name,
@@ -158,14 +158,12 @@ int main(int argc, char** argv)
     std::thread(libevent, std::ref(blockChainController.get_wallet_statistics()), std::ref(blockChainController.get_wallet_request_addreses()), "wsstata.metahash.io", 80, "net-test").detach();
     std::thread(sendStat, std::ref(network), std::ref(host), tx_port, std::ref(blockChainController)).detach();
 
-    BLOCK_SERVER BS(tx_port, [&blockChainController](const std::string& req_post, const std::string& req_url) {
-        std::string_view pack_sw(req_post);
-
-        std::string path = req_url;
-        path.erase(std::remove(path.begin(), path.end(), '/'), path.end());
-        std::string_view url_sw(path);
-
-        if (path == "getinfo") {
+    BLOCK_SERVER BS(tx_port, [&blockChainController](
+        const std::string_view req_post, 
+        const std::string_view req_url, 
+        const std::string_view req_sign,
+        const std::string_view req_pubk) {
+        if (req_url == "getinfo") {
             static const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COMMIT_HASH);
             rapidjson::StringBuffer s;
             rapidjson::Writer<rapidjson::StringBuffer> writer(s);
@@ -185,7 +183,7 @@ int main(int argc, char** argv)
             return std::string(s.GetString());
         } else {
             //        DEBUG_COUT(url_sw);
-            return blockChainController.add_pack_to_queue(pack_sw, url_sw);
+            return blockChainController.add_pack_to_queue(req_post, req_url, req_sign, req_pubk);
         }
     });
     BS.start();
@@ -222,7 +220,7 @@ int main(int argc, char** argv)
     // });
 }
 
-__attribute__((__noreturn__)) void sendStat(const std::string& network, std::string& host, int tx_port, BlockChainController& BlckChnCtrl)
+__attribute__((__noreturn__)) void sendStat(const std::string& network, std::string& , int , BlockChainController& BlckChnCtrl)
 {
     CurlFetch CF("172.104.236.166", 5797);
     //    const std::string host_name = host + "_" + std::to_string(tx_port);
