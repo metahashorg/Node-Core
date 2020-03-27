@@ -40,7 +40,7 @@ const uint64_t MINIMUM_COIN_FORGING_N = 512 MHC;
 
 const uint64_t DECADE_POOL = 4'600'000'000 MHC;
 //            start ts    pool
-const std::map<uint64_t, uint64_t> FORGING_POOL_PER_YEAR{
+const std::map<uint64_t, uint64_t> FORGING_POOL_PER_YEAR {
     /*2019*/ { 1550000000, 1940822 MHC },
     /*2020*/ { 1581900000, (DECADE_POOL * 138 / 1000) / 366 },
     /*2021*/ { 1613200000, (DECADE_POOL * 124 / 1000) / 365 },
@@ -51,6 +51,7 @@ const std::map<uint64_t, uint64_t> FORGING_POOL_PER_YEAR{
     /*2026*/ { 1771000000, (DECADE_POOL * 73 / 1000) / 365 },
     /*2027*/ { 1802500000, (DECADE_POOL * 66 / 1000) / 365 },
     /*2028*/ { 1834090000, (DECADE_POOL * 59 / 1000) / 366 },
+    /*2029+*/ { 1834090000, 125000 MHC }
 };
 
 // COMISSIONS FOR TRANSACTIONS
@@ -112,7 +113,7 @@ static const std::string RPC_GET_CORE_LIST = "get_core_list";
 static const std::string RPC_GET_CORE_ADDR = "get_core_addr";
 
 /*                           NODE ROLE CONSTANTS                           */
-static const std::set<std::string> ROLES{
+static const std::set<std::string> ROLES {
     "Proxy",
     "InfrastructureTorrent",
     "Torrent",
@@ -170,49 +171,49 @@ const uint64_t NODE_STATE_FLAG_TORRENT_FORGING = 0b0000'0000'0000'0000'0111'0000
 const uint64_t NODE_STATE_FLAG_VERIFIER_FORGING = 0b0000'0000'0000'0111'0000'0000'0000'0001;
 const uint64_t NODE_STATE_FLAG_CORE_FORGING = 0b0000'0000'0000'0111'0000'0000'0000'0000'0001;
 
-static const std::map<std::string, uint64_t> NODE_SEED_CAP{
+static const std::map<std::string, uint64_t> NODE_SEED_CAP {
     { "Proxy", NODE_PROXY_SEED_CAP },
     { "InfrastructureTorrent", NODE_INFRASTRUCTURETORRENT_SEED_CAP },
     { "Torrent", NODE_TORRENT_SEED_CAP },
     { "Verifier", NODE_VERIFIER_SEED_CAP },
     { "Core", NODE_CORE_SEED_CAP }
 };
-static const std::map<std::string, uint64_t> NODE_SOFT_CAP{
+static const std::map<std::string, uint64_t> NODE_SOFT_CAP {
     { "Proxy", NODE_PROXY_SOFT_CAP },
     { "InfrastructureTorrent", NODE_INFRASTRUCTURETORRENT_SOFT_CAP },
     { "Torrent", NODE_TORRENT_SOFT_CAP },
     { "Verifier", NODE_VERIFIER_SOFT_CAP },
     { "Core", NODE_CORE_SOFT_CAP }
 };
-static const std::map<std::string, uint64_t> NODE_HARD_CAP{
+static const std::map<std::string, uint64_t> NODE_HARD_CAP {
     { "Proxy", NODE_PROXY_HARD_CAP },
     { "InfrastructureTorrent", NODE_INFRASTRUCTURETORRENT_HARD_CAP },
     { "Torrent", NODE_TORRENT_HARD_CAP },
     { "Verifier", NODE_VERIFIER_HARD_CAP },
     { "Core", NODE_CORE_HARD_CAP }
 };
-static const std::map<std::string, uint64_t> NODE_STATE_FLAG_PRETEND{
+static const std::map<std::string, uint64_t> NODE_STATE_FLAG_PRETEND {
     { "Proxy", NODE_STATE_FLAG_PROXY_PRETEND },
     { "InfrastructureTorrent", NODE_STATE_FLAG_INFRASTRUCTURETORRENT_PRETEND },
     { "Torrent", NODE_STATE_FLAG_TORRENT_PRETEND },
     { "Verifier", NODE_STATE_FLAG_VERIFIER_PRETEND },
     { "Core", NODE_STATE_FLAG_CORE_PRETEND }
 };
-static const std::map<std::string, uint64_t> NODE_STATE_FLAG_SEED_CAP{
+static const std::map<std::string, uint64_t> NODE_STATE_FLAG_SEED_CAP {
     { "Proxy", NODE_STATE_FLAG_PROXY_SEED_CAP },
     { "InfrastructureTorrent", NODE_STATE_FLAG_INFRASTRUCTURETORRENT_SEED_CAP },
     { "Torrent", NODE_STATE_FLAG_TORRENT_SEED_CAP },
     { "Verifier", NODE_STATE_FLAG_VERIFIER_SEED_CAP },
     { "Core", NODE_STATE_FLAG_CORE_SEED_CAP }
 };
-static const std::map<std::string, uint64_t> NODE_STATE_FLAG_SOFT_CAP{
+static const std::map<std::string, uint64_t> NODE_STATE_FLAG_SOFT_CAP {
     { "Proxy", NODE_STATE_FLAG_PROXY_SOFT_CAP },
     { "InfrastructureTorrent", NODE_STATE_FLAG_INFRASTRUCTURETORRENT_SOFT_CAP },
     { "Torrent", NODE_STATE_FLAG_TORRENT_SOFT_CAP },
     { "Verifier", NODE_STATE_FLAG_VERIFIER_SOFT_CAP },
     { "Core", NODE_STATE_FLAG_CORE_SOFT_CAP }
 };
-static const std::map<std::string, uint64_t> NODE_STATE_FLAG_FORGING{
+static const std::map<std::string, uint64_t> NODE_STATE_FLAG_FORGING {
     { "Proxy", NODE_STATE_FLAG_PROXY_FORGING },
     { "InfrastructureTorrent", NODE_STATE_FLAG_INFRASTRUCTURETORRENT_FORGING },
     { "Torrent", NODE_STATE_FLAG_TORRENT_FORGING },
