@@ -559,8 +559,8 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
     }
 
     {
-        for (auto&& wallet_f : FOUNDER_WALLETS) {
-            std::vector<char> state_tx = make_forging_tx(wallet_f, FORGING_FOUNDER_REWARD, {}, TX_STATE_FORGING_FOUNDER);
+        for (auto&& wallet_f : TEAM_WALLETS) {
+            std::vector<char> state_tx = make_forging_tx(wallet_f, FORGING_TEAM_REWARD / TEAM_WALLETS.size(), {}, TX_STATE_FORGING_TEAM);
 
             append_varint(txs_buff, state_tx.size());
             txs_buff.insert(txs_buff.end(), state_tx.begin(), state_tx.end());
@@ -1141,6 +1141,9 @@ bool BlockChain::can_apply_forging_block(Block* block)
             case TX_STATE_FORGING_W: {
                 wallet_to->add(tx->value);
                 total_forging += tx->value;
+            } break;
+            case TX_STATE_FORGING_TEAM: {
+                wallet_to->add(tx->value);
             } break;
             case TX_STATE_FORGING_DAPP: {
                 if (tx->data.size() != 25) {
