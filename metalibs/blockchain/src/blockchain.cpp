@@ -150,7 +150,7 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
                                 && success_size > min_for_reward
                                 && average >= MINIMUM_AVERAGE_PROXY_RPS
                                 && revard_nodes.insert(addr).second) {
-                                    
+
                                 DEBUG_COUT(addr + "\t" + std::to_string(average) + "\t" + geo + "\t" + type + "\t" + int2bin(w_state) + "\t" + int2bin(state_mask));
 
                                 uint64_t node_total_delegate = 0;
@@ -190,7 +190,7 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
 
         if (!type_geo_node_delegates.empty()) {
             std::set<std::string> reward_nodes;
-            static const std::vector<std::string> types_by_value{
+            static const std::vector<std::string> types_by_value {
                 "Proxy",
                 "InfrastructureTorrent",
                 "Torrent",
@@ -551,7 +551,19 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
             std::vector<unsigned char> bin_addr_from = hex2bin(wallet_pair.first);
             for (const auto& host_pair : reward_map) {
                 std::vector<char> state_tx = make_forging_tx(host_pair.first, host_pair.second, bin_addr_from, TX_STATE_FORGING_DAPP);
+
+                append_varint(txs_buff, state_tx.size());
+                txs_buff.insert(txs_buff.end(), state_tx.begin(), state_tx.end());
             }
+        }
+    }
+
+    {
+        for (auto&& wallet_f : FOUNDER_WALLETS) {
+            std::vector<char> state_tx = make_forging_tx(wallet_f, FORGING_FOUNDER_REWARD, {}, TX_STATE_FORGING_FOUNDER);
+
+            append_varint(txs_buff, state_tx.size());
+            txs_buff.insert(txs_buff.end(), state_tx.begin(), state_tx.end());
         }
     }
 
