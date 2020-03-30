@@ -68,6 +68,7 @@ const std::map<uint64_t, uint64_t> FORGING_POOL_PER_YEAR {
     /*2029+*/ { 1865800000, 125000 MHC },
     /*2039+*/ { 2181300000, 0 MHC }
 };
+
 const uint64_t FORGING_TEAM_REWARD = 1 MHC;
 
 // COMISSIONS FOR TRANSACTIONS

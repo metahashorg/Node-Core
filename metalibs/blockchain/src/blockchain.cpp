@@ -551,9 +551,6 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
             std::vector<unsigned char> bin_addr_from = hex2bin(wallet_pair.first);
             for (const auto& host_pair : reward_map) {
                 std::vector<char> state_tx = make_forging_tx(host_pair.first, host_pair.second, bin_addr_from, TX_STATE_FORGING_DAPP);
-
-                append_varint(txs_buff, state_tx.size());
-                txs_buff.insert(txs_buff.end(), state_tx.begin(), state_tx.end());
             }
         }
     }
