@@ -76,6 +76,10 @@ public:
 class CommonWallet : public Wallet {
 private:
     struct WalletAdditions {
+        bool founder = false;
+        uint64_t used_limit = 0;
+        uint64_t limit = 0;
+
         uint64_t delegated_from_sum = 0; // сумма средств делегированных этому кошельку
         uint64_t delegated_to_sum = 0; // сумма средств делегированных этим кошельком
 
@@ -117,6 +121,7 @@ public:
     void set_trust(uint64_t);
     void add_trust();
     void sub_trust();
+    void add_founder_limit();
 
     std::deque<std::pair<std::string, uint64_t>> get_delegate_to_list();
     std::deque<std::pair<std::string, uint64_t>> get_delegated_from_list();

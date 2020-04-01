@@ -86,6 +86,16 @@ void CommonWallet::sub_trust()
     changed_wallets.insert(this);
 }
 
+void CommonWallet::add_founder_limit()
+{
+    if (!addition) {
+        addition = new WalletAdditions();
+    }
+    addition->founder = true;
+    addition->limit += FORGING_DAILY_LIMIT_UP;
+    changed_wallets.insert(this);
+}
+
 std::deque<std::pair<std::string, uint64_t>> CommonWallet::get_delegate_to_list()
 {
     std::deque<std::pair<std::string, uint64_t>> return_list;
@@ -312,6 +322,9 @@ void CommonWallet::apply_delegates()
         addition->delegated_from_daly_snapshot = addition->delegated_from;
         addition->delegate_to_daly_snapshot = addition->delegate_to;
 
+        if (addition->founder) {
+            return;
+        }
         if (addition->state) {
             return;
         }
@@ -358,6 +371,15 @@ std::tuple<uint64_t, uint64_t, std::string> CommonWallet::serialize()
 
         writer.StartObject();
 
+        if (addition->founder) {
+            has_json = true;
+            writer.String("used_limit");
+            writer.Uint64(addition->used_limit);
+
+            writer.String("limit");
+            writer.Uint64(addition->limit);
+        }
+
         if (addition->state || addition->trust != 2) {
             has_json = true;
             writer.String("state");
@@ -367,31 +389,35 @@ std::tuple<uint64_t, uint64_t, std::string> CommonWallet::serialize()
             writer.Uint64(get_trust() * 5);
         }
 
-        writer.String("delegate_to");
-        writer.StartArray();
-        for (auto& delegate_pair : addition->delegate_to_daly_snapshot) {
+        if (addition->delegate_to_daly_snapshot.size()) {
             has_json = true;
-            writer.StartObject();
-            writer.String("a");
-            writer.String(delegate_pair.first.c_str());
-            writer.String("v");
-            writer.Uint64(delegate_pair.second);
-            writer.EndObject();
+            writer.String("delegate_to");
+            writer.StartArray();
+            for (auto&& [a, v] : addition->delegate_to_daly_snapshot) {
+                writer.StartObject();
+                writer.String("a");
+                writer.String(a.c_str());
+                writer.String("v");
+                writer.Uint64(v);
+                writer.EndObject();
+            }
+            writer.EndArray();
         }
-        writer.EndArray();
 
-        writer.String("delegated_from");
-        writer.StartArray();
-        for (auto& delegate_pair : addition->delegated_from_daly_snapshot) {
+        if (addition->delegated_from_daly_snapshot.size()) {
             has_json = true;
-            writer.StartObject();
-            writer.String("a");
-            writer.String(delegate_pair.first.c_str());
-            writer.String("v");
-            writer.Uint64(delegate_pair.second);
-            writer.EndObject();
+            writer.String("delegated_from");
+            writer.StartArray();
+            for (auto&& [a, v] : addition->delegated_from_daly_snapshot) {
+                writer.StartObject();
+                writer.String("a");
+                writer.String(a.c_str());
+                writer.String("v");
+                writer.Uint64(v);
+                writer.EndObject();
+            }
+            writer.EndArray();
         }
-        writer.EndArray();
 
         writer.EndObject();
 
@@ -411,6 +437,10 @@ bool CommonWallet::initialize(uint64_t value, uint64_t nonce, const std::string&
     uint64_t state = 0;
     uint64_t trust = 2;
 
+    bool founder = false;
+    uint64_t used_limit = 0;
+    uint64_t limit = 0;
+
     std::deque<std::pair<std::string, uint64_t>> delegated_from;
     std::deque<std::pair<std::string, uint64_t>> delegate_to;
 
@@ -421,14 +451,26 @@ bool CommonWallet::initialize(uint64_t value, uint64_t nonce, const std::string&
     if (!json.empty() && json.front() == '{' && json.back() == '}') {
         rapidjson::Document rpc_json;
         if (!rpc_json.Parse(json.c_str()).HasParseError()) {
-            if (rpc_json.HasMember("state") && rpc_json["state"].GetUint64()) {
+            if (rpc_json.HasMember("state") && rpc_json["state"].IsUint64()) {
                 got_additions = true;
                 state = rpc_json["state"].GetUint64();
             }
 
-            if (rpc_json.HasMember("trust") && rpc_json["trust"].GetUint64()) {
+            if (rpc_json.HasMember("trust") && rpc_json["trust"].IsUint64()) {
                 got_additions = true;
                 trust = rpc_json["trust"].GetUint64() / 5;
+            }
+
+            if (rpc_json.HasMember("used_limit") && rpc_json["used_limit"].IsUint64()) {
+                got_additions = true;
+                founder = true;
+                used_limit = rpc_json["used_limit"].GetUint64();
+            }
+
+            if (rpc_json.HasMember("limit") && rpc_json["limit"].IsUint64()) {
+                got_additions = true;
+                founder = true;
+                limit = rpc_json["limit"].GetUint64();
             }
 
             if (rpc_json.HasMember("delegate_list") && rpc_json["delegate_list"].IsArray()) {
@@ -496,6 +538,10 @@ bool CommonWallet::initialize(uint64_t value, uint64_t nonce, const std::string&
         delete addition;
         addition = new WalletAdditions;
 
+        addition->founder = founder;
+        addition->used_limit = used_limit;
+        addition->limit = limit;
+
         addition->state = state;
         addition->trust = trust;
 
@@ -522,7 +568,18 @@ uint64_t CommonWallet::sub(Wallet* other, TX const* tx, uint64_t real_fee)
         return TX_REJECT_INSUFFICIENT_FUNDS_EXT;
     }
 
-    return Wallet::sub(other, tx, real_fee);
+    if (addition->founder && addition->used_limit + total_sub > addition->limit) {
+        DEBUG_COUT("founder limits");
+        return TX_REJECT_FOUNDER_LIMIT;
+    }
+
+    uint64_t sub_result = Wallet::sub(other, tx, real_fee);
+
+    if (addition->founder && sub_result == 0) {
+        addition->used_limit += total_sub;
+    }
+
+    return sub_result;
 }
 
 bool CommonWallet::try_apply_method(Wallet* other, TX const* tx)

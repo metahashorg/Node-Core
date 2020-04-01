@@ -305,7 +305,7 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
                         geo_total[node_role][geo_name] -= forging_node_reward_geo;
                         forging_node_total -= forging_node_reward;
 
-                        std::vector<char> state_tx = make_forging_tx(node_name, forging_node_reward + forging_node_reward_geo, {}, TX_STATE_FORGING_N);
+                        auto&& state_tx = make_forging_tx(node_name, forging_node_reward + forging_node_reward_geo, {}, TX_STATE_FORGING_N);
 
                         if (!state_tx.empty()) {
                             append_varint(txs_buff, state_tx.size());
@@ -335,7 +335,7 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
 
                 forging_coin_total -= forging_coin;
 
-                std::vector<char> state_tx = make_forging_tx(coin_addres, forging_coin, {}, TX_STATE_FORGING_C);
+                auto&& state_tx = make_forging_tx(coin_addres, forging_coin, {}, TX_STATE_FORGING_C);
 
                 if (!state_tx.empty()) {
                     append_varint(txs_buff, state_tx.size());
@@ -416,7 +416,7 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
 
             uint64_t reward_passive_per_share = FORGING_PASSIVE_REWARD / forging_shares_total;
             for (const auto& addr_pair : pasive_forging) {
-                std::vector<char> state_tx = make_forging_tx(addr_pair.first, addr_pair.second * reward_passive_per_share, {}, TX_STATE_FORGING_W);
+                auto&& state_tx = make_forging_tx(addr_pair.first, addr_pair.second * reward_passive_per_share, {}, TX_STATE_FORGING_W);
                 append_varint(txs_buff, state_tx.size());
                 txs_buff.insert(txs_buff.end(), state_tx.begin(), state_tx.end());
             }
@@ -492,43 +492,43 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
 
             uint64_t reward_bank_per_one = reward_bank / active_forging.size();
             for (uint i = 0; i < 1 && i < active_forging.size(); i++) {
-                std::vector<char> state_tx = make_forging_tx(active_forging[i], FORGING_RANDOM_REWARD_1 + reward_bank_per_one, {}, TX_STATE_FORGING_R);
+                auto&& state_tx = make_forging_tx(active_forging[i], FORGING_RANDOM_REWARD_1 + reward_bank_per_one, {}, TX_STATE_FORGING_R);
 
                 append_varint(txs_buff, state_tx.size());
                 txs_buff.insert(txs_buff.end(), state_tx.begin(), state_tx.end());
             }
             for (uint i = 1; i < 2 && i < active_forging.size(); i++) {
-                std::vector<char> state_tx = make_forging_tx(active_forging[i], FORGING_RANDOM_REWARD_2 + reward_bank_per_one, {}, TX_STATE_FORGING_R);
+                auto&& state_tx = make_forging_tx(active_forging[i], FORGING_RANDOM_REWARD_2 + reward_bank_per_one, {}, TX_STATE_FORGING_R);
 
                 append_varint(txs_buff, state_tx.size());
                 txs_buff.insert(txs_buff.end(), state_tx.begin(), state_tx.end());
             }
             for (uint i = 2; i < 3 && i < active_forging.size(); i++) {
-                std::vector<char> state_tx = make_forging_tx(active_forging[i], FORGING_RANDOM_REWARD_3 + reward_bank_per_one, {}, TX_STATE_FORGING_R);
+                auto&& state_tx = make_forging_tx(active_forging[i], FORGING_RANDOM_REWARD_3 + reward_bank_per_one, {}, TX_STATE_FORGING_R);
 
                 append_varint(txs_buff, state_tx.size());
                 txs_buff.insert(txs_buff.end(), state_tx.begin(), state_tx.end());
             }
             for (uint i = 3; i < 4 && i < active_forging.size(); i++) {
-                std::vector<char> state_tx = make_forging_tx(active_forging[i], FORGING_RANDOM_REWARD_4 + reward_bank_per_one, {}, TX_STATE_FORGING_R);
+                auto&& state_tx = make_forging_tx(active_forging[i], FORGING_RANDOM_REWARD_4 + reward_bank_per_one, {}, TX_STATE_FORGING_R);
 
                 append_varint(txs_buff, state_tx.size());
                 txs_buff.insert(txs_buff.end(), state_tx.begin(), state_tx.end());
             }
             for (uint i = 4; i < 5 && i < active_forging.size(); i++) {
-                std::vector<char> state_tx = make_forging_tx(active_forging[i], FORGING_RANDOM_REWARD_5 + reward_bank_per_one, {}, TX_STATE_FORGING_R);
+                auto&& state_tx = make_forging_tx(active_forging[i], FORGING_RANDOM_REWARD_5 + reward_bank_per_one, {}, TX_STATE_FORGING_R);
 
                 append_varint(txs_buff, state_tx.size());
                 txs_buff.insert(txs_buff.end(), state_tx.begin(), state_tx.end());
             }
             for (uint i = 5; i < 100 && i < active_forging.size(); i++) {
-                std::vector<char> state_tx = make_forging_tx(active_forging[i], FORGING_RANDOM_REWARD_6_100 + reward_bank_per_one, {}, TX_STATE_FORGING_R);
+                auto&& state_tx = make_forging_tx(active_forging[i], FORGING_RANDOM_REWARD_6_100 + reward_bank_per_one, {}, TX_STATE_FORGING_R);
 
                 append_varint(txs_buff, state_tx.size());
                 txs_buff.insert(txs_buff.end(), state_tx.begin(), state_tx.end());
             }
             for (uint i = 100; i < 1000 && i < active_forging.size(); i++) {
-                std::vector<char> state_tx = make_forging_tx(active_forging[i], FORGING_RANDOM_REWARD_101_1000 + reward_bank_per_one, {}, TX_STATE_FORGING_R);
+                auto&& state_tx = make_forging_tx(active_forging[i], FORGING_RANDOM_REWARD_101_1000 + reward_bank_per_one, {}, TX_STATE_FORGING_R);
 
                 append_varint(txs_buff, state_tx.size());
                 txs_buff.insert(txs_buff.end(), state_tx.begin(), state_tx.end());
@@ -550,7 +550,7 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
 
             std::vector<unsigned char> bin_addr_from = hex2bin(wallet_pair.first);
             for (const auto& host_pair : reward_map) {
-                std::vector<char> state_tx = make_forging_tx(host_pair.first, host_pair.second, bin_addr_from, TX_STATE_FORGING_DAPP);
+                auto&& state_tx = make_forging_tx(host_pair.first, host_pair.second, bin_addr_from, TX_STATE_FORGING_DAPP);
 
                 append_varint(txs_buff, state_tx.size());
                 txs_buff.insert(txs_buff.end(), state_tx.begin(), state_tx.end());
@@ -559,8 +559,15 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
     }
 
     {
-        for (auto&& wallet_f : TEAM_WALLETS) {
-            std::vector<char> state_tx = make_forging_tx(wallet_f, FORGING_TEAM_REWARD / TEAM_WALLETS.size(), {}, TX_STATE_FORGING_TEAM);
+        auto&& state_tx = make_forging_tx(TEAM_WALLET, FORGING_TEAM_REWARD, {}, TX_STATE_FORGING_TEAM);
+
+        append_varint(txs_buff, state_tx.size());
+        txs_buff.insert(txs_buff.end(), state_tx.begin(), state_tx.end());
+    }
+
+    {
+        for (auto&& wallet_f : FOUNDER_WALLETS) {
+            auto&& state_tx = make_forging_tx(wallet_f, FORGING_FOUNDER_REWARD, {}, TX_STATE_FORGING_FOUNDER);
 
             append_varint(txs_buff, state_tx.size());
             txs_buff.insert(txs_buff.end(), state_tx.begin(), state_tx.end());
@@ -596,10 +603,7 @@ Block* BlockChain::make_state_block(uint64_t timestamp)
             wallet_pair.second->initialize(0, 0, "");
         }
 
-        uint64_t value = 0;
-        uint64_t nonce = 0;
-        std::string json;
-        std::tie(value, nonce, json) = wallet_pair.second->serialize();
+        auto&& [value, nonce, json] = wallet_pair.second->serialize();
 
         state_tx.insert(state_tx.end(), bin_addres.begin(), bin_addres.end());
 
@@ -982,7 +986,7 @@ bool BlockChain::can_apply_state_block(Block* block, bool check)
 
         if (check) {
             if (common_block->get_block_timestamp() >= 1572120000) {
-                for (auto tx : common_block->get_txs()) {
+                for (auto&& tx : common_block->get_txs()) {
                     const std::string& addr = tx->addr_to;
                     Wallet* wallet_to = wallet_map.get_wallet(addr);
 
@@ -1023,7 +1027,7 @@ bool BlockChain::can_apply_state_block(Block* block, bool check)
                     }
                 }
             } else {
-                for (auto tx : common_block->get_txs()) {
+                for (auto&& tx : common_block->get_txs()) {
                     const std::string& addr_to = tx->addr_to;
                     Wallet* wallet_to = wallet_map.get_wallet(addr_to);
 
@@ -1056,7 +1060,7 @@ bool BlockChain::can_apply_state_block(Block* block, bool check)
                 }
             }
         } else {
-            for (auto tx : common_block->get_txs()) {
+            for (auto&& tx : common_block->get_txs()) {
                 const std::string& addr_to = tx->addr_to;
                 Wallet* wallet_to = wallet_map.get_wallet(addr_to);
 
@@ -1066,11 +1070,6 @@ bool BlockChain::can_apply_state_block(Block* block, bool check)
                 }
 
                 if (auto common_wallet = dynamic_cast<CommonWallet*>(wallet_to)) {
-                    //                    DEBUG_COUT("common_wallet->initialize(tx->value, tx->nonce, std::string(tx->data));");
-                    //                    DEBUG_COUT(addr_to);
-                    //                    DEBUG_COUT(tx->value);
-                    //                    DEBUG_COUT(tx->nonce);
-                    //                    DEBUG_COUT(std::string(tx->data));
                     common_wallet->initialize(tx->value, tx->nonce, std::string(tx->data));
                 } else if (auto application = dynamic_cast<DecentralizedApplication*>(wallet_to)) {
                     application->initialize(tx->value, tx->nonce, std::string(tx->data));
@@ -1078,19 +1077,19 @@ bool BlockChain::can_apply_state_block(Block* block, bool check)
                     DEBUG_COUT("unknown wallet type wrong type");
                 }
             }
-        }
 
-        {
-            auto* father_of_wallets = dynamic_cast<CommonWallet*>(wallet_map.get_wallet(MASTER_WALLET_COIN_FORGING));
-            auto* lookup_addreses = new std::deque<std::pair<std::string, uint64_t>>(father_of_wallets->get_delegated_from_list());
+            {
+                auto* father_of_wallets = dynamic_cast<CommonWallet*>(wallet_map.get_wallet(MASTER_WALLET_COIN_FORGING));
+                auto* lookup_addreses = new std::deque<std::pair<std::string, uint64_t>>(father_of_wallets->get_delegated_from_list());
 
-            DEBUG_COUT("lookup_addreses.size() = \t" + std::to_string(lookup_addreses->size()));
+                DEBUG_COUT("lookup_addreses.size() = \t" + std::to_string(lookup_addreses->size()));
 
-            while (true) {
-                std::deque<std::pair<std::string, uint64_t>>* lookup_addreses_prev = wallet_request_addreses.load();
-                if (wallet_request_addreses.compare_exchange_strong(lookup_addreses_prev, lookup_addreses)) {
-                    delete lookup_addreses_prev;
-                    break;
+                while (true) {
+                    std::deque<std::pair<std::string, uint64_t>>* lookup_addreses_prev = wallet_request_addreses.load();
+                    if (wallet_request_addreses.compare_exchange_strong(lookup_addreses_prev, lookup_addreses)) {
+                        delete lookup_addreses_prev;
+                        break;
+                    }
                 }
             }
         }
@@ -1144,6 +1143,14 @@ bool BlockChain::can_apply_forging_block(Block* block)
             } break;
             case TX_STATE_FORGING_TEAM: {
                 wallet_to->add(tx->value);
+            } break;
+            case TX_STATE_FORGING_FOUNDER: {
+                wallet_to->add(tx->value);
+                auto* f_wallet = dynamic_cast<CommonWallet*>(wallet_to);
+                if (f_wallet) {
+                    f_wallet->add_founder_limit();
+                }
+
             } break;
             case TX_STATE_FORGING_DAPP: {
                 if (tx->data.size() != 25) {
