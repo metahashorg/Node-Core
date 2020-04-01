@@ -24,10 +24,10 @@ private:
         CoreConnection(std::pair<std::string, int>);
 
         std::atomic<bool> goon = true;
-        //        mh::libevent::LibEvent event;
-        CURL* curl = nullptr;
 
         std::pair<std::string, int> host_port;
+
+        CURL* curl = nullptr;
 
         std::string send_with_return(const std::string& request_method, const std::string& reques_string);
 

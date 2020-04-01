@@ -35,7 +35,7 @@ std::set<std::string> get_files_in_dir(std::string& path)
             // Day
             std::isdigit(filename[6]) && std::isdigit(filename[7]) &&
             // Extension
-            filename.compare(8, 4, std::string{ ".blk" }) == 0) {
+            filename.compare(8, 4, std::string { ".blk" }) == 0) {
             files.insert(file_path.string());
         }
     }
@@ -89,8 +89,8 @@ ControllerImplementation::ControllerImplementation(
     const std::pair<std::string, int>& host_port,
     bool test)
     : BC(new BlockChain())
-    , path(_path)
     , TP(TP)
+    , path(_path)
     , cores(core_list, host_port)
     , test(test)
 {
