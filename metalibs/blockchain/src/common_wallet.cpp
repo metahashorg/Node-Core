@@ -568,14 +568,14 @@ uint64_t CommonWallet::sub(Wallet* other, TX const* tx, uint64_t real_fee)
         return TX_REJECT_INSUFFICIENT_FUNDS_EXT;
     }
 
-    if (addition->founder && addition->used_limit + total_sub > addition->limit) {
+    if (addition && addition->founder && addition->used_limit + total_sub > addition->limit) {
         DEBUG_COUT("founder limits");
         return TX_REJECT_FOUNDER_LIMIT;
     }
 
     uint64_t sub_result = Wallet::sub(other, tx, real_fee);
 
-    if (addition->founder && sub_result == 0) {
+    if (addition && addition->founder && sub_result == 0) {
         addition->used_limit += total_sub;
     }
 
