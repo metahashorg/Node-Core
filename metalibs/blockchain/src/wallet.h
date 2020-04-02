@@ -121,7 +121,6 @@ public:
     void set_trust(uint64_t);
     void add_trust();
     void sub_trust();
-    void add_founder_limit();
 
     std::deque<std::pair<std::string, uint64_t>> get_delegate_to_list();
     std::deque<std::pair<std::string, uint64_t>> get_delegated_from_list();

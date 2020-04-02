@@ -86,16 +86,6 @@ void CommonWallet::sub_trust()
     changed_wallets.insert(this);
 }
 
-void CommonWallet::add_founder_limit()
-{
-    if (!addition) {
-        addition = new WalletAdditions();
-    }
-    addition->founder = true;
-    addition->limit += FORGING_DAILY_LIMIT_UP;
-    changed_wallets.insert(this);
-}
-
 std::deque<std::pair<std::string, uint64_t>> CommonWallet::get_delegate_to_list()
 {
     std::deque<std::pair<std::string, uint64_t>> return_list;
@@ -319,10 +309,13 @@ bool CommonWallet::register_node(Wallet*, const TX* tx)
 void CommonWallet::apply_delegates()
 {
     if (addition) {
+        changed_wallets.insert(this);
+
         addition->delegated_from_daly_snapshot = addition->delegated_from;
         addition->delegate_to_daly_snapshot = addition->delegate_to;
 
         if (addition->founder) {
+            addition->limit += FORGING_DAILY_LIMIT_UP;
             return;
         }
         if (addition->state) {
@@ -355,7 +348,6 @@ void CommonWallet::apply_delegates()
 
         delete addition;
         addition = nullptr;
-        changed_wallets.insert(this);
     }
 }
 

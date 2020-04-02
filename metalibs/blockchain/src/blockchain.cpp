@@ -565,15 +565,6 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
         txs_buff.insert(txs_buff.end(), state_tx.begin(), state_tx.end());
     }
 
-    {
-        for (auto&& wallet_f : FOUNDER_WALLETS) {
-            auto&& state_tx = make_forging_tx(wallet_f, FORGING_FOUNDER_REWARD, {}, TX_STATE_FORGING_FOUNDER);
-
-            append_varint(txs_buff, state_tx.size());
-            txs_buff.insert(txs_buff.end(), state_tx.begin(), state_tx.end());
-        }
-    }
-
     txs_buff.push_back(0);
 
     return make_block(block_type, timestamp, prev_hash, txs_buff);
@@ -1143,14 +1134,6 @@ bool BlockChain::can_apply_forging_block(Block* block)
             } break;
             case TX_STATE_FORGING_TEAM: {
                 wallet_to->add(tx->value);
-            } break;
-            case TX_STATE_FORGING_FOUNDER: {
-                wallet_to->add(tx->value);
-                auto* f_wallet = dynamic_cast<CommonWallet*>(wallet_to);
-                if (f_wallet) {
-                    f_wallet->add_founder_limit();
-                }
-
             } break;
             case TX_STATE_FORGING_DAPP: {
                 if (tx->data.size() != 25) {
