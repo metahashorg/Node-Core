@@ -22,7 +22,7 @@ std::vector<unsigned char> int_as_varint_array(uint64_t value)
     return ret_data;
 }
 
-std::vector<unsigned char> hex2bin(const std::string& src)
+std::vector<unsigned char> hex2bin(const std::string_view src)
 {
     static const std::array<unsigned char, 256> DecLookup = {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // gap before first hex digit

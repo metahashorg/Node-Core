@@ -16,9 +16,9 @@ BlockChainController::BlockChainController(
 {
 }
 
-std::string BlockChainController::add_pack_to_queue(std::string_view pack, std::string_view url)
+std::string BlockChainController::add_pack_to_queue(std::string_view pack, std::string_view url, std::string_view sign, std::string_view pubk)
 {
-    return CI->add_pack_to_queue(pack, url);
+    return CI->add_pack_to_queue(pack, url, sign, pubk);
 }
 
 std::string BlockChainController::get_str_address()

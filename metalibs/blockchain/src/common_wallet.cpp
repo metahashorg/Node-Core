@@ -261,7 +261,6 @@ bool CommonWallet::try_undelegate(Wallet* other, TX const* tx)
 
 bool CommonWallet::register_node(Wallet*, const TX* tx)
 {
-    const auto& method = tx->json_rpc->method;
     uint64_t w_state = get_state();
 
     auto&& set_state_by_type = [&w_state](const std::string& type) {
@@ -284,9 +283,8 @@ bool CommonWallet::register_node(Wallet*, const TX* tx)
         }
     };
 
-    if (method == "mh-noderegistration") {
-        w_state |= NODE_STATE_FLAG_PROXY_PRETEND;
-    } else if (tx->json_rpc->parameters.find("type") != tx->json_rpc->parameters.end()) {
+    w_state &= NODE_STATE_FLAG_PRETEND_COMMON;
+    if (tx->json_rpc->parameters.find("type") != tx->json_rpc->parameters.end()) {
         const auto& type = tx->json_rpc->parameters["type"];
         auto start = 0U;
         auto&& end = type.find('|');

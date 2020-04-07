@@ -13,7 +13,7 @@
 
 using sha256_2 = std::array<unsigned char, 32>;
 
-std::vector<unsigned char> hex2bin(const std::string& src);
+std::vector<unsigned char> hex2bin(const std::string_view src);
 
 template <typename Container>
 std::string bin2hex(const Container& bin_msg);

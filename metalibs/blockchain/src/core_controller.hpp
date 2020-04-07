@@ -15,6 +15,8 @@ private:
     struct Message {
         std::string url;
         std::string msg;
+        std::string sign;
+        std::string pubk;
         uint64_t milli_time;
         std::atomic<bool>* get_resp;
         std::string* resp;
@@ -24,16 +26,23 @@ private:
         CoreConnection(std::pair<std::string, int>);
 
         std::atomic<bool> goon = true;
-
         std::pair<std::string, int> host_port;
-
         CURL* curl = nullptr;
 
-        std::string send_with_return(const std::string& request_method, const std::string& reques_string);
+        std::string send_with_return(
+            const std::string& request_method,
+            const std::string& reques_string,
+            const std::string& sign,
+            const std::string& bubk);
 
         void start_loop(moodycamel::ConcurrentQueue<Message*>&);
 
-        bool curl_post(const std::string& request_method, const std::string& reques_string, std::string& response);
+        bool curl_post(
+            const std::string& request_method,
+            const std::string& reques_string,
+            const std::string& sign,
+            const std::string& bubk,
+            std::string& response);
     };
 
     std::mutex core_lock;
@@ -45,8 +54,13 @@ private:
 
     std::pair<std::string, int> my_host_port;
 
+    std::vector<unsigned char> bin_priv;
+    std::vector<unsigned char> bin_pubk;
+
+    std::string str_pubk;
+
 public:
-    CoreController(const std::set<std::pair<std::string, int>>&, std::pair<std::string, int>);
+    CoreController(const std::set<std::pair<std::string, int>>&, std::pair<std::string, int>, const std::string&);
 
     void sync_core_lists();
 
@@ -58,6 +72,8 @@ public:
 
     void send_no_return_to_core(const std::string& addr, const std::string& req, const std::string& data);
     std::string send_with_return_to_core(const std::string& addr, const std::string& req, const std::string& data);
+
+    std::pair<std::string, std::string> sign_string(const std::string& data);
 };
 
 #endif // CORE_CONTROLLER_HPP

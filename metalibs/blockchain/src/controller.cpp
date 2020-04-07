@@ -91,7 +91,7 @@ ControllerImplementation::ControllerImplementation(
     : BC(new BlockChain())
     , TP(TP)
     , path(_path)
-    , cores(core_list, host_port)
+    , cores(core_list, host_port, priv_key_line)
     , test(test)
 {
     std::this_thread::sleep_for(std::chrono::seconds(2));
@@ -330,7 +330,7 @@ void ControllerImplementation::apply_block_chain(std::map<sha256_2, Block*>& blo
     DEBUG_COUT("START");
     {
         std::atomic<int> jobs = 0;
-        for (const auto [hash, block] : block_tree) {
+        for (auto&& [hash, block] : block_tree) {
             jobs++;
             TP.runAsync([hash, block, this, &jobs]() {
                 if (blocks.find(hash) == blocks.end()) {
@@ -431,30 +431,47 @@ void ControllerImplementation::start_main_loop()
     std::thread(&ControllerImplementation::main_loop, this).detach();
 }
 
-std::string ControllerImplementation::add_pack_to_queue(std::string_view pack, std::string_view url)
+std::string ControllerImplementation::add_pack_to_queue(std::string_view pack, std::string_view url, std::string_view sign, std::string_view pubk)
 {
-    if (url == RPC_PING) {
-        parse_S_PING(pack);
-    } else if (url == RPC_TX) {
-        parse_B_TX(pack);
-    } else if (url == RPC_PRETEND_BLOCK) {
-        parse_C_PRETEND_BLOCK(pack);
-    } else if (url == RPC_APPROVE) {
-        parse_C_APPROVE(pack);
-    } else if (url == RPC_DISAPPROVE) {
-        parse_C_DISAPPROVE(pack);
-    } else if (url == RPC_APPROVE_BLOCK) {
-        parse_C_APPROVE_BLOCK(pack);
-    } else if (url == RPC_LAST_BLOCK) {
-        return parse_S_LAST_BLOCK(pack);
-    } else if (url == RPC_GET_BLOCK) {
-        return parse_S_GET_BLOCK(pack);
-    } else if (url == RPC_GET_CHAIN) {
-        return parse_S_GET_CHAIN(pack);
-    } else if (url == RPC_GET_CORE_LIST) {
-        return parse_S_GET_CORE_LIST(pack);
-    } else if (url == RPC_GET_CORE_ADDR) {
-        return parse_S_GET_CORE_ADDR(pack);
+    auto&& bin_pubk = hex2bin(pubk);
+    auto&& bin_sign = hex2bin(sign);
+    if (check_sign(pack, bin_sign, bin_pubk)) {
+        auto&& sender_addr = "0x" + bin2hex(get_address(bin_pubk));
+        auto rights = BC->check_addr(sender_addr);
+
+        if (rights >= 50) {
+            if (url == RPC_PING) {
+                parse_S_PING(pack);
+            } else if (url == RPC_TX && master) {
+                parse_B_TX(pack);
+            }
+
+            if (rights >= 100) {
+                if (url == RPC_APPROVE) {
+                    parse_C_APPROVE(pack);
+                } else if (url == RPC_DISAPPROVE) {
+                    parse_C_DISAPPROVE(pack);
+                } else if (url == RPC_APPROVE_BLOCK) {
+                    parse_C_APPROVE_BLOCK(pack);
+                } else if (url == RPC_LAST_BLOCK) {
+                    return parse_S_LAST_BLOCK(pack);
+                } else if (url == RPC_GET_BLOCK) {
+                    return parse_S_GET_BLOCK(pack);
+                } else if (url == RPC_GET_CHAIN) {
+                    return parse_S_GET_CHAIN(pack);
+                } else if (url == RPC_GET_CORE_LIST) {
+                    return parse_S_GET_CORE_LIST(pack);
+                } else if (url == RPC_GET_CORE_ADDR) {
+                    return parse_S_GET_CORE_ADDR(pack);
+                }
+            }
+
+            if (rights >= 150) {
+                if (url == RPC_PRETEND_BLOCK) {
+                    parse_C_PRETEND_BLOCK(pack);
+                }
+            }
+        }
     }
 
     return "";
@@ -485,7 +502,6 @@ void ControllerImplementation::main_loop()
 {
     std::this_thread::sleep_for(std::chrono::seconds(15));
     while (goon) {
-
         const uint64_t get_arr_size = 128;
         bool need_actualize = true;
 

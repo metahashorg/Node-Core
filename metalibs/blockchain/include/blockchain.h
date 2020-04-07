@@ -28,7 +28,7 @@ public:
         const std::pair<std::string, int>& host_port,
         bool test);
 
-    std::string add_pack_to_queue(std::string_view, std::string_view);
+    std::string add_pack_to_queue(std::string_view, std::string_view, std::string_view, std::string_view);
 
     std::string get_str_address();
     std::string get_last_block_str();

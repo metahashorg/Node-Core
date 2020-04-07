@@ -55,6 +55,8 @@ public:
     std::atomic<std::map<std::string, std::pair<uint, uint>>*>& get_wallet_statistics();
     std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& get_wallet_request_addreses();
 
+    uint8_t check_addr(const std::string & addr);
+
 private:
     Block* make_block(uint64_t b_type, uint64_t b_time, sha256_2 prev_b_hash, std::vector<char>& tx_buff);
 
