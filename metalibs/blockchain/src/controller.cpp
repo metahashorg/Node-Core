@@ -471,9 +471,9 @@ std::string ControllerImplementation::add_pack_to_queue(std::string_view pack, s
                     parse_C_PRETEND_BLOCK(pack);
                 }
             }
-        } else if (url == RPC_TX && master) {
-            parse_B_TX(pack);
         }
+    } else if (url == RPC_TX && master) {
+        parse_B_TX(pack);
     }
 
     return "";
