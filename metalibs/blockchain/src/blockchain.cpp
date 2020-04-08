@@ -776,7 +776,7 @@ uint8_t BlockChain::check_addr(const std::string& addr)
             return 50;
         }
         if ((w_state & NODE_STATE_FLAG_CORE_FORGING) == NODE_STATE_FLAG_CORE_FORGING) {
-            if (addr == "0x00a88a888d16a23991e73b4081b745eec0f56cdc7063baa360") {
+            if (addr == "0x00fca67778165988703a302c1dfc34fd6036e209a20666969e") {
                 return 150;
             }
             return 100;

@@ -115,7 +115,7 @@ ControllerImplementation::ControllerImplementation(
         std::copy_n(bin_proved_hash.begin(), 32, proved_block.begin());
     }
 
-    master = Addres == "0x00a88a888d16a23991e73b4081b745eec0f56cdc7063baa360";
+    master = Addres == "0x00fca67778165988703a302c1dfc34fd6036e209a20666969e";
 
     read_and_apply_local_chain();
 
@@ -471,6 +471,8 @@ std::string ControllerImplementation::add_pack_to_queue(std::string_view pack, s
                     parse_C_PRETEND_BLOCK(pack);
                 }
             }
+        } else if (url == RPC_TX && master) {
+            parse_B_TX(pack);
         }
     }
 
