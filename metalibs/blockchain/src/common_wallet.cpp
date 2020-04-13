@@ -283,7 +283,12 @@ bool CommonWallet::register_node(Wallet*, const TX* tx)
         }
     };
 
-    w_state &= NODE_STATE_FLAG_PRETEND_COMMON;
+    w_state &= ~NODE_STATE_FLAG_PROXY_PRETEND;
+    w_state &= ~NODE_STATE_FLAG_INFRASTRUCTURETORRENT_PRETEND;
+    w_state &= ~NODE_STATE_FLAG_TORRENT_PRETEND;
+    w_state &= ~NODE_STATE_FLAG_VERIFIER_PRETEND;
+    w_state &= ~NODE_STATE_FLAG_CORE_PRETEND;
+
     if (tx->json_rpc->parameters.find("type") != tx->json_rpc->parameters.end()) {
         const auto& type = tx->json_rpc->parameters["type"];
         auto start = 0U;
