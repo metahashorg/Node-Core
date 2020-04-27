@@ -57,20 +57,22 @@ const std::vector<char>& Block::get_data()
 
 uint64_t Block::get_block_type()
 {
-    return block_type;
+    return *(reinterpret_cast<const uint64_t*>(&data[0]));
 }
 
 uint64_t Block::get_block_timestamp()
 {
-    return block_timestamp;
+    return *(reinterpret_cast<const uint64_t*>(&data[8]));
 }
 
 sha256_2 Block::get_prev_hash()
 {
+    sha256_2 prev_hash;
+    std::copy_n(data.begin() + 16, 32, prev_hash.begin());
     return prev_hash;
 }
 
 sha256_2 Block::get_block_hash()
 {
-    return block_hash;
+    return get_sha256(data);
 }

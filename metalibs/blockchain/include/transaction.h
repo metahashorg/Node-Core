@@ -19,15 +19,15 @@ public:
     uint64_t state = 0;
     uint64_t tx_size = 0;
 
-    std::string_view bin_to;
+    std::string bin_to;
     uint64_t value;
     uint64_t fee;
     uint64_t nonce;
-    std::string_view data;
-    std::string_view sign;
-    std::string_view pub_key;
+    std::string data;
+    std::string sign;
+    std::string pub_key;
 
-    std::string_view data_for_sign;
+    std::string data_for_sign;
 
     std::vector<char> raw_tx;
 
@@ -40,10 +40,11 @@ public:
 
     TX();
 
-    TX(const TX&) = delete;
-    TX(TX&&) = delete;
-    TX& operator=(const TX& other) = delete;
-    TX& operator=(TX&& other) = delete;
+    TX(const TX&);
+    TX(TX&&);
+
+    TX& operator=(const TX& other);
+    TX& operator=(TX&& other);
 
     ~TX();
 

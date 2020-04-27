@@ -3,13 +3,6 @@
 #include <open_ssl_decor.h>
 #include <statics.hpp>
 
-RejectedTXBlock::~RejectedTXBlock()
-{
-    for (auto& tx : txs) {
-        delete tx;
-    }
-}
-
 std::string RejectedTXBlock::get_sign()
 {
     return std::string(sign);
@@ -25,8 +18,41 @@ std::string RejectedTXBlock::get_data_for_sign()
     return std::string(data_for_sign);
 }
 
-const std::vector<RejectedTXInfo*>& RejectedTXBlock::get_txs()
+const std::vector<RejectedTXInfo> RejectedTXBlock::get_txs()
 {
+    std::vector<RejectedTXInfo> txs;
+    if (data.empty()) {
+        return txs;
+    }
+
+    uint64_t cur_pos = tx_buff;
+    uint64_t tx_size;
+    {
+        std::string_view tx_size_arr(&data[cur_pos], data.size() - cur_pos);
+        uint64_t varint_size = read_varint(tx_size, tx_size_arr);
+        cur_pos += varint_size;
+    }
+
+    std::vector<std::string_view> tx_buffs;
+    while (tx_size > 0) {
+        std::string_view tx_sw(&data[cur_pos], tx_size);
+        cur_pos += tx_size;
+        tx_buffs.push_back(tx_sw);
+
+        {
+            std::string_view tx_size_arr = std::string_view(&data[cur_pos], data.size() - cur_pos);
+            uint64_t varint_size = read_varint(tx_size, tx_size_arr);
+            cur_pos += varint_size;
+        }
+    }
+
+    txs.resize(tx_buffs.size());
+    uint64_t i = 0;
+    for (auto&& tx_data : tx_buffs) {
+        txs[i].parse(tx_data);
+        i++;
+    }
+
     return txs;
 }
 
@@ -47,16 +73,7 @@ bool RejectedTXBlock::parse(std::string_view block_sw)
     uint64_t data_size = 0;
     std::string_view tmp_data_for_sign;
 
-    uint64_t cur_pos = 0;
-
-    block_type = *(reinterpret_cast<const uint64_t*>(&block_sw[cur_pos]));
-    cur_pos += sizeof(uint64_t);
-
-    block_timestamp = *(reinterpret_cast<const uint64_t*>(&block_sw[cur_pos]));
-    cur_pos += sizeof(uint64_t);
-
-    std::copy_n(block_sw.begin() + cur_pos, 32, prev_hash.begin());
-    cur_pos += 32;
+    uint64_t cur_pos = 48;
 
     {
         std::string_view varint_arr(&block_sw[cur_pos], block_sw.size() - cur_pos);
@@ -103,7 +120,7 @@ bool RejectedTXBlock::parse(std::string_view block_sw)
         return false;
     }
 
-    txs.reserve(block_sw.size() / 32);
+    tx_buff = cur_pos;
 
     uint64_t tx_size;
     {
@@ -126,13 +143,12 @@ bool RejectedTXBlock::parse(std::string_view block_sw)
 
         std::string_view tx_as_sw(&block_sw[cur_pos], tx_size);
         auto* tx = new RejectedTXInfo;
-        if (tx->parse(tx_as_sw)) {
-            txs.push_back(tx);
-        } else {
+        if (!tx->parse(tx_as_sw)) {
             DEBUG_COUT("TX PARSE ERROR");
             delete tx;
             return false;
         }
+        delete tx;
         cur_pos += tx_size;
 
         {
@@ -155,18 +171,7 @@ bool RejectedTXBlock::parse(std::string_view block_sw)
     pub_key = std::string_view(&data[pubk_start], pubk_size);
     data_for_sign = std::string_view(&data[data_start], data_size);
 
-    block_hash = get_sha256(data);
-
     return true;
-}
-
-void RejectedTXBlock::clean()
-{
-    for (auto tx : txs) {
-        delete tx;
-    }
-    txs.resize(0);
-    txs.shrink_to_fit();
 }
 
 bool RejectedTXBlock::make(

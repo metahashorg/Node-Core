@@ -3,15 +3,41 @@
 #include <open_ssl_decor.h>
 #include <statics.hpp>
 
-ApproveBlock::~ApproveBlock()
+const std::vector<ApproveRecord> ApproveBlock::get_txs()
 {
-    for (auto& tx : txs) {
-        delete tx;
+    std::vector<ApproveRecord> txs;
+    if (data.empty()) {
+        return txs;
     }
-}
 
-const std::vector<ApproveRecord*>& ApproveBlock::get_txs()
-{
+    uint64_t cur_pos = tx_buff;
+    uint64_t tx_size;
+    {
+        std::string_view tx_size_arr(&data[cur_pos], data.size() - cur_pos);
+        uint64_t varint_size = read_varint(tx_size, tx_size_arr);
+        cur_pos += varint_size;
+    }
+
+    std::vector<std::string_view> tx_buffs;
+    while (tx_size > 0) {
+        std::string_view tx_sw(&data[cur_pos], tx_size);
+        cur_pos += tx_size;
+        tx_buffs.push_back(tx_sw);
+
+        {
+            std::string_view tx_size_arr = std::string_view(&data[cur_pos], data.size() - cur_pos);
+            uint64_t varint_size = read_varint(tx_size, tx_size_arr);
+            cur_pos += varint_size;
+        }
+    }
+
+    txs.resize(tx_buffs.size());
+    uint64_t i = 0;
+    for (auto&& tx_data : tx_buffs) {
+        txs[i].parse(tx_data);
+        i++;
+    }
+
     return txs;
 }
 
@@ -22,19 +48,7 @@ bool ApproveBlock::parse(std::string_view block_sw)
         return false;
     }
 
-    uint64_t cur_pos = 0;
-
-    block_type = *(reinterpret_cast<const uint64_t*>(&block_sw[cur_pos]));
-    cur_pos += sizeof(uint64_t);
-
-    block_timestamp = *(reinterpret_cast<const uint64_t*>(&block_sw[cur_pos]));
-    cur_pos += sizeof(uint64_t);
-
-    std::copy_n(block_sw.begin() + cur_pos, 32, prev_hash.begin());
-    cur_pos += 32;
-
-    txs.reserve(block_sw.size() / 128);
-
+    uint64_t cur_pos = tx_buff;
     uint64_t tx_size;
     {
         std::string_view tx_size_arr(
@@ -56,13 +70,13 @@ bool ApproveBlock::parse(std::string_view block_sw)
 
         std::string_view tx_as_sw(&block_sw[cur_pos], tx_size);
         auto* tx = new ApproveRecord;
-        if (tx->parse(tx_as_sw)) {
-            txs.push_back(tx);
-        } else {
+        if (!tx->parse(tx_as_sw)) {
             DEBUG_COUT("TX PARSE ERROR");
             delete tx;
             return false;
         }
+        delete tx;
+
         cur_pos += tx_size;
         {
             std::string_view tx_size_arr = std::string_view(
@@ -77,21 +91,12 @@ bool ApproveBlock::parse(std::string_view block_sw)
         }
     }
 
+    data.clear();
     data.insert(data.end(), block_sw.begin(), block_sw.begin() + cur_pos);
-
-    block_hash = get_sha256(data);
 
     return true;
 }
 
-void ApproveBlock::clean()
-{
-    for (auto tx : txs) {
-        delete tx;
-    }
-    txs.resize(0);
-    txs.shrink_to_fit();
-}
 bool ApproveBlock::make(uint64_t timestamp, const sha256_2& new_prev_hash, const std::vector<ApproveRecord*>& new_txs)
 {
     std::vector<char> block_buff;

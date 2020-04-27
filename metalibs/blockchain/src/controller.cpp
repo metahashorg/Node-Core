@@ -49,8 +49,8 @@ void parse_block_async(
     char* block_buff,
     int64_t block_size,
     std::mutex& block_lock,
-    std::map<sha256_2, Block*>& block_tree,
-    std::map<sha256_2, Block*>& prev_tree,
+    std::unordered_map<sha256_2, Block*, sha256_2_hasher>& block_tree,
+    std::unordered_map<sha256_2, Block*, sha256_2_hasher>& prev_tree,
     bool delete_buff)
 {
     TP.runAsync([&jobs, block_buff, block_size, &block_lock, &block_tree, &prev_tree, delete_buff]() {
@@ -68,6 +68,9 @@ void parse_block_async(
                     block_tree.erase(block->get_block_hash());
                     delete block;
                 }
+            } else {
+                DEBUG_COUT("Not common block");
+                delete block;
             }
         } else {
             DEBUG_COUT("Block parse error");
@@ -155,36 +158,24 @@ void ControllerImplementation::read_and_apply_local_chain()
         last_known_state_file.close();
     }
 
-    std::map<sha256_2, Block*> block_tree;
-    std::map<sha256_2, Block*> prev_tree;
+    std::unordered_map<sha256_2, Block*, sha256_2_hasher> prev_tree;
 
     char uint64_buff[8];
     std::set<std::string> files = get_files_in_dir(path);
 
-    bool skip = !last_file.empty();
     for (const std::string& file : files) {
-        if (skip) {
-            if (fs::path(last_file).filename().string() != fs::path(file).filename().string()) {
-                continue;
-            }
-
-            skip = false;
-        }
-
         std::ifstream ifile(file.c_str(), std::ios::in | std::ios::binary);
 
         if (ifile.is_open()) {
             while (ifile.read(uint64_buff, 8)) {
                 uint64_t block_size = *(reinterpret_cast<uint64_t*>(uint64_buff));
 
-                //                DEBUG_COUT("block_size:\t" + std::to_string(block_size));
-
                 char* block_buff = new char[block_size];
 
                 if (ifile.read(block_buff, static_cast<int64_t>(block_size))) {
                     jobs++;
 
-                    parse_block_async(TP, jobs, block_buff, block_size, block_lock, block_tree, prev_tree, true);
+                    parse_block_async(TP, jobs, block_buff, block_size, block_lock, blocks, prev_tree, true);
 
                 } else {
                     std::string msg = "read file error\t" + file;
@@ -207,12 +198,12 @@ void ControllerImplementation::read_and_apply_local_chain()
 
     DEBUG_COUT("PARSE BLOCKCHAIN COMPLETE");
 
-    apply_block_chain(block_tree, prev_tree, "local storage", false);
+    apply_block_chain(blocks, prev_tree, "local storage", false);
 
     DEBUG_COUT("READ BLOCK COMPLETE");
 }
 
-void ControllerImplementation::apply_block_chain(std::map<sha256_2, Block*>& block_tree, std::map<sha256_2, Block*>& prev_tree, const std::string& source, bool need_write)
+void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Block*, sha256_2_hasher>& block_tree, std::unordered_map<sha256_2, Block*, sha256_2_hasher>& prev_tree, const std::string& source, bool need_write)
 {
     static const sha256_2 zero_block = { { 0 } };
 
@@ -256,8 +247,11 @@ void ControllerImplementation::apply_block_chain(std::map<sha256_2, Block*>& blo
         }
 
         if (!got_start) {
-            for (auto& map_pair : block_tree) {
-                delete map_pair.second;
+
+            if (need_write) {
+                for (auto& map_pair : block_tree) {
+                    delete map_pair.second;
+                }
             }
             DEBUG_COUT("blockchain from " + source + " is incomplete");
             return;
@@ -273,6 +267,7 @@ void ControllerImplementation::apply_block_chain(std::map<sha256_2, Block*>& blo
             curr_block = block->get_block_hash();
         }
     }
+
     if (test) {
         for (auto block_it = block_chain.begin(); block_it != block_chain.end(); block_it++) {
             if ((*block_it)->get_block_type() == BLOCK_TYPE_FORGING) {
@@ -313,6 +308,7 @@ void ControllerImplementation::apply_block_chain(std::map<sha256_2, Block*>& blo
             }
 
             write_block(block);
+            blocks.insert({ last_applied_block, block });
         }
 
         prev_timestamp = block->get_block_timestamp();
@@ -322,13 +318,10 @@ void ControllerImplementation::apply_block_chain(std::map<sha256_2, Block*>& blo
 
         last_applied_block = block->get_block_hash();
         last_created_block = block->get_block_hash();
-        blocks.insert({ last_applied_block, block });
-
-        block->clean();
     }
 
     DEBUG_COUT("START");
-    {
+    if (need_write) {
         std::atomic<int> jobs = 0;
         for (auto&& [hash, block] : block_tree) {
             jobs++;
@@ -354,11 +347,12 @@ void ControllerImplementation::actualize_chain()
 
     // DEBUG_COUT("actualize_chain");
 
-    std::map<std::string, sha256_2> cores_with_missing_block;
     std::map<std::string, std::string> last_block_on_cores = cores.send_with_return(RPC_LAST_BLOCK, "");
+
+    std::set<std::string> cores_with_missing_block;
+    std::set<sha256_2> missing_blocks;
     for (auto last_block_on_core : last_block_on_cores) {
         if (last_block_on_core.second.size() >= 40) {
-
             sha256_2 last_block_return;
             std::copy_n(last_block_on_core.second.begin(), 32, last_block_return.begin());
 
@@ -367,61 +361,66 @@ void ControllerImplementation::actualize_chain()
 
             if (block_timestamp > prev_timestamp && blocks.find(last_block_return) == blocks.end()) {
                 DEBUG_COUT("core\t" + last_block_on_core.first + "have more recent block\t" + bin2hex(last_block_return));
-                cores_with_missing_block.insert({ last_block_on_core.first, last_block_return });
+                cores_with_missing_block.insert(last_block_on_core.first);
+                missing_blocks.insert(last_block_return);
             }
         }
     }
 
-    for (const auto& core_block : cores_with_missing_block) {
-        if (blocks.find(core_block.second) == blocks.end()) {
-            std::string last_block_as_sting;
-            std::copy_n(last_applied_block.begin(), 32, std::back_inserter(last_block_as_sting));
+    if (cores_with_missing_block.size()) {
+        DEBUG_COUT("GET BLOCKCHAIN START");
 
-            DEBUG_COUT("trying to get chain from:\t" + core_block.first);
-            std::string return_data = cores.send_with_return_to_core(core_block.first, RPC_GET_CHAIN, last_block_as_sting);
+        std::unordered_map<sha256_2, Block*, sha256_2_hasher> block_tree;
+        std::unordered_map<sha256_2, Block*, sha256_2_hasher> prev_tree;
 
-            DEBUG_COUT("PARSE BLOCKCHAIN START");
-            DEBUG_COUT("return_data.size()\t" + std::to_string(return_data.size()));
-            std::mutex block_lock;
-            std::atomic<long int> jobs(0);
-
-            std::map<sha256_2, Block*> block_tree;
-            std::map<sha256_2, Block*> prev_tree;
-            {
-                uint64_t position = 0;
-                while (position + 8 < return_data.size()) {
-                    uint64_t block_size = *(reinterpret_cast<uint64_t*>(&return_data[position]));
-                    position += 8;
-
-                    if (position + block_size <= return_data.size()) {
-                        jobs++;
-
-                        char* block_buff = &return_data[position];
-
-                        parse_block_async(TP, jobs, block_buff, block_size, block_lock, block_tree, prev_tree, false);
-
-                    } else {
-                        DEBUG_COUT("position + block_size <= return_data.size()");
-                        DEBUG_COUT(std::to_string(position) + "+" + std::to_string(block_size) + "<=" + std::to_string(return_data.size()));
-                        break;
-                    }
-
-                    position += block_size;
+        for (;;) {
+            for (const auto& core : cores_with_missing_block) {
+                if (missing_blocks.empty()) {
+                    DEBUG_COUT("GET BLOCKCHAIN COMPLETE");
+                    apply_block_chain(block_tree, prev_tree, "metachain network", true);
+                    DEBUG_COUT("APPLY BLOCKCHAIN COMPLETE");
+                    return;
                 }
 
-                while (jobs.load(std::memory_order_acquire) != 0) {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                sha256_2 requested_block = *missing_blocks.begin();
+
+                std::string block_as_sting;
+                std::copy_n(requested_block.begin(), 32, std::back_inserter(block_as_sting));
+
+                DEBUG_COUT("trying to get block\t" + bin2hex(requested_block) + "\tfrom:\t" + core);
+                std::string return_data = cores.send_with_return_to_core(core, RPC_GET_BLOCK, block_as_sting);
+
+                if (return_data.size()) {
+                    missing_blocks.erase(missing_blocks.begin());
+                } else {
+                    DEBUG_COUT("Block is empty");
+                }
+
+                Block* block = parse_block(return_data);
+                if (block) {
+                    if (dynamic_cast<CommonBlock*>(block)) {
+                        if (!block_tree.insert({ block->get_block_hash(), block }).second) {
+                            DEBUG_COUT("Duplicate block in chain\t" + bin2hex(block->get_block_hash()));
+                            delete block;
+                            block = nullptr;
+                        } else if (!prev_tree.insert({ block->get_prev_hash(), block }).second) {
+                            DEBUG_COUT("Branches in block chain\t" + bin2hex(block->get_prev_hash()) + "\t->\t" + bin2hex(block->get_block_hash()));
+                            block_tree.erase(block->get_block_hash());
+                            delete block;
+                            block = nullptr;
+                        }
+                        if (blocks.find(block->get_prev_hash()) == blocks.end()) {
+                            missing_blocks.insert(block->get_prev_hash());
+                        }
+                    } else {
+                        DEBUG_COUT("Not Common Block");
+                        delete block;
+                        block = nullptr;
+                    }
+                } else {
+                    DEBUG_COUT("Parse block error");
                 }
             }
-
-            DEBUG_COUT("PARSE BLOCKCHAIN COMPLETE");
-            //            for (auto block_pair : block_tree) {
-            //                block_queue.enqueue(block_pair.second);
-            //            }
-
-            apply_block_chain(block_tree, prev_tree, core_block.first, true);
-
-            DEBUG_COUT("READ BLOCK COMPLETE");
         }
     }
 }
@@ -688,7 +687,6 @@ void ControllerImplementation::parse_C_APPROVE_BLOCK(std::string_view pack)
         block_queue.enqueue(block);
     } else {
         DEBUG_COUT("corrupt pack");
-        delete block;
     }
 }
 
@@ -741,7 +739,6 @@ std::string ControllerImplementation::parse_S_LAST_BLOCK(std::string_view)
 
 std::string ControllerImplementation::parse_S_GET_BLOCK(std::string_view pack)
 {
-
     if (pack.size() < 32) {
         return "";
     }
@@ -753,9 +750,6 @@ std::string ControllerImplementation::parse_S_GET_BLOCK(std::string_view pack)
         std::string return_string;
         {
             auto& block_data = blocks[block_hash]->get_data();
-
-            uint64_t block_size = block_data.size();
-            return_string.insert(return_string.end(), reinterpret_cast<char*>(&block_size), reinterpret_cast<char*>(&block_size) + sizeof(uint64_t));
             return_string.insert(return_string.end(), block_data.begin(), block_data.end());
         }
         return return_string;

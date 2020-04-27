@@ -721,6 +721,7 @@ Block* BlockChain::make_common_block(uint64_t timestamp, std::vector<TX*>& trans
     }
     return nullptr;
 }
+
 void BlockChain::reject(const TX* tx, uint64_t reason)
 {
     auto rejected_tx = new RejectedTXInfo();
@@ -888,50 +889,50 @@ bool BlockChain::can_apply_common_block(Block* block)
         uint64_t fee = 0;
         Wallet* state_fee = wallet_map.get_wallet(STATE_FEE_WALLET);
 
-        for (const auto tx : common_block->get_txs()) {
-            if (tx->state == TX_STATE_FEE) {
-                fee = tx->value;
+        for (const auto& tx : common_block->get_txs()) {
+            if (tx.state == TX_STATE_FEE) {
+                fee = tx.value;
                 continue;
             }
 
-            const std::string& addr_from = tx->addr_from;
-            const std::string& addr_to = tx->addr_to;
+            const std::string& addr_from = tx.addr_from;
+            const std::string& addr_to = tx.addr_to;
 
             Wallet* wallet_to = wallet_map.get_wallet(addr_to);
             Wallet* wallet_from = wallet_map.get_wallet(addr_from);
 
             if (!wallet_to || !wallet_from) {
-                DEBUG_COUT("invalid wallet\t" + bin2hex(tx->hash));
+                DEBUG_COUT("invalid wallet\t" + bin2hex(tx.hash));
                 DEBUG_COUT(addr_from);
                 DEBUG_COUT(addr_to);
                 continue;
             }
-            if (tx->state == TX_STATE_APPROVE) {
-                wallet_from->sub(wallet_to, tx, 0);
+            if (tx.state == TX_STATE_APPROVE) {
+                wallet_from->sub(wallet_to, &tx, 0);
                 continue;
             }
 
-            if (tx->state == TX_STATE_TECH_NODE_STAT && tx->json_rpc && test_nodes.find(addr_from) != test_nodes.end()) {
-                const auto& type = tx->json_rpc->parameters["type"];
+            if (tx.state == TX_STATE_TECH_NODE_STAT && tx.json_rpc && test_nodes.find(addr_from) != test_nodes.end()) {
+                const auto& type = tx.json_rpc->parameters["type"];
                 if (type == "Proxy"
                     || type == "InfrastructureTorrent"
                     || type == "Torrent"
                     || type == "Verifier") {
 
-                    const auto& mhaddr = tx->json_rpc->parameters["address"];
+                    const auto& mhaddr = tx.json_rpc->parameters["address"];
                     node_statistics[type][mhaddr].count++;
 
-                    if (tx->json_rpc->parameters["success"] != "false") {
+                    if (tx.json_rpc->parameters["success"] != "false") {
                         uint64_t stat_value = 0;
                         if (type == "Proxy") {
                             try {
-                                stat_value = std::stol(tx->json_rpc->parameters["rps"]);
+                                stat_value = std::stol(tx.json_rpc->parameters["rps"]);
                             } catch (...) {
                                 stat_value = 0;
                             }
                         } else {
                             try {
-                                stat_value = std::stol(tx->json_rpc->parameters["latency"]);
+                                stat_value = std::stol(tx.json_rpc->parameters["latency"]);
                             } catch (...) {
                                 stat_value = 1'000'000;
                             }
@@ -941,13 +942,13 @@ bool BlockChain::can_apply_common_block(Block* block)
                         node_statistics[type][mhaddr].stats[test_nodes.at(addr_from)].second += stat_value;
                     }
                 } else {
-                    auto& mhaddr = tx->json_rpc->parameters["mhaddr"];
+                    auto& mhaddr = tx.json_rpc->parameters["mhaddr"];
                     node_statistics["Proxy"][mhaddr].count++;
 
-                    if (tx->json_rpc->parameters["success"] != "false") {
+                    if (tx.json_rpc->parameters["success"] != "false") {
                         uint64_t rps = 0;
                         try {
-                            rps = std::stol(tx->json_rpc->parameters["rps"]);
+                            rps = std::stol(tx.json_rpc->parameters["rps"]);
                         } catch (...) {
                             rps = 1;
                         }
@@ -961,22 +962,22 @@ bool BlockChain::can_apply_common_block(Block* block)
                 continue;
             }
 
-            if (wallet_from->sub(wallet_to, tx, fee + (tx->raw_tx.size() > 255 ? tx->raw_tx.size() - 255 : 0)) > 0) {
-                DEBUG_COUT("tx hash:\t" + bin2hex(tx->hash));
+            if (wallet_from->sub(wallet_to, &tx, fee + (tx.raw_tx.size() > 255 ? tx.raw_tx.size() - 255 : 0)) > 0) {
+                DEBUG_COUT("tx hash:\t" + bin2hex(tx.hash));
                 DEBUG_COUT("addr_from:\t" + addr_from);
                 DEBUG_COUT("addr_to:\t" + addr_to);
                 return false;
             }
 
-            if (tx->state == TX_STATE_ACCEPT && !wallet_from->try_apply_method(wallet_to, tx)) {
+            if (tx.state == TX_STATE_ACCEPT && !wallet_from->try_apply_method(wallet_to, &tx)) {
                 DEBUG_COUT("block hash:\t" + bin2hex(block->get_block_hash()));
-                DEBUG_COUT("tx hash:\t" + bin2hex(tx->hash));
+                DEBUG_COUT("tx hash:\t" + bin2hex(tx.hash));
                 DEBUG_COUT("addr_from:\t" + addr_from);
                 DEBUG_COUT("addr_to:\t" + addr_to);
                 return false;
             }
 
-            state_fee->add(fee + (tx->raw_tx.size() > 255 ? tx->raw_tx.size() - 255 : 0));
+            state_fee->add(fee + (tx.raw_tx.size() > 255 ? tx.raw_tx.size() - 255 : 0));
         }
     } else {
         DEBUG_COUT("block wrong type");
@@ -996,8 +997,8 @@ bool BlockChain::can_apply_state_block(Block* block, bool check)
 
         if (check) {
             if (common_block->get_block_timestamp() >= 1572120000) {
-                for (auto&& tx : common_block->get_txs()) {
-                    const std::string& addr = tx->addr_to;
+                for (const auto& tx : common_block->get_txs()) {
+                    const std::string& addr = tx.addr_to;
                     Wallet* wallet_to = wallet_map.get_wallet(addr);
 
                     if (!wallet_to) {
@@ -1012,33 +1013,33 @@ bool BlockChain::can_apply_state_block(Block* block, bool check)
 
                         std::tie(value, nonce, data) = common_wallet->serialize();
 
-                        if (tx->nonce != nonce) {
+                        if (tx.nonce != nonce) {
                             DEBUG_COUT("nonce not equal in state block");
                             DEBUG_COUT(addr);
 
                             return false;
                         }
 
-                        if (tx->value != value) {
+                        if (tx.value != value) {
                             DEBUG_COUT("balance not equal in state block");
                             DEBUG_COUT(addr);
-                            DEBUG_COUT(tx->value);
+                            DEBUG_COUT(tx.value);
                             DEBUG_COUT(value);
 
                             return false;
                         }
 
-                        if (tx->data != data) {
+                        if (tx.data != data) {
                             DEBUG_COUT("data not equal in state block");
                             DEBUG_COUT(addr);
-                            DEBUG_COUT(tx->data);
+                            DEBUG_COUT(tx.data);
                             DEBUG_COUT(data);
                         }
                     }
                 }
             } else {
-                for (auto&& tx : common_block->get_txs()) {
-                    const std::string& addr_to = tx->addr_to;
+                for (const auto& tx : common_block->get_txs()) {
+                    const std::string& addr_to = tx.addr_to;
                     Wallet* wallet_to = wallet_map.get_wallet(addr_to);
 
                     if (!wallet_to) {
@@ -1052,17 +1053,17 @@ bool BlockChain::can_apply_state_block(Block* block, bool check)
 
                     std::tie(value, nonce, data) = wallet_to->serialize();
 
-                    if (tx->nonce != nonce) {
+                    if (tx.nonce != nonce) {
                         DEBUG_COUT("nonce not equal in state block");
                         DEBUG_COUT(addr_to);
 
                         return false;
                     }
 
-                    if (tx->value != value) {
+                    if (tx.value != value) {
                         DEBUG_COUT("balance not equal in state block");
                         DEBUG_COUT(addr_to);
-                        DEBUG_COUT(tx->value);
+                        DEBUG_COUT(tx.value);
                         DEBUG_COUT(value);
 
                         return false;
@@ -1070,8 +1071,8 @@ bool BlockChain::can_apply_state_block(Block* block, bool check)
                 }
             }
         } else {
-            for (auto&& tx : common_block->get_txs()) {
-                const std::string& addr_to = tx->addr_to;
+            for (const auto& tx : common_block->get_txs()) {
+                const std::string& addr_to = tx.addr_to;
                 Wallet* wallet_to = wallet_map.get_wallet(addr_to);
 
                 if (!wallet_to) {
@@ -1080,9 +1081,9 @@ bool BlockChain::can_apply_state_block(Block* block, bool check)
                 }
 
                 if (auto common_wallet = dynamic_cast<CommonWallet*>(wallet_to)) {
-                    common_wallet->initialize(tx->value, tx->nonce, std::string(tx->data));
+                    common_wallet->initialize(tx.value, tx.nonce, std::string(tx.data));
                 } else if (auto application = dynamic_cast<DecentralizedApplication*>(wallet_to)) {
-                    application->initialize(tx->value, tx->nonce, std::string(tx->data));
+                    application->initialize(tx.value, tx.nonce, std::string(tx.data));
                 } else {
                     DEBUG_COUT("unknown wallet type wrong type");
                 }
@@ -1122,8 +1123,8 @@ bool BlockChain::can_apply_forging_block(Block* block)
 
         std::set<std::string> forging_nodes_add_trust;
 
-        for (const auto* tx : common_block->get_txs()) {
-            const std::string& addr_to = tx->addr_to;
+        for (const auto& tx : common_block->get_txs()) {
+            const std::string& addr_to = tx.addr_to;
             Wallet* wallet_to = wallet_map.get_wallet(addr_to);
 
             if (!wallet_to) {
@@ -1131,49 +1132,49 @@ bool BlockChain::can_apply_forging_block(Block* block)
                 continue;
             }
 
-            switch (tx->state) {
+            switch (tx.state) {
             case 0: {
             } break;
             case TX_STATE_FORGING_R: {
-                wallet_to->add(tx->value);
-                total_forging += tx->value;
+                wallet_to->add(tx.value);
+                total_forging += tx.value;
             } break;
             case TX_STATE_FORGING_N: {
                 forging_nodes_add_trust.insert(addr_to);
-                wallet_to->add(tx->value);
-                total_forging += tx->value;
+                wallet_to->add(tx.value);
+                total_forging += tx.value;
             } break;
             case TX_STATE_FORGING_C: {
-                wallet_to->add(tx->value);
-                total_forging += tx->value;
+                wallet_to->add(tx.value);
+                total_forging += tx.value;
             } break;
             case TX_STATE_FORGING_W: {
-                wallet_to->add(tx->value);
-                total_forging += tx->value;
+                wallet_to->add(tx.value);
+                total_forging += tx.value;
             } break;
             case TX_STATE_FORGING_TEAM: {
-                wallet_to->add(tx->value);
+                wallet_to->add(tx.value);
             } break;
             case TX_STATE_FORGING_DAPP: {
-                if (tx->data.size() != 25) {
+                if (tx.data.size() != 25) {
                     DEBUG_COUT("wrong dapp addres");
                     return false;
                 }
 
-                const std::string& addr_from = bin2hex(tx->data);
+                const std::string& addr_from = bin2hex(tx.data);
                 auto* wallet_from = dynamic_cast<DecentralizedApplication*>(wallet_map.get_wallet(addr_to));
                 if (!wallet_from) {
                     DEBUG_COUT("wrong wallet type");
                     return false;
                 }
 
-                if (!wallet_from->sub(wallet_to, tx, 0)) {
+                if (!wallet_from->sub(wallet_to, &tx, 0)) {
                     DEBUG_COUT("not enough money on dapp wallet");
                     return false;
                 }
             } break;
             default:
-                DEBUG_COUT("wrong tx state\t" + std::to_string(tx->state));
+                DEBUG_COUT("wrong tx state\t" + std::to_string(tx.state));
                 return false;
                 break;
             }

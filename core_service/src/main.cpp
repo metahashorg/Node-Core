@@ -75,19 +75,22 @@ void SIGPIPE_handler(int /*s*/)
     DEBUG_COUT("Caught SIGPIPE");
 }
 
-[[noreturn]] void SIGSEGV_handler(int /*s*/) {
+[[noreturn]] void SIGSEGV_handler(int /*s*/)
+{
     DEBUG_COUT("Caught SIGSEGV");
     std::this_thread::sleep_for(std::chrono::seconds(2));
     exit(1);
 }
 
-[[noreturn]] void SIGTERM_handler(int /*s*/) {
+[[noreturn]] void SIGTERM_handler(int /*s*/)
+{
     DEBUG_COUT("Caught SIGTERM");
     std::this_thread::sleep_for(std::chrono::seconds(2));
     exit(0);
 }
 
-[[noreturn]] void print_config_file_params_and_exit() {
+[[noreturn]] void print_config_file_params_and_exit()
+{
     static const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COMMIT_HASH);
     DEBUG_COUT("");
     DEBUG_COUT(version);
@@ -158,13 +161,9 @@ int main(int argc, char** argv)
     std::thread(libevent, std::ref(blockChainController.get_wallet_statistics()), std::ref(blockChainController.get_wallet_request_addreses()), "wsstata.metahash.io", 80, "net-test").detach();
     std::thread(sendStat, std::ref(network), std::ref(host), tx_port, std::ref(blockChainController)).detach();
 
-    BLOCK_SERVER BS(tx_port, [&blockChainController](
-        const std::string_view req_post, 
-        const std::string_view req_url, 
-        const std::string_view req_sign,
-        const std::string_view req_pubk) {
+    BLOCK_SERVER BS(tx_port, [&blockChainController](const std::string_view req_post, const std::string_view req_url, const std::string_view req_sign, const std::string_view req_pubk) {
         if (req_url == "getinfo") {
-            static const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COMMIT_HASH);
+            static const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COUNT);
             rapidjson::StringBuffer s;
             rapidjson::Writer<rapidjson::StringBuffer> writer(s);
             writer.StartObject();
@@ -220,7 +219,7 @@ int main(int argc, char** argv)
     // });
 }
 
-__attribute__((__noreturn__)) void sendStat(const std::string& network, std::string& , int , BlockChainController& BlckChnCtrl)
+__attribute__((__noreturn__)) void sendStat(const std::string& network, std::string&, int, BlockChainController& BlckChnCtrl)
 {
     CurlFetch CF("172.104.236.166", 5797);
     //    const std::string host_name = host + "_" + std::to_string(tx_port);

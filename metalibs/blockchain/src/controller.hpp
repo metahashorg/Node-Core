@@ -117,8 +117,8 @@ private:
     void actualize_chain();
 
     void apply_block_chain(
-        std::map<sha256_2, Block*>& block_tree,
-        std::map<sha256_2, Block*>& prev_tree,
+        std::unordered_map<sha256_2, Block*, sha256_2_hasher>& block_tree,
+        std::unordered_map<sha256_2, Block*, sha256_2_hasher>& prev_tree,
         const std::string& source,
         bool need_write);
 };
