@@ -1155,6 +1155,13 @@ bool BlockChain::can_apply_forging_block(Block* block)
             case TX_STATE_FORGING_TEAM: {
                 wallet_to->add(tx.value);
             } break;
+            case TX_STATE_FORGING_FOUNDER: {
+                wallet_to->add(tx.value);
+                auto* f_wallet = dynamic_cast<CommonWallet*>(wallet_to);
+                if (f_wallet) {
+                    f_wallet->set_founder_limit();
+                }
+            } break;
             case TX_STATE_FORGING_DAPP: {
                 if (tx.data.size() != 25) {
                     DEBUG_COUT("wrong dapp addres");
