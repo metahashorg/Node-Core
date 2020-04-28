@@ -10,7 +10,10 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
-BlockChain::BlockChain() = default;
+BlockChain::BlockChain(boost::asio::io_context& io_context)
+    : io_context(io_context)
+{
+}
 
 bool BlockChain::can_apply_block(Block* block)
 {
@@ -889,7 +892,7 @@ bool BlockChain::can_apply_common_block(Block* block)
         uint64_t fee = 0;
         Wallet* state_fee = wallet_map.get_wallet(STATE_FEE_WALLET);
 
-        for (const auto& tx : common_block->get_txs()) {
+        for (const auto& tx : common_block->get_txs(io_context)) {
             if (tx.state == TX_STATE_FEE) {
                 fee = tx.value;
                 continue;
@@ -997,7 +1000,7 @@ bool BlockChain::can_apply_state_block(Block* block, bool check)
 
         if (check) {
             if (common_block->get_block_timestamp() >= 1572120000) {
-                for (const auto& tx : common_block->get_txs()) {
+                for (const auto& tx : common_block->get_txs(io_context)) {
                     const std::string& addr = tx.addr_to;
                     Wallet* wallet_to = wallet_map.get_wallet(addr);
 
@@ -1038,7 +1041,7 @@ bool BlockChain::can_apply_state_block(Block* block, bool check)
                     }
                 }
             } else {
-                for (const auto& tx : common_block->get_txs()) {
+                for (const auto& tx : common_block->get_txs(io_context)) {
                     const std::string& addr_to = tx.addr_to;
                     Wallet* wallet_to = wallet_map.get_wallet(addr_to);
 
@@ -1071,7 +1074,7 @@ bool BlockChain::can_apply_state_block(Block* block, bool check)
                 }
             }
         } else {
-            for (const auto& tx : common_block->get_txs()) {
+            for (const auto& tx : common_block->get_txs(io_context)) {
                 const std::string& addr_to = tx.addr_to;
                 Wallet* wallet_to = wallet_map.get_wallet(addr_to);
 
@@ -1123,7 +1126,7 @@ bool BlockChain::can_apply_forging_block(Block* block)
 
         std::set<std::string> forging_nodes_add_trust;
 
-        for (const auto& tx : common_block->get_txs()) {
+        for (const auto& tx : common_block->get_txs(io_context)) {
             const std::string& addr_to = tx.addr_to;
             Wallet* wallet_to = wallet_map.get_wallet(addr_to);
 

@@ -3,6 +3,8 @@
 #include <open_ssl_decor.h>
 #include <statics.hpp>
 
+#include <boost/thread/future.hpp>
+
 const std::vector<TX> CommonBlock::get_txs()
 {
     if (data.empty()) {
@@ -38,6 +40,55 @@ const std::vector<TX> CommonBlock::get_txs()
         txs[i].parse(tx_data, !SKIP_CHECK_SIGN);
         i++;
     }
+
+    std::sort(txs.begin(), txs.end(), [](TX& lh, TX& rh) { return lh.nonce < rh.nonce; });
+
+    return txs;
+}
+
+const std::vector<TX> CommonBlock::get_txs(boost::asio::io_context& io_context)
+{
+    if (data.empty()) {
+        return std::vector<TX>();
+    }
+
+    uint64_t cur_pos = tx_buff;
+    uint64_t tx_size;
+    {
+        std::string_view tx_size_arr(&data[cur_pos], data.size() - cur_pos);
+        uint64_t varint_size = read_varint(tx_size, tx_size_arr);
+        cur_pos += varint_size;
+    }
+
+    bool SKIP_CHECK_SIGN = (get_block_type() == BLOCK_TYPE_STATE || get_block_type() == BLOCK_TYPE_FORGING || get_prev_hash() == sha256_2 {});
+
+    std::vector<std::string_view> tx_buffs;
+    while (tx_size > 0) {
+        std::string_view tx_sw(&data[cur_pos], tx_size);
+        cur_pos += tx_size;
+        tx_buffs.push_back(tx_sw);
+
+        {
+            std::string_view tx_size_arr = std::string_view(&data[cur_pos], data.size() - cur_pos);
+            uint64_t varint_size = read_varint(tx_size, tx_size_arr);
+            cur_pos += varint_size;
+        }
+    }
+
+    std::vector<boost::shared_future<bool>> pending_data;
+    std::vector<TX> txs(tx_buffs.size());
+    uint64_t i = 0;
+    for (auto&& tx_data : tx_buffs) {
+        txs[i].parse(tx_data, !SKIP_CHECK_SIGN);
+        i++;
+
+        boost::packaged_task<bool> task(boost::bind(&TX::parse, &txs[i], tx_data, !SKIP_CHECK_SIGN));
+        boost::shared_future<bool> fut(task.get_future());
+        pending_data.push_back(std::move(fut));
+        boost::asio::post(io_context, std::move(task));
+    }
+
+    boost::wait_for_all(pending_data.begin(), pending_data.end());
 
     std::sort(txs.begin(), txs.end(), [](TX& lh, TX& rh) { return lh.nonce < rh.nonce; });
 

@@ -91,7 +91,7 @@ ControllerImplementation::ControllerImplementation(
     const std::set<std::pair<std::string, int>>& core_list,
     const std::pair<std::string, int>& host_port,
     bool test)
-    : BC(new BlockChain())
+    : BC(new BlockChain(io_context))
     , io_context(io_context)
     , path(_path)
     , cores(core_list, host_port, priv_key_line)

@@ -5,6 +5,7 @@
 #include "wallet.h"
 
 #include <atomic>
+#include <thread_pool.hpp>
 
 class BlockChain {
 private:
@@ -35,8 +36,10 @@ private:
     std::atomic<std::map<std::string, std::pair<uint, uint>>*> wallet_statistics = nullptr;
     std::atomic<std::deque<std::pair<std::string, uint64_t>>*> wallet_request_addreses = nullptr;
 
+    boost::asio::io_context& io_context;
+
 public:
-    BlockChain();
+    BlockChain(boost::asio::io_context& io_context);
 
     bool can_apply_block(Block* block);
 
@@ -55,7 +58,7 @@ public:
     std::atomic<std::map<std::string, std::pair<uint, uint>>*>& get_wallet_statistics();
     std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& get_wallet_request_addreses();
 
-    uint8_t check_addr(const std::string & addr);
+    uint8_t check_addr(const std::string& addr);
 
 private:
     Block* make_block(uint64_t b_type, uint64_t b_time, sha256_2 prev_b_hash, std::vector<char>& tx_buff);

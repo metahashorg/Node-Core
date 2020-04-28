@@ -1,6 +1,7 @@
 #ifndef BLOCK_H
 #define BLOCK_H
 
+#include <thread_pool.hpp>
 #include <transaction.h>
 
 class Block {
@@ -28,6 +29,7 @@ public:
 
     uint64_t get_block_type() override;
     const std::vector<TX> get_txs();
+    const std::vector<TX> get_txs(boost::asio::io_context& io_context);
 
     bool parse(std::string_view block_sw) override;
 };
