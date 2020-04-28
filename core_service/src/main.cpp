@@ -123,8 +123,6 @@ void libevent(
     const std::string& host, int port,
     const std::string& network);
 
-void sendStat(const std::string& network, std::string& host, int tx_port, BlockChainController& BlckChnCtrl);
-
 int main(int argc, char** argv)
 {
     //    signal(SIGPIPE, SIGPIPE_handler);
@@ -159,7 +157,6 @@ int main(int argc, char** argv)
     BlockChainController blockChainController(TP, key, path, known_hash, core_list, { host, tx_port }, skip_last_forging_and_state);
 
     std::thread(libevent, std::ref(blockChainController.get_wallet_statistics()), std::ref(blockChainController.get_wallet_request_addreses()), "wsstata.metahash.io", 80, "net-test").detach();
-    std::thread(sendStat, std::ref(network), std::ref(host), tx_port, std::ref(blockChainController)).detach();
 
     BLOCK_SERVER BS(tx_port, [&blockChainController](const std::string_view req_post, const std::string_view req_url, const std::string_view req_sign, const std::string_view req_pubk) {
         if (req_url == "getinfo") {
@@ -186,112 +183,6 @@ int main(int argc, char** argv)
         }
     });
     BS.start();
-
-    // http_server(TP, tx_port, [&blockChainController](HTTP_SERVER_IO* io_struct) {
-    //     //        return "Hello World";
-    //     std::string_view pack_sw(io_struct->req_post);
-
-    //     std::string path = io_struct->req_path;
-    //     path.erase(std::remove(path.begin(), path.end(), '/'), path.end());
-    //     std::string_view url_sw(path);
-
-    //     if (path == "getinfo") {
-    //         static const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COMMIT_HASH);
-    //         rapidjson::StringBuffer s;
-    //         rapidjson::Writer<rapidjson::StringBuffer> writer(s);
-    //         writer.StartObject();
-    //         {
-    //             writer.String("result");
-    //             writer.StartObject();
-    //             {
-    //                 writer.String("version");
-    //                 writer.String(version.c_str());
-    //                 writer.String("mh_addr");
-    //                 writer.String(blockChainController.get_str_address().c_str());
-    //             }
-    //             writer.EndObject();
-    //         }
-    //         writer.EndObject();
-    //         return std::string(s.GetString());
-    //     } else {
-    //         return blockChainController.add_pack_to_queue(pack_sw, url_sw);
-    //     }
-    // });
-}
-
-__attribute__((__noreturn__)) void sendStat(const std::string& network, std::string&, int, BlockChainController& BlckChnCtrl)
-{
-    CurlFetch CF("172.104.236.166", 5797);
-    //    const std::string host_name = host + "_" + std::to_string(tx_port);
-    const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COUNT) + "." + std::string(GIT_COMMIT_HASH);
-
-    bool forever = true;
-    while (forever) {
-        std::this_thread::sleep_for(std::chrono::seconds(3));
-        std::string ip = getMyIp();
-        uint64_t timestamp = std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count();
-        std::string req_post;
-
-        {
-            rapidjson::StringBuffer s;
-            rapidjson::Writer<rapidjson::StringBuffer> writer(s);
-
-            auto write_metric = [&writer](const std::string& key, const std::string& value) {
-                writer.StartObject();
-                {
-
-                    writer.String("metric");
-                    writer.String(key.c_str());
-
-                    writer.String("type");
-                    writer.String("none");
-
-                    writer.String("value");
-                    writer.String(value.c_str());
-                }
-                writer.EndObject();
-            };
-
-            writer.StartObject();
-            {
-
-                writer.String("params");
-                writer.StartObject();
-                {
-
-                    writer.String("network");
-                    writer.String(network.c_str());
-
-                    writer.String("group");
-                    writer.String("core");
-
-                    writer.String("server");
-                    writer.String(BlckChnCtrl.get_str_address().c_str());
-
-                    writer.String("timestamp_ms");
-                    writer.Uint64(timestamp);
-
-                    writer.String("metrics");
-                    writer.StartArray();
-                    {
-                        write_metric("ip", ip);
-                        write_metric("mh_addr", BlckChnCtrl.get_str_address());
-                        write_metric("last_block_info", "hash: " + BlckChnCtrl.get_last_block_str() + ";");
-                        write_metric("version", version);
-                    }
-                    writer.EndArray();
-                }
-                writer.EndObject();
-            }
-            writer.EndObject();
-
-            req_post = std::string(s.GetString());
-        }
-
-        std::string response;
-        CF.post("save-metrics", req_post, response);
-    }
-    exit(0);
 }
 
 __attribute__((__noreturn__)) void libevent(
