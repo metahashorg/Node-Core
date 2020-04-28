@@ -20,7 +20,7 @@ private:
 
 public:
     BlockChainController(
-        ThreadPool& TP,
+        boost::asio::io_context& io_context,
         const std::string& priv_key_line,
         const std::string& path,
         const std::string& proved_hash,

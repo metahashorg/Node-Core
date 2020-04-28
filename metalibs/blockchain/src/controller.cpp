@@ -44,7 +44,7 @@ std::set<std::string> get_files_in_dir(std::string& path)
 }
 
 void parse_block_async(
-    ThreadPool& TP,
+    boost::asio::io_context& io_context,
     std::atomic<long int>& jobs,
     char* block_buff,
     int64_t block_size,
@@ -53,7 +53,7 @@ void parse_block_async(
     std::unordered_map<sha256_2, Block*, sha256_2_hasher>& prev_tree,
     bool delete_buff)
 {
-    TP.runAsync([&jobs, block_buff, block_size, &block_lock, &block_tree, &prev_tree, delete_buff]() {
+    boost::asio::post(io_context, [&jobs, block_buff, block_size, &block_lock, &block_tree, &prev_tree, delete_buff]() {
         std::string_view block_as_string(block_buff, block_size);
         Block* block = parse_block(block_as_string);
 
@@ -84,7 +84,7 @@ void parse_block_async(
 }
 
 ControllerImplementation::ControllerImplementation(
-    ThreadPool& TP,
+    boost::asio::io_context& io_context,
     const std::string& priv_key_line,
     const std::string& _path,
     const std::string& proved_hash,
@@ -92,7 +92,7 @@ ControllerImplementation::ControllerImplementation(
     const std::pair<std::string, int>& host_port,
     bool test)
     : BC(new BlockChain())
-    , TP(TP)
+    , io_context(io_context)
     , path(_path)
     , cores(core_list, host_port, priv_key_line)
     , test(test)
@@ -175,7 +175,7 @@ void ControllerImplementation::read_and_apply_local_chain()
                 if (ifile.read(block_buff, static_cast<int64_t>(block_size))) {
                     jobs++;
 
-                    parse_block_async(TP, jobs, block_buff, block_size, block_lock, blocks, prev_tree, true);
+                    parse_block_async(io_context, jobs, block_buff, block_size, block_lock, blocks, prev_tree, true);
 
                 } else {
                     std::string msg = "read file error\t" + file;
@@ -325,7 +325,7 @@ void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Bl
         std::atomic<int> jobs = 0;
         for (auto&& [hash, block] : block_tree) {
             jobs++;
-            TP.runAsync([hash, block, this, &jobs]() {
+            boost::asio::post(io_context, [hash, block, this, &jobs]() {
                 if (blocks.find(hash) == blocks.end()) {
                     delete block;
                 }

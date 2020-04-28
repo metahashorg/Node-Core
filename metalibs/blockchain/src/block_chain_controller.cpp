@@ -5,14 +5,14 @@
 #include <meta_log.hpp>
 
 BlockChainController::BlockChainController(
-    ThreadPool& TP,
+    boost::asio::io_context& io_context,
     const std::string& priv_key_line,
     const std::string& path,
     const std::string& proved_hash,
     const std::set<std::pair<std::string, int>>& core_list,
     const std::pair<std::string, int>& host_port,
     bool test)
-    : CI(new ControllerImplementation(TP, priv_key_line, path, proved_hash, core_list, host_port, test))
+    : CI(new ControllerImplementation(io_context, priv_key_line, path, proved_hash, core_list, host_port, test))
 {
 }
 

@@ -29,7 +29,7 @@ struct ControllerImplementation {
     moodycamel::ConcurrentQueue<ApproveRecord*> approve_queue;
 
     BlockChain* BC;
-    ThreadPool& TP;
+    boost::asio::io_context& io_context;
 
     std::vector<TX*> transactions;
     std::unordered_map<sha256_2, Block*, sha256_2_hasher> blocks;
@@ -67,7 +67,7 @@ struct ControllerImplementation {
 
 public:
     ControllerImplementation(
-        ThreadPool& TP,
+        boost::asio::io_context& io_context,
         const std::string& priv_key_line,
         const std::string& _path,
         const std::string& proved_hash,
