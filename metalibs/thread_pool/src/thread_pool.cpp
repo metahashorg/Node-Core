@@ -1,6 +1,6 @@
 #include <thread_pool.hpp>
 
-std::vector<boost::thread> thread_pool(boost::asio::io_context& io_context, uint64_t thread_count)
+std::tuple<std::vector<boost::thread>, boost::asio::io_context::work> thread_pool(boost::asio::io_context& io_context, uint64_t thread_count)
 {
     std::vector<boost::thread> threadpool;
     boost::asio::io_context::work work(io_context);
@@ -12,5 +12,5 @@ std::vector<boost::thread> thread_pool(boost::asio::io_context& io_context, uint
             }));
     }
 
-    return threadpool;
+    return { std::move(threadpool), std::move(work) };
 }
