@@ -10,6 +10,7 @@
 
 #include <experimental/filesystem>
 #include <fstream>
+#include <future>
 #include <list>
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
@@ -43,34 +44,21 @@ std::set<std::string> get_files_in_dir(std::string& path)
     return files;
 }
 
-void parse_block_async(
+std::future<Block*> parse_block_async(
     boost::asio::io_context& io_context,
-    std::atomic<long int>& jobs,
     char* block_buff,
     int64_t block_size,
-    std::mutex& block_lock,
-    std::unordered_map<sha256_2, Block*, sha256_2_hasher>& block_tree,
-    std::unordered_map<sha256_2, Block*, sha256_2_hasher>& prev_tree,
     bool delete_buff)
 {
-    boost::asio::post(io_context, [&jobs, block_buff, block_size, &block_lock, &block_tree, &prev_tree, delete_buff]() {
+    std::packaged_task<Block*()> task([block_buff, block_size, delete_buff]() {
         std::string_view block_as_string(block_buff, block_size);
         Block* block = parse_block(block_as_string);
 
         if (block) {
-            if (dynamic_cast<CommonBlock*>(block)) {
-                std::lock_guard<std::mutex> lock(block_lock);
-                if (!block_tree.insert({ block->get_block_hash(), block }).second) {
-                    DEBUG_COUT("Duplicate block in chain\t" + bin2hex(block->get_block_hash()));
-                    delete block;
-                } else if (!prev_tree.insert({ block->get_prev_hash(), block }).second) {
-                    DEBUG_COUT("Branches in block chain\t" + bin2hex(block->get_prev_hash()) + "\t->\t" + bin2hex(block->get_block_hash()));
-                    block_tree.erase(block->get_block_hash());
-                    delete block;
-                }
-            } else {
+            if (!dynamic_cast<CommonBlock*>(block)) {
                 DEBUG_COUT("Not common block");
                 delete block;
+                block = nullptr;
             }
         } else {
             DEBUG_COUT("Block parse error");
@@ -79,8 +67,13 @@ void parse_block_async(
         if (delete_buff) {
             delete[] block_buff;
         }
-        jobs--;
+
+        return block;
     });
+    std::future<Block*> fut(task.get_future());
+    boost::asio::post(io_context, std::move(task));
+
+    return fut;
 }
 
 ControllerImplementation::ControllerImplementation(
@@ -127,9 +120,6 @@ ControllerImplementation::ControllerImplementation(
 
 void ControllerImplementation::read_and_apply_local_chain()
 {
-    std::mutex block_lock;
-    std::atomic<long int> jobs(0);
-
     std::string last_file;
 
     std::ifstream last_known_state_file("last_state.json");
@@ -158,6 +148,7 @@ void ControllerImplementation::read_and_apply_local_chain()
         last_known_state_file.close();
     }
 
+    std::vector<std::future<Block*>> pending_data;
     std::unordered_map<sha256_2, Block*, sha256_2_hasher> prev_tree;
 
     char uint64_buff[8];
@@ -169,14 +160,10 @@ void ControllerImplementation::read_and_apply_local_chain()
         if (ifile.is_open()) {
             while (ifile.read(uint64_buff, 8)) {
                 uint64_t block_size = *(reinterpret_cast<uint64_t*>(uint64_buff));
-
                 char* block_buff = new char[block_size];
 
                 if (ifile.read(block_buff, static_cast<int64_t>(block_size))) {
-                    jobs++;
-
-                    parse_block_async(io_context, jobs, block_buff, block_size, block_lock, blocks, prev_tree, true);
-
+                    pending_data.push_back(parse_block_async(io_context, block_buff, block_size, true));
                 } else {
                     std::string msg = "read file error\t" + file;
                     DEBUG_COUT(msg);
@@ -192,8 +179,18 @@ void ControllerImplementation::read_and_apply_local_chain()
         }
     }
 
-    while (jobs.load(std::memory_order_acquire) != 0) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    for (auto&& fut : pending_data) {
+        auto block = fut.get();
+        if (block) {
+            if (!blocks.insert({ block->get_block_hash(), block }).second) {
+                DEBUG_COUT("Duplicate block in chain\t" + bin2hex(block->get_block_hash()));
+                delete block;
+            } else if (!prev_tree.insert({ block->get_prev_hash(), block }).second) {
+                DEBUG_COUT("Branches in block chain\t" + bin2hex(block->get_prev_hash()) + "\t->\t" + bin2hex(block->get_block_hash()));
+                blocks.erase(block->get_block_hash());
+                delete block;
+            }
+        }
     }
 
     DEBUG_COUT("PARSE BLOCKCHAIN COMPLETE");

@@ -3,7 +3,7 @@
 #include <open_ssl_decor.h>
 #include <statics.hpp>
 
-#include <boost/thread/future.hpp>
+#include <future>
 
 const std::vector<TX> CommonBlock::get_txs()
 {
@@ -75,20 +75,21 @@ const std::vector<TX> CommonBlock::get_txs(boost::asio::io_context& io_context)
         }
     }
 
-    std::vector<boost::shared_future<bool>> pending_data;
+    std::vector<std::future<bool>> pending_data;
     std::vector<TX> txs(tx_buffs.size());
     uint64_t i = 0;
     for (auto&& tx_data : tx_buffs) {
-        txs[i].parse(tx_data, !SKIP_CHECK_SIGN);
-        i++;
-
-        boost::packaged_task<bool> task(boost::bind(&TX::parse, &txs[i], tx_data, !SKIP_CHECK_SIGN));
-        boost::shared_future<bool> fut(task.get_future());
+        std::packaged_task<bool()> task(std::bind(&TX::parse, &txs[i], tx_data, !SKIP_CHECK_SIGN));
+        std::future<bool> fut(task.get_future());
         pending_data.push_back(std::move(fut));
         boost::asio::post(io_context, std::move(task));
+
+        i++;
     }
 
-    boost::wait_for_all(pending_data.begin(), pending_data.end());
+    for (auto&& fut : pending_data) {
+        fut.get();
+    }
 
     std::sort(txs.begin(), txs.end(), [](TX& lh, TX& rh) { return lh.nonce < rh.nonce; });
 
