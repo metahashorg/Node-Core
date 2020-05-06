@@ -8,8 +8,8 @@
 #include "date.h"
 
 namespace meta_log {
-    auto output_queue = new moodycamel::ConcurrentQueue<std::stringstream *>();
-    auto cout_printer = new std::thread([]() {
+    moodycamel::ConcurrentQueue<std::stringstream *>* output_queue = new moodycamel::ConcurrentQueue<std::stringstream *>();
+    std::thread* cout_printer = new std::thread([]() {
         moodycamel::ConsumerToken ct(*output_queue);
 
         for (;;) {

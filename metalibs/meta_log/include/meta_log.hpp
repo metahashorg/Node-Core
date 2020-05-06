@@ -29,7 +29,7 @@ namespace meta_log {
             auto *p_ssout = new std::stringstream;
             print_to_stream_date_and_place(p_ssout, file, function, line);
             (*p_ssout) << msg;
-            __output_queue->enqueue(p_ssout);
+            output_queue->enqueue(p_ssout);
 #endif
         }
     }
