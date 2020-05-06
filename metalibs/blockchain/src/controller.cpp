@@ -408,8 +408,7 @@ void ControllerImplementation::actualize_chain()
                             block_tree.erase(block->get_block_hash());
                             delete block;
                             block = nullptr;
-                        }
-                        if (blocks.find(block->get_prev_hash()) == blocks.end()) {
+                        } else if (blocks.find(block->get_prev_hash()) == blocks.end()) {
                             missing_blocks.insert(block->get_prev_hash());
                         }
                     } else {
