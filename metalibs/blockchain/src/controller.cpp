@@ -299,7 +299,9 @@ void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Bl
         }
 
         if (need_write) {
-            {
+            uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
+
+            if (timestamp - block->get_block_timestamp() < 60) {
                 auto* p_ar = new ApproveRecord;
                 p_ar->make(block->get_block_hash(), PrivKey, PubKey);
                 p_ar->approve = true;
