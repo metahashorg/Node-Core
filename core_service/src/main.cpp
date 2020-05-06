@@ -192,19 +192,10 @@ __attribute__((__noreturn__)) void libevent(
     const std::string& host, int port,
     const std::string& network)
 {
-    std::string key_type = "keys_tmh";
-    if (network == "net-main") {
-        key_type = "keys_mth";
-    } else if (network == "net-dev") {
-        key_type = "keys_tmh";
-    } else if (network == "net-test") {
-        key_type = "keys_mth";
-    }
+    std::string key_type = network == "net-dev" ? "keys_tmh" : "keys_mth";
 
-    //    mh::libevent::LibEvent levent;
     CurlFetch CF(host, port);
-    bool endless_loop = true;
-    while (endless_loop) {
+    for (;;) {
         std::deque<std::pair<std::string, uint64_t>>* p_addreses;
         while (true) {
             std::deque<std::pair<std::string, uint64_t>>* null_adr = nullptr;

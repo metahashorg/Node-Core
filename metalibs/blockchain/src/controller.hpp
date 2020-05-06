@@ -24,6 +24,7 @@ struct Block;
 class BlockChain;
 
 struct ControllerImplementation {
+private:
     moodycamel::ConcurrentQueue<TX*> tx_queue;
     moodycamel::ConcurrentQueue<Block*> block_queue;
     moodycamel::ConcurrentQueue<ApproveRecord*> approve_queue;
