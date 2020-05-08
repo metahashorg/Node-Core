@@ -1,12 +1,7 @@
 project(net_io VERSION 0.1 LANGUAGES C CXX)
 
 add_library(${PROJECT_NAME}
-    src/http_io_data.cpp
-    src/io_service.cpp
-    src/picohttpparser.c
-    src/socket_client.cpp
-    src/socket_io_data.cpp
-    src/socket_server.cpp)
+    src/meta_http_server.cpp include/meta_client.h src/meta_client.cpp)
 
 
 target_include_directories(${PROJECT_NAME} PUBLIC

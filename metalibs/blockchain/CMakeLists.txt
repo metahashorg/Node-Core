@@ -23,9 +23,9 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 
 target_link_libraries(${PROJECT_NAME} ${OPENSSL_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} curl)
-target_link_libraries(${PROJECT_NAME} mh_xxhash)
-#target_link_libraries(${PROJECT_NAME} mh_libevent)
 target_link_libraries(${PROJECT_NAME} stdc++fs)
 target_link_libraries(${PROJECT_NAME} meta_log)
 target_link_libraries(${PROJECT_NAME} metacrypto)
-target_link_libraries(${PROJECT_NAME} moodycamel rapidjson thread_pool)
+target_link_libraries(${PROJECT_NAME} moodycamel)
+target_link_libraries(${PROJECT_NAME} thread_pool)
+target_link_libraries(${PROJECT_NAME} rapidjson)
