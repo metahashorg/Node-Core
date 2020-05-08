@@ -22,8 +22,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package (Threads)
 
+add_subdirectory(version)
 add_subdirectory(libs)
 add_subdirectory(metalibs)
-add_subdirectory(mhsupport)
 
 add_subdirectory(core_service)
