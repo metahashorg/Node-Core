@@ -18,7 +18,6 @@
 #include "version.h"
 
 #include <blockchain.h>
-// #include <http_io_data.hpp>
 #include <meta_log.hpp>
 #include <open_ssl_decor.h>
 #include <statics.hpp>
@@ -28,66 +27,6 @@
 #include <rapidjson/writer.h>
 
 #include <mhcurl.hpp>
-
-std::string getMyIp()
-{
-    std::string MyIP;
-    const char* statistics_server = "172.104.236.166";
-    int statistics_port = 5797;
-
-    struct sockaddr_in serv {
-    };
-
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-
-    //Socket could not be created
-    if (sock < 0) {
-        perror("Socket error");
-    }
-
-    serv.sin_family = AF_INET;
-    serv.sin_addr.s_addr = inet_addr(statistics_server);
-    serv.sin_port = htons(statistics_port);
-
-    connect(sock, (const struct sockaddr*)&serv, sizeof(serv));
-
-    struct sockaddr_in name {
-    };
-    socklen_t namelen = sizeof(name);
-    getsockname(sock, (struct sockaddr*)&name, &namelen);
-
-    char buffer[100];
-    const char* p = inet_ntop(AF_INET, &name.sin_addr, buffer, 100);
-
-    if (p != nullptr) {
-        MyIP = std::string(buffer);
-    } else {
-        MyIP = "0.0.0.0";
-    }
-
-    close(sock);
-
-    return MyIP;
-}
-
-void SIGPIPE_handler(int /*s*/)
-{
-    DEBUG_COUT("Caught SIGPIPE");
-}
-
-[[noreturn]] void SIGSEGV_handler(int /*s*/)
-{
-    DEBUG_COUT("Caught SIGSEGV");
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-    exit(1);
-}
-
-[[noreturn]] void SIGTERM_handler(int /*s*/)
-{
-    DEBUG_COUT("Caught SIGTERM");
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-    exit(0);
-}
 
 [[noreturn]] void print_config_file_params_and_exit()
 {
@@ -125,10 +64,6 @@ void libevent(
 
 int main(int argc, char** argv)
 {
-    //    signal(SIGPIPE, SIGPIPE_handler);
-    signal(SIGTERM, SIGTERM_handler);
-    signal(SIGSEGV, SIGSEGV_handler);
-
     std::string network;
     std::string host;
     int tx_port = 8181;
@@ -153,9 +88,23 @@ int main(int argc, char** argv)
 
     parse_settings(std::string(argv[1]), network, host, tx_port, path, known_hash, key, core_list);
 
-    boost::asio::io_context io_context;
-    auto&& [threads, work] = thread_pool(io_context, std::thread::hardware_concurrency());
+    int threads = std::thread::hardware_concurrency();
+    boost::asio::io_context io_context(threads);
     BlockChainController blockChainController(io_context, key, path, known_hash, core_list, { host, tx_port }, skip_last_forging_and_state);
+
+    std::vector<std::thread> thread_pool;
+    thread_pool.reserve(threads - 1);
+    for (auto i = 1; i < threads; i++) {
+        thread_pool.emplace_back(
+            [&io_context] {
+                io_context.run();
+            });
+    }
+    io_context.run();
+
+    for (auto& t : thread_pool) {
+        t.join();
+    }
 
     std::thread(libevent, std::ref(blockChainController.get_wallet_statistics()), std::ref(blockChainController.get_wallet_request_addreses()), "wsstata.metahash.io", 80, "net-test").detach();
 
@@ -184,6 +133,8 @@ int main(int argc, char** argv)
         }
     });
     BS.start();
+
+    return EXIT_SUCCESS;
 }
 
 __attribute__((__noreturn__)) void libevent(
