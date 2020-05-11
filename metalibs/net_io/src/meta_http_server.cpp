@@ -6,6 +6,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/shared_ptr.hpp>
 #include <meta_http_server.h>
+#include <open_ssl_decor.h>
 
 meta_http_server::meta_http_server(boost::asio::io_context& io_context, const std::string& address, const std::string& port)
     : io_context(io_context)
@@ -106,13 +107,86 @@ std::vector<boost::asio::const_buffer> reply::to_buffers()
     return buffers;
 }
 
+bool request::read_varint(uint64_t varint)
+{
+    auto previous_offset = offset;
+    offset += ::read_varint(request_id, std::string_view(&request_full[offset], request_full.size() - offset));
+    return offset != previous_offset;
+}
+
+bool request::fill_sw(std::string_view& sw, uint64_t sw_size)
+{
+    if (offset + sw_size < request_full.size()) {
+        return false;
+    } else {
+        sw = std::string_view(&request_full[offset], sw_size);
+        offset += sw_size;
+        return true;
+    }
+}
+
 int8_t request::parse(char* buff_data, size_t buff_size)
 {
+    request_full.insert(request_full.end(), buff_data, buff_data + buff_size);
 
-    switch (current_state) {
-    case state["magic_number_state"].first:
-        ls;
-    default:
-        return false;
+    if (magic_number == 0) {
+        if (request_full.size() >= sizeof(uint32_t)) {
+            magic_number = *(reinterpret_cast<uint32_t*>(&request_full[0]));
+            if (magic_number != METAHASH_MAGIC_NUMBER) {
+                return WRONG_MAGIC_NUMBER;
+            }
+            offset = sizeof(uint32_t);
+            current_state = 10;
+        } else {
+            return 0;
+        }
     }
+
+    if (request_id == 0 && !read_varint(request_id)) {
+        return 0;
+    }
+
+    if (request_type == 0 && !read_varint(request_type)) {
+        return 0;
+    }
+
+    if (public_key_size == 0 && !read_varint(public_key_size)) {
+        return 0;
+    }
+
+    if (public_key.empty()) {
+        if (fill_sw(public_key, public_key_size)) {
+            if (!allowed_addreses.empty()) {
+                if (allowed_addreses.find(get_address(public_key)) == allowed_addreses.end()) {
+                    return UNKNOWN_SENDER_METAHASH_ADDRESS;
+                }
+            }
+        } else {
+            return 0;
+        }
+    }
+
+    if (sign_size == 0 && !read_varint(sign_size)) {
+        return 0;
+    }
+
+    if (sign.empty() && fill_sw(sign, sign_size)) {
+        return 0;
+    }
+
+    if (message_size == 0 && !read_varint(message_size)) {
+        return 0;
+    }
+
+    if (message.empty()) {
+        if (fill_sw(message, message_size)) {
+            if (!check_sign(message, sign, public_key)) {
+                return INVALID_SIGN;
+            }
+        } else {
+            return 0;
+        }
+    }
+
+    return 1;
 }

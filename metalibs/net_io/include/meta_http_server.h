@@ -12,30 +12,25 @@
 #include <boost/enable_shared_from_this.hpp>
 
 struct request {
-    uint64_t part_index = 0;
-    uint64_t part_expected_size = 0;
-    uint32_t magic_number;
-    uint64_t request_size;
-    std::vector<char> request_type;
-    std::vector<char> public_key;
-    std::vector<char> sign;
-    std::vector<char> message;
+    uint64_t request_id = 0;
+    uint64_t request_type = 0;
+    std::string_view public_key;
+    std::string_view sign;
+    std::string_view message;
 
-    int8_t parse(char *, size_t);
+    int8_t parse(char*, size_t);
 
-    int current_state = 0;
-    std::unordered_map<std::string, std::pair<int, int>> state{
-        {"magic_number_state",{0,4}},
-        {"request_size_state",{0,0}},
-        {"request_type_state",{0,0}},
-        {"public_key_size_state",{0,0}},
-        {"public_key_state",{0,0}},
-        {"sign_size_state",{0,0}},
-        {"sign_state",{0,0}},
-        {"message_size_state",{0,0}},
-        {"message_size",{0,0}},
-        {"message_state",{0,0}}
-    };
+private:
+    std::vector<char> request_full;
+    uint64_t offset = 0;
+
+    uint32_t magic_number = 0;
+    uint64_t public_key_size = 0;
+    uint64_t sign_size = 0;
+    uint64_t message_size = 0;
+
+    bool read_varint(uint64_t varint);
+    bool fill_sw(std::string_view& sw, uint64_t sw_size);
 };
 
 class connection
@@ -60,7 +55,6 @@ private:
     boost::array<char, 0xffff> buffer;
 
     request request;
-
 };
 
 class meta_http_server {
