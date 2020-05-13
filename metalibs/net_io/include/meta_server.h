@@ -1,9 +1,5 @@
-//
-// Created by 79173 on 07.05.2020.
-//
-
-#ifndef METANET_META_HTTP_SERVER_H
-#define METANET_META_HTTP_SERVER_H
+#ifndef METANET_META_SERVER_H
+#define METANET_META_SERVER_H
 
 #include <unordered_map>
 
@@ -57,9 +53,9 @@ private:
     request request;
 };
 
-class meta_http_server {
+class meta_server {
 public:
-    explicit meta_http_server(boost::asio::io_context& io_context, const std::string& address, const std::string& port);
+    explicit meta_server(boost::asio::io_context& io_context, const std::string& address, const std::string& port, request_handler);
 
 private:
     void start_accept();
@@ -73,4 +69,4 @@ private:
     boost::shared_ptr<connection> new_connection;
 };
 
-#endif //METANET_META_HTTP_SERVER_H
+#endif //METANET_META_SERVER_H

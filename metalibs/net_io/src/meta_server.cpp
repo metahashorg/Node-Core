@@ -5,10 +5,10 @@
 #include <boost/bind.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/shared_ptr.hpp>
-#include <meta_http_server.h>
+#include <meta_server.h>
 #include <open_ssl_decor.h>
 
-meta_http_server::meta_http_server(boost::asio::io_context& io_context, const std::string& address, const std::string& port)
+meta_server::meta_server(boost::asio::io_context& io_context, const std::string& address, const std::string& port)
     : io_context(io_context)
     , acceptor(io_context)
     , new_connection()
@@ -24,14 +24,13 @@ meta_http_server::meta_http_server(boost::asio::io_context& io_context, const st
     start_accept();
 }
 
-void meta_http_server::start_accept()
+void meta_server::start_accept()
 {
     new_connection.reset(new connection(io_context, request_handler));
-    acceptor.async_accept(new_connection->get_socket(),
-        boost::bind(&meta_http_server::handle_accept, this, boost::asio::placeholders::error));
+    acceptor.async_accept(new_connection->get_socket(), boost::bind(&meta_server::handle_accept, this, boost::asio::placeholders::error));
 }
 
-void meta_http_server::handle_accept(const boost::system::error_code& e)
+void meta_server::handle_accept(const boost::system::error_code& e)
 {
     if (!e) {
         new_connection->start();
