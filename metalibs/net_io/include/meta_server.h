@@ -7,12 +7,16 @@
 #include <boost/asio.hpp>
 #include <boost/enable_shared_from_this.hpp>
 
-struct request {
+class request {
+public:
     uint64_t request_id = 0;
     uint64_t request_type = 0;
     std::string_view public_key;
     std::string_view sign;
     std::string_view message;
+
+    std::string sender_addr;
+    std::string remote_address;
 
     int8_t parse(char*, size_t);
 
@@ -25,12 +29,22 @@ private:
     uint64_t sign_size = 0;
     uint64_t message_size = 0;
 
-    bool read_varint(uint64_t varint);
+    bool read_varint(uint64_t &varint);
     bool fill_sw(std::string_view& sw, uint64_t sw_size);
 };
 
-class connection
-    : public boost::enable_shared_from_this<connection> {
+class reply {
+public:
+    uint64_t reply_id = 0;
+    std::vector<char> message;
+
+    std::vector<boost::asio::const_buffer> to_buffers();
+    void make(signer);
+
+private:
+};
+
+class connection : public boost::enable_shared_from_this<connection> {
 public:
     explicit connection(boost::asio::io_context& io_context);
 
@@ -39,8 +53,7 @@ public:
     void start();
 
 private:
-    void handle_read(const boost::system::error_code& e,
-        std::size_t bytes_transferred);
+    void handle_read(const boost::system::error_code& e,        std::size_t bytes_transferred);
 
     void handle_write(const boost::system::error_code& e);
 
@@ -51,6 +64,7 @@ private:
     boost::array<char, 0xffff> buffer;
 
     request request;
+
 };
 
 class meta_server {
@@ -63,7 +77,6 @@ private:
     void handle_accept(const boost::system::error_code& e);
 
     boost::asio::io_context& io_context;
-
     boost::asio::ip::tcp::acceptor acceptor;
 
     boost::shared_ptr<connection> new_connection;

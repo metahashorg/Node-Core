@@ -1,7 +1,3 @@
-//
-// Created by 79173 on 07.05.2020.
-//
-
 #include <boost/bind.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/shared_ptr.hpp>
@@ -53,32 +49,26 @@ boost::asio::ip::tcp::socket& connection::get_socket()
 
 void connection::start()
 {
-    socket.async_read_some(boost::asio::buffer(buffer),
-        boost::bind(&connection::handle_read, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+    socket.async_read_some(boost::asio::buffer(buffer), boost::bind(&connection::handle_read, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 }
 
-void connection::handle_read(const boost::system::error_code& e,
-    std::size_t bytes_transferred)
+void connection::handle_read(const boost::system::error_code& e, std::size_t bytes_transferred)
 {
     if (!e) {
         int8_t result = request.parse(buffer.data(), bytes_transferred);
 
         switch (result) {
         case 1: {
-            request_handler.handle_request(request, reply);
-            boost::asio::async_write(socket, reply.to_buffers(),
-                boost::bind(&connection::handle_write, shared_from_this(), boost::asio::placeholders::error));
+            request.remote_address = socket.remote_endpoint().address().to_string();
+            std::vector<char> reply = request_handler(request);
+            boost::asio::async_write(socket, reply, boost::bind(&connection::handle_write, shared_from_this(), boost::asio::placeholders::error));
         } break;
         case 0: {
-            socket.async_read_some(boost::asio::buffer(buffer),
-                boost::bind(&connection::handle_read, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
-        } break;
-        case -1: {
-            reply = reply::stock_reply(reply::bad_request);
-            boost::asio::async_write(socket, reply.to_buffers(),
-                boost::bind(&connection::handle_write, shared_from_this(), boost::asio::placeholders::error));
+            socket.async_read_some(boost::asio::buffer(buffer), boost::bind(&connection::handle_read, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
         } break;
         default: {
+            reply = reply::stock_reply(reply::bad_request);
+            boost::asio::async_write(socket, version_info, boost::bind(&connection::handle_write, shared_from_this(), boost::asio::placeholders::error));
         }
         }
     }
@@ -94,22 +84,14 @@ void connection::handle_write(const boost::system::error_code& e)
 std::vector<boost::asio::const_buffer> reply::to_buffers()
 {
     std::vector<boost::asio::const_buffer> buffers;
-    buffers.push_back(status_strings::to_buffer(status));
-    for (auto& header : headers) {
-        buffers.push_back(boost::asio::buffer(header.name));
-        buffers.push_back(boost::asio::buffer(misc_strings::name_value_separator));
-        buffers.push_back(boost::asio::buffer(header.value));
-        buffers.push_back(boost::asio::buffer(misc_strings::crlf));
-    }
-    buffers.push_back(boost::asio::buffer(misc_strings::crlf));
-    buffers.push_back(boost::asio::buffer(content));
+
     return buffers;
 }
 
-bool request::read_varint(uint64_t varint)
+bool request::read_varint(uint64_t &varint)
 {
     auto previous_offset = offset;
-    offset += ::read_varint(request_id, std::string_view(&request_full[offset], request_full.size() - offset));
+    offset += ::read_varint(varint, std::string_view(&request_full[offset], request_full.size() - offset));
     return offset != previous_offset;
 }
 
@@ -155,6 +137,7 @@ int8_t request::parse(char* buff_data, size_t buff_size)
 
     if (public_key.empty()) {
         if (fill_sw(public_key, public_key_size)) {
+            sender_addr = "0x" + bin2hex(get_address(public_key));
             if (!allowed_addreses.empty()) {
                 if (allowed_addreses.find(get_address(public_key)) == allowed_addreses.end()) {
                     return UNKNOWN_SENDER_METAHASH_ADDRESS;
