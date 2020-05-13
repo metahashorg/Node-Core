@@ -103,7 +103,7 @@ bool DecentralizedApplication::initialize(uint64_t value, uint64_t nonce, const 
     return true;
 }
 
-bool DecentralizedApplication::try_apply_method(Wallet* , TX const* )
+bool DecentralizedApplication::try_apply_method(Wallet*, TX const*)
 {
     return false;
 }

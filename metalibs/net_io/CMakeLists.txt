@@ -1,8 +1,8 @@
 project(net_io VERSION 0.1 LANGUAGES C CXX)
 
 add_library(${PROJECT_NAME}
-    src/meta_http_server.cpp include/meta_client.h src/meta_client.cpp)
-
+        src/meta_server.cpp
+        src/meta_client.cpp)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

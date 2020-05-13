@@ -18,26 +18,26 @@
 
 namespace fs = std::experimental::filesystem;
 
-std::set<std::string> get_files_in_dir(std::string &path) {
+std::set<std::string> get_files_in_dir(std::string& path)
+{
     std::set<std::string> files;
 
     //                          y   m   d   t
     const uint file_name_size = 4 + 2 + 2 + 4;
 
-    for (const auto &p : fs::directory_iterator(path)) {
-        const auto &file_path = p.path();
+    for (const auto& p : fs::directory_iterator(path)) {
+        const auto& file_path = p.path();
         auto filename = file_path.filename().string();
 
         if (filename.length() == file_name_size &&
             // Year
-            std::isdigit(filename[0]) && std::isdigit(filename[1]) && std::isdigit(filename[2]) &&
-            std::isdigit(filename[3]) &&
+            std::isdigit(filename[0]) && std::isdigit(filename[1]) && std::isdigit(filename[2]) && std::isdigit(filename[3]) &&
             // Month
             std::isdigit(filename[4]) && std::isdigit(filename[5]) &&
             // Day
             std::isdigit(filename[6]) && std::isdigit(filename[7]) &&
             // Extension
-            filename.compare(8, 4, std::string{".blk"}) == 0) {
+            filename.compare(8, 4, std::string { ".blk" }) == 0) {
             files.insert(file_path.string());
         }
     }
@@ -45,17 +45,18 @@ std::set<std::string> get_files_in_dir(std::string &path) {
     return files;
 }
 
-std::future<Block *> parse_block_async(
-        boost::asio::io_context &io_context,
-        char *block_buff,
-        int64_t block_size,
-        bool delete_buff) {
-    std::packaged_task<Block *()> task([block_buff, block_size, delete_buff]() {
+std::future<Block*> parse_block_async(
+    boost::asio::io_context& io_context,
+    char* block_buff,
+    int64_t block_size,
+    bool delete_buff)
+{
+    std::packaged_task<Block*()> task([block_buff, block_size, delete_buff]() {
         std::string_view block_as_string(block_buff, block_size);
-        Block *block = parse_block(block_as_string);
+        Block* block = parse_block(block_as_string);
 
         if (block) {
-            if (!dynamic_cast<CommonBlock *>(block)) {
+            if (!dynamic_cast<CommonBlock*>(block)) {
                 DEBUG_COUT("Not common block");
                 delete block;
                 block = nullptr;
@@ -70,22 +71,26 @@ std::future<Block *> parse_block_async(
 
         return block;
     });
-    std::future<Block *> fut(task.get_future());
+    std::future<Block*> fut(task.get_future());
     boost::asio::post(io_context, std::move(task));
 
     return fut;
 }
 
 ControllerImplementation::ControllerImplementation(
-        boost::asio::io_context &io_context,
-        const std::string &priv_key_line,
-        const std::string &_path,
-        const std::string &proved_hash,
-        const std::set<std::pair<std::string, int>> &core_list,
-        const std::pair<std::string, int> &host_port,
-        bool test)
-        : BC(new BlockChain(io_context)), io_context(io_context), path(_path),
-          cores(core_list, host_port, priv_key_line), test(test) {
+    boost::asio::io_context& io_context,
+    const std::string& priv_key_line,
+    const std::string& _path,
+    const std::string& proved_hash,
+    const std::set<std::pair<std::string, int>>& core_list,
+    const std::pair<std::string, int>& host_port,
+    bool test)
+    : BC(new BlockChain(io_context))
+    , io_context(io_context)
+    , path(_path)
+    , cores(core_list, host_port, priv_key_line)
+    , test(test)
+{
     std::this_thread::sleep_for(std::chrono::seconds(2));
     {
         std::vector<unsigned char> priv_k = hex2bin(priv_key_line);
@@ -114,13 +119,14 @@ ControllerImplementation::ControllerImplementation(
     start_main_loop();
 }
 
-void ControllerImplementation::read_and_apply_local_chain() {
+void ControllerImplementation::read_and_apply_local_chain()
+{
     std::string last_file;
 
     std::ifstream last_known_state_file("last_state.json");
     if (last_known_state_file.is_open()) {
         std::string content((std::istreambuf_iterator<char>(last_known_state_file)),
-                            (std::istreambuf_iterator<char>()));
+            (std::istreambuf_iterator<char>()));
 
         rapidjson::Document last_known_state_json;
         if (!last_known_state_json.Parse(content.c_str()).HasParseError()) {
@@ -128,9 +134,9 @@ void ControllerImplementation::read_and_apply_local_chain() {
             if (last_known_state_json.HasMember("hash") && last_known_state_json["hash"].IsString()
                 && last_known_state_json.HasMember("file") && last_known_state_json["file"].IsString()) {
                 std::string last_block = std::string(last_known_state_json["hash"].GetString(),
-                                                     last_known_state_json["hash"].GetStringLength());
+                    last_known_state_json["hash"].GetStringLength());
                 last_file = std::string(last_known_state_json["file"].GetString(),
-                                        last_known_state_json["file"].GetStringLength());
+                    last_known_state_json["file"].GetStringLength());
 
                 DEBUG_COUT("got last state info. file:\t" + last_file + "\t and block:\t" + last_block);
 
@@ -144,19 +150,19 @@ void ControllerImplementation::read_and_apply_local_chain() {
         last_known_state_file.close();
     }
 
-    std::vector<std::future<Block *>> pending_data;
-    std::unordered_map<sha256_2, Block *, sha256_2_hasher> prev_tree;
+    std::vector<std::future<Block*>> pending_data;
+    std::unordered_map<sha256_2, Block*, sha256_2_hasher> prev_tree;
 
     char uint64_buff[8];
     std::set<std::string> files = get_files_in_dir(path);
 
-    for (const std::string &file : files) {
+    for (const std::string& file : files) {
         std::ifstream ifile(file.c_str(), std::ios::in | std::ios::binary);
 
         if (ifile.is_open()) {
             while (ifile.read(uint64_buff, 8)) {
-                uint64_t block_size = *(reinterpret_cast<uint64_t *>(uint64_buff));
-                char *block_buff = new char[block_size];
+                uint64_t block_size = *(reinterpret_cast<uint64_t*>(uint64_buff));
+                char* block_buff = new char[block_size];
 
                 if (ifile.read(block_buff, static_cast<int64_t>(block_size))) {
                     pending_data.push_back(parse_block_async(io_context, block_buff, block_size, true));
@@ -175,15 +181,14 @@ void ControllerImplementation::read_and_apply_local_chain() {
         }
     }
 
-    for (auto &&fut : pending_data) {
+    for (auto&& fut : pending_data) {
         auto block = fut.get();
         if (block) {
-            if (!blocks.insert({block->get_block_hash(), block}).second) {
+            if (!blocks.insert({ block->get_block_hash(), block }).second) {
                 DEBUG_COUT("Duplicate block in chain\t" + bin2hex(block->get_block_hash()));
                 delete block;
-            } else if (!prev_tree.insert({block->get_prev_hash(), block}).second) {
-                DEBUG_COUT("Branches in block chain\t" + bin2hex(block->get_prev_hash()) + "\t->\t" +
-                           bin2hex(block->get_block_hash()));
+            } else if (!prev_tree.insert({ block->get_prev_hash(), block }).second) {
+                DEBUG_COUT("Branches in block chain\t" + bin2hex(block->get_prev_hash()) + "\t->\t" + bin2hex(block->get_block_hash()));
                 blocks.erase(block->get_block_hash());
                 delete block;
             }
@@ -197,45 +202,43 @@ void ControllerImplementation::read_and_apply_local_chain() {
     DEBUG_COUT("READ BLOCK COMPLETE");
 }
 
-void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Block *, sha256_2_hasher> &block_tree,
-                                                 std::unordered_map<sha256_2, Block *, sha256_2_hasher> &prev_tree,
-                                                 const std::string &source, bool need_write) {
-    static const sha256_2 zero_block = {{0}};
+void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Block*, sha256_2_hasher>& block_tree,
+    std::unordered_map<sha256_2, Block*, sha256_2_hasher>& prev_tree,
+    const std::string& source, bool need_write)
+{
+    static const sha256_2 zero_block = { { 0 } };
 
     bool do_clean_and_return = false;
     if (last_applied_block == zero_block) {
         if (proved_block == zero_block) {
             if (prev_tree.find(zero_block) == prev_tree.end()) {
-                DEBUG_COUT("blockchain from " + source + " have no blocks to connect with my chain to zero_block\t" +
-                           bin2hex(zero_block));
+                DEBUG_COUT("blockchain from " + source + " have no blocks to connect with my chain to zero_block\t" + bin2hex(zero_block));
                 do_clean_and_return = true;
             }
         } else if (block_tree.find(proved_block) == block_tree.end()) {
-            DEBUG_COUT("blockchain from " + source + " have no blocks to connect with my chain to proved_block\t" +
-                       bin2hex(proved_block));
+            DEBUG_COUT("blockchain from " + source + " have no blocks to connect with my chain to proved_block\t" + bin2hex(proved_block));
             do_clean_and_return = true;
         }
     } else if (prev_tree.find(last_applied_block) == prev_tree.end()) {
-        DEBUG_COUT("blockchain from " + source + " have no blocks to connect with my chain to last_applied_block\t" +
-                   bin2hex(last_applied_block));
+        DEBUG_COUT("blockchain from " + source + " have no blocks to connect with my chain to last_applied_block\t" + bin2hex(last_applied_block));
         do_clean_and_return = true;
     }
 
     if (do_clean_and_return) {
-        for (auto &map_pair : block_tree) {
+        for (auto& map_pair : block_tree) {
             delete map_pair.second;
         }
         return;
     }
 
-    std::list<Block *> block_chain;
+    std::list<Block*> block_chain;
 
     if (last_applied_block == zero_block && proved_block != zero_block) {
         sha256_2 curr_block = proved_block;
 
         bool got_start = false;
         while (block_tree.find(curr_block) != block_tree.end()) {
-            Block *block = block_tree[curr_block];
+            Block* block = block_tree[curr_block];
             block_chain.push_front(block);
             if (block->get_block_type() == BLOCK_TYPE_STATE || block->get_prev_hash() == zero_block) {
                 got_start = true;
@@ -247,7 +250,7 @@ void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Bl
         if (!got_start) {
 
             if (need_write) {
-                for (auto &map_pair : block_tree) {
+                for (auto& map_pair : block_tree) {
                     delete map_pair.second;
                 }
             }
@@ -260,7 +263,7 @@ void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Bl
         sha256_2 curr_block = last_applied_block != zero_block ? last_applied_block : proved_block;
 
         while (prev_tree.find(curr_block) != prev_tree.end()) {
-            Block *block = prev_tree[curr_block];
+            Block* block = prev_tree[curr_block];
             block_chain.push_back(block);
             curr_block = block->get_block_hash();
         }
@@ -298,10 +301,12 @@ void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Bl
 
         if (need_write) {
             uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(
-                    std::chrono::system_clock::now()).time_since_epoch().count());
+                std::chrono::system_clock::now())
+                                                           .time_since_epoch()
+                                                           .count());
 
             if (timestamp - block->get_block_timestamp() < 60) {
-                auto *p_ar = new ApproveRecord;
+                auto* p_ar = new ApproveRecord;
                 p_ar->make(block->get_block_hash(), PrivKey, PubKey);
                 p_ar->approve = true;
                 distribute(p_ar);
@@ -309,7 +314,7 @@ void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Bl
             }
 
             write_block(block);
-            blocks.insert({last_applied_block, block});
+            blocks.insert({ last_applied_block, block });
         }
 
         prev_timestamp = block->get_block_timestamp();
@@ -324,7 +329,7 @@ void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Bl
     DEBUG_COUT("START");
     if (need_write) {
         std::atomic<int> jobs = 0;
-        for (auto&&[hash, block] : block_tree) {
+        for (auto&& [hash, block] : block_tree) {
             jobs++;
             boost::asio::post(io_context, [hash, block, this, &jobs]() {
                 if (blocks.find(hash) == blocks.end()) {
@@ -340,7 +345,8 @@ void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Bl
     DEBUG_COUT("STOP");
 }
 
-void ControllerImplementation::actualize_chain() {
+void ControllerImplementation::actualize_chain()
+{
     if (master) {
         return;
     }
@@ -357,11 +363,11 @@ void ControllerImplementation::actualize_chain() {
             std::copy_n(last_block_on_core.second.begin(), 32, last_block_return.begin());
 
             uint64_t block_timestamp = 0;
-            std::copy_n(last_block_on_core.second.begin() + 32, 8, reinterpret_cast<char *>(&block_timestamp));
+            std::copy_n(last_block_on_core.second.begin() + 32, 8, reinterpret_cast<char*>(&block_timestamp));
 
             if (block_timestamp > prev_timestamp && blocks.find(last_block_return) == blocks.end()) {
                 DEBUG_COUT(
-                        "core\t" + last_block_on_core.first + "have more recent block\t" + bin2hex(last_block_return));
+                    "core\t" + last_block_on_core.first + "have more recent block\t" + bin2hex(last_block_return));
                 cores_with_missing_block.insert(last_block_on_core.first);
                 missing_blocks.insert(last_block_return);
             }
@@ -371,11 +377,11 @@ void ControllerImplementation::actualize_chain() {
     if (!cores_with_missing_block.empty()) {
         DEBUG_COUT("GET BLOCKCHAIN START");
 
-        std::unordered_map<sha256_2, Block *, sha256_2_hasher> block_tree;
-        std::unordered_map<sha256_2, Block *, sha256_2_hasher> prev_tree;
+        std::unordered_map<sha256_2, Block*, sha256_2_hasher> block_tree;
+        std::unordered_map<sha256_2, Block*, sha256_2_hasher> prev_tree;
 
         for (;;) {
-            for (const auto &core : cores_with_missing_block) {
+            for (const auto& core : cores_with_missing_block) {
                 if (missing_blocks.empty()) {
                     DEBUG_COUT("GET BLOCKCHAIN COMPLETE");
                     apply_block_chain(block_tree, prev_tree, "metachain network", true);
@@ -397,16 +403,15 @@ void ControllerImplementation::actualize_chain() {
                     missing_blocks.erase(missing_blocks.begin());
                 }
 
-                Block *block = parse_block(return_data);
+                Block* block = parse_block(return_data);
                 if (block) {
-                    if (dynamic_cast<CommonBlock *>(block)) {
-                        if (!block_tree.insert({block->get_block_hash(), block}).second) {
+                    if (dynamic_cast<CommonBlock*>(block)) {
+                        if (!block_tree.insert({ block->get_block_hash(), block }).second) {
                             DEBUG_COUT("Duplicate block in chain\t" + bin2hex(block->get_block_hash()));
                             delete block;
                             block = nullptr;
-                        } else if (!prev_tree.insert({block->get_prev_hash(), block}).second) {
-                            DEBUG_COUT("Branches in block chain\t" + bin2hex(block->get_prev_hash()) + "\t->\t" +
-                                       bin2hex(block->get_block_hash()));
+                        } else if (!prev_tree.insert({ block->get_prev_hash(), block }).second) {
+                            DEBUG_COUT("Branches in block chain\t" + bin2hex(block->get_prev_hash()) + "\t->\t" + bin2hex(block->get_block_hash()));
                             block_tree.erase(block->get_block_hash());
                             delete block;
                             block = nullptr;
@@ -426,17 +431,19 @@ void ControllerImplementation::actualize_chain() {
     }
 }
 
-void ControllerImplementation::start_main_loop() {
+void ControllerImplementation::start_main_loop()
+{
     std::thread(&ControllerImplementation::main_loop, this).detach();
 }
 
 std::string
 ControllerImplementation::add_pack_to_queue(std::string_view pack, std::string_view url, std::string_view sign,
-                                            std::string_view pubk) {
-    auto &&bin_pubk = hex2bin(pubk);
-    auto &&bin_sign = hex2bin(sign);
+    std::string_view pubk)
+{
+    auto&& bin_pubk = hex2bin(pubk);
+    auto&& bin_sign = hex2bin(sign);
     if (check_sign(pack, bin_sign, bin_pubk)) {
-        auto &&sender_addr = "0x" + bin2hex(get_address(bin_pubk));
+        auto&& sender_addr = "0x" + bin2hex(get_address(bin_pubk));
         auto rights = BC->check_addr(sender_addr);
 
         if (rights >= 50) {
@@ -479,24 +486,29 @@ ControllerImplementation::add_pack_to_queue(std::string_view pack, std::string_v
     return "";
 }
 
-std::string ControllerImplementation::get_str_address() {
+std::string ControllerImplementation::get_str_address()
+{
     return Addres;
 }
 
-std::string ControllerImplementation::get_last_block_str() {
+std::string ControllerImplementation::get_last_block_str()
+{
     return bin2hex(last_applied_block);
 }
 
-std::atomic<std::map<std::string, std::pair<uint, uint>> *> &ControllerImplementation::get_wallet_statistics() {
+std::atomic<std::map<std::string, std::pair<uint, uint>>*>& ControllerImplementation::get_wallet_statistics()
+{
 
     return BC->get_wallet_statistics();
 }
 
-std::atomic<std::deque<std::pair<std::string, uint64_t>> *> &ControllerImplementation::get_wallet_request_addreses() {
+std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& ControllerImplementation::get_wallet_request_addreses()
+{
     return BC->get_wallet_request_addreses();
 }
 
-void ControllerImplementation::main_loop() {
+void ControllerImplementation::main_loop()
+{
     std::this_thread::sleep_for(std::chrono::seconds(15));
     while (goon) {
         const uint64_t get_arr_size = 128;
@@ -505,7 +517,7 @@ void ControllerImplementation::main_loop() {
         bool no_sleep = false;
 
         if (transactions.size() < 1024) {
-            static TX *tx_arr[get_arr_size];
+            static TX* tx_arr[get_arr_size];
             uint64_t got_tx = tx_queue.try_dequeue_bulk(tx_arr, get_arr_size);
 
             if (got_tx) {
@@ -515,35 +527,36 @@ void ControllerImplementation::main_loop() {
         }
 
         {
-            static Block *block_arr[get_arr_size];
+            static Block* block_arr[get_arr_size];
             uint64_t got_block = block_queue.try_dequeue_bulk(block_arr, get_arr_size);
 
             if (got_block) {
                 no_sleep = true;
 
                 for (uint i = 0; i < got_block; i++) {
-                    Block *block = block_arr[i];
+                    Block* block = block_arr[i];
 
-                    if (dynamic_cast<CommonBlock *>(block)) {
+                    if (dynamic_cast<CommonBlock*>(block)) {
                         if (blocks.find(block->get_prev_hash()) == blocks.end()) {
                             need_actualize = true;
                         }
 
-                        if (blocks.insert({block->get_block_hash(), block}).second) { ;
+                        if (blocks.insert({ block->get_block_hash(), block }).second) {
+                            ;
                         } else {
                             delete block;
                         }
-                    } else if (dynamic_cast<RejectedTXBlock *>(block)) {
+                    } else if (dynamic_cast<RejectedTXBlock*>(block)) {
                         write_block(block);
                     }
                 }
             }
 
-            for (std::pair<sha256_2, Block *> block_pair : blocks) {
+            for (std::pair<sha256_2, Block*> block_pair : blocks) {
                 if (block_approve[block_pair.first].find(Addres) == block_approve[block_pair.first].end()
                     && block_disapprove[block_pair.first].find(Addres) == block_disapprove[block_pair.first].end()) {
 
-                    Block *block = block_pair.second;
+                    Block* block = block_pair.second;
                     if (block->get_prev_hash() == last_applied_block) {
                         if (BC->can_apply_block(block)) {
                             approve_block(block);
@@ -556,7 +569,7 @@ void ControllerImplementation::main_loop() {
         }
 
         {
-            static ApproveRecord *approve_arr[get_arr_size];
+            static ApproveRecord* approve_arr[get_arr_size];
             uint64_t got_approve = approve_queue.try_dequeue_bulk(approve_arr, get_arr_size);
 
             if (got_approve) {
@@ -574,7 +587,9 @@ void ControllerImplementation::main_loop() {
 
         {
             uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(
-                    std::chrono::system_clock::now()).time_since_epoch().count());
+                std::chrono::system_clock::now())
+                                                           .time_since_epoch()
+                                                           .count());
 
             if (timestamp - last_sync_timestamp > 60) {
                 DEBUG_COUT("sync_core_lists");
@@ -599,17 +614,20 @@ void ControllerImplementation::main_loop() {
             }
         }
 
-        if (no_sleep) { ;
+        if (no_sleep) {
+            ;
         } else {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     }
 }
 
-void ControllerImplementation::parse_S_PING(std::string_view) {
+void ControllerImplementation::parse_S_PING(std::string_view)
+{
 }
 
-void ControllerImplementation::parse_B_TX(std::string_view pack) {
+void ControllerImplementation::parse_B_TX(std::string_view pack)
+{
     uint64_t index = 0;
 
     uint64_t tx_size;
@@ -629,7 +647,7 @@ void ControllerImplementation::parse_B_TX(std::string_view pack) {
         std::string_view tx_sw(&pack[index], tx_size);
         index += tx_size;
 
-        TX *p_tx = new TX;
+        TX* p_tx = new TX;
         if (p_tx->parse(tx_sw)) {
             tx_queue.enqueue(p_tx);
         } else {
@@ -647,7 +665,8 @@ void ControllerImplementation::parse_B_TX(std::string_view pack) {
     }
 }
 
-void ControllerImplementation::parse_C_APPROVE_BLOCK(std::string_view pack) {
+void ControllerImplementation::parse_C_APPROVE_BLOCK(std::string_view pack)
+{
     uint64_t block_size;
     uint64_t approve_size;
 
@@ -657,7 +676,7 @@ void ControllerImplementation::parse_C_APPROVE_BLOCK(std::string_view pack) {
     }
 
     std::string_view approve_sw(pack.data() + offset, approve_size);
-    auto *p_ar = new ApproveRecord;
+    auto* p_ar = new ApproveRecord;
     if (p_ar->parse(approve_sw)) {
         p_ar->approve = true;
         approve_queue.enqueue(p_ar);
@@ -673,7 +692,7 @@ void ControllerImplementation::parse_C_APPROVE_BLOCK(std::string_view pack) {
         DEBUG_COUT("corrupt pack");
     }
     std::string_view block_sw(block_raw.data() + offset, block_size);
-    Block *block = parse_block(block_sw);
+    Block* block = parse_block(block_sw);
 
     if (block) {
         block_queue.enqueue(block);
@@ -682,12 +701,13 @@ void ControllerImplementation::parse_C_APPROVE_BLOCK(std::string_view pack) {
     }
 }
 
-void ControllerImplementation::parse_C_PRETEND_BLOCK(std::string_view pack) {
+void ControllerImplementation::parse_C_PRETEND_BLOCK(std::string_view pack)
+{
     std::string_view block_sw(pack);
-    Block *block = parse_block(block_sw);
+    Block* block = parse_block(block_sw);
 
     if (block) {
-        if (dynamic_cast<CommonBlock *>(block) || dynamic_cast<RejectedTXBlock *>(block)) {
+        if (dynamic_cast<CommonBlock*>(block) || dynamic_cast<RejectedTXBlock*>(block)) {
             block_queue.enqueue(block);
         } else {
             delete block;
@@ -695,9 +715,10 @@ void ControllerImplementation::parse_C_PRETEND_BLOCK(std::string_view pack) {
     }
 }
 
-void ControllerImplementation::parse_C_APPROVE(std::string_view pack) {
+void ControllerImplementation::parse_C_APPROVE(std::string_view pack)
+{
     std::string_view approve_sw(pack);
-    auto *p_ar = new ApproveRecord;
+    auto* p_ar = new ApproveRecord;
     if (p_ar->parse(approve_sw)) {
         p_ar->approve = true;
         approve_queue.enqueue(p_ar);
@@ -706,9 +727,10 @@ void ControllerImplementation::parse_C_APPROVE(std::string_view pack) {
     }
 }
 
-void ControllerImplementation::parse_C_DISAPPROVE(std::string_view pack) {
+void ControllerImplementation::parse_C_DISAPPROVE(std::string_view pack)
+{
     std::string_view approve_sw(pack);
-    auto *p_ar = new ApproveRecord;
+    auto* p_ar = new ApproveRecord;
     if (p_ar->parse(approve_sw)) {
         p_ar->approve = false;
         approve_queue.enqueue(p_ar);
@@ -717,15 +739,17 @@ void ControllerImplementation::parse_C_DISAPPROVE(std::string_view pack) {
     }
 }
 
-std::string ControllerImplementation::parse_S_LAST_BLOCK(std::string_view) {
+std::string ControllerImplementation::parse_S_LAST_BLOCK(std::string_view)
+{
     std::string last_block;
     last_block.insert(last_block.end(), last_applied_block.begin(), last_applied_block.end());
-    char *p_timestamp = reinterpret_cast<char *>(&prev_timestamp);
+    char* p_timestamp = reinterpret_cast<char*>(&prev_timestamp);
     last_block.insert(last_block.end(), p_timestamp, p_timestamp + 8);
     return last_block;
 }
 
-std::string ControllerImplementation::parse_S_GET_BLOCK(std::string_view pack) {
+std::string ControllerImplementation::parse_S_GET_BLOCK(std::string_view pack)
+{
     if (pack.size() < 32) {
         return "";
     }
@@ -736,7 +760,7 @@ std::string ControllerImplementation::parse_S_GET_BLOCK(std::string_view pack) {
     if (blocks.find(block_hash) != blocks.end()) {
         std::string return_string;
         {
-            auto &block_data = blocks[block_hash]->get_data();
+            auto& block_data = blocks[block_hash]->get_data();
             return_string.insert(return_string.end(), block_data.begin(), block_data.end());
         }
         return return_string;
@@ -744,8 +768,9 @@ std::string ControllerImplementation::parse_S_GET_BLOCK(std::string_view pack) {
     return "";
 }
 
-std::string ControllerImplementation::parse_S_GET_CHAIN(std::string_view pack) {
-    sha256_2 prev_block = {{0}};
+std::string ControllerImplementation::parse_S_GET_CHAIN(std::string_view pack)
+{
+    sha256_2 prev_block = { { 0 } };
     //    DEBUG_COUT(std::to_string(pack.size()));
 
     if (pack.size() < 32) {
@@ -761,11 +786,11 @@ std::string ControllerImplementation::parse_S_GET_CHAIN(std::string_view pack) {
     //    DEBUG_COUT(bin2hex(got_block));
 
     while (got_block != prev_block && blocks.find(got_block) != blocks.end()) {
-        auto &block_data = blocks[got_block]->get_data();
+        auto& block_data = blocks[got_block]->get_data();
 
         uint64_t block_size = block_data.size();
-        chain.insert(chain.end(), reinterpret_cast<char *>(&block_size),
-                     reinterpret_cast<char *>(&block_size) + sizeof(uint64_t));
+        chain.insert(chain.end(), reinterpret_cast<char*>(&block_size),
+            reinterpret_cast<char*>(&block_size) + sizeof(uint64_t));
         chain.insert(chain.end(), block_data.begin(), block_data.end());
 
         got_block = blocks[got_block]->get_prev_hash();
@@ -774,11 +799,13 @@ std::string ControllerImplementation::parse_S_GET_CHAIN(std::string_view pack) {
     return chain;
 }
 
-std::string ControllerImplementation::parse_S_GET_CORE_LIST(std::string_view) {
+std::string ControllerImplementation::parse_S_GET_CORE_LIST(std::string_view)
+{
     return cores.get_core_list();
 }
 
-std::string ControllerImplementation::parse_S_GET_CORE_ADDR(std::string_view pack) {
+std::string ControllerImplementation::parse_S_GET_CORE_ADDR(std::string_view pack)
+{
     std::string addr_req_str(pack);
     std::stringstream ss(addr_req_str);
     std::string item;
@@ -794,8 +821,9 @@ std::string ControllerImplementation::parse_S_GET_CORE_ADDR(std::string_view pac
     return Addres;
 }
 
-void ControllerImplementation::approve_block(Block *p_block) {
-    auto *p_ar = new ApproveRecord;
+void ControllerImplementation::approve_block(Block* p_block)
+{
+    auto* p_ar = new ApproveRecord;
     p_ar->make(p_block->get_block_hash(), PrivKey, PubKey);
     p_ar->approve = true;
 
@@ -803,8 +831,9 @@ void ControllerImplementation::approve_block(Block *p_block) {
     apply_approve(p_ar);
 }
 
-void ControllerImplementation::disapprove_block(Block *p_block) {
-    auto *p_ar = new ApproveRecord;
+void ControllerImplementation::disapprove_block(Block* p_block)
+{
+    auto* p_ar = new ApproveRecord;
     p_ar->make(p_block->get_block_hash(), PrivKey, PubKey);
     p_ar->approve = false;
 
@@ -812,7 +841,8 @@ void ControllerImplementation::disapprove_block(Block *p_block) {
     apply_approve(p_ar);
 }
 
-void ControllerImplementation::apply_approve(ApproveRecord *p_ar) {
+void ControllerImplementation::apply_approve(ApproveRecord* p_ar)
+{
     sha256_2 block_hash;
     std::copy(p_ar->block_hash.begin(), p_ar->block_hash.end(), block_hash.begin());
 
@@ -820,7 +850,7 @@ void ControllerImplementation::apply_approve(ApproveRecord *p_ar) {
     std::string addr = "0x" + bin2hex(bin_addres);
 
     if (p_ar->approve) {
-        if (!block_approve[block_hash].insert({addr, p_ar}).second) {
+        if (!block_approve[block_hash].insert({ addr, p_ar }).second) {
             DEBUG_COUT("APPROVE ALREADY PRESENT NOT CREATED");
             delete p_ar;
         }
@@ -831,7 +861,7 @@ void ControllerImplementation::apply_approve(ApproveRecord *p_ar) {
         if (approve_size >= m_approve) {
 
             if (blocks.find(block_hash) != blocks.end()) {
-                Block *block = blocks[block_hash];
+                Block* block = blocks[block_hash];
                 if (block->get_prev_hash() == last_applied_block) {
                     if (BC->can_apply_block(block)) {
                         if (block->get_block_type() == BLOCK_TYPE_STATE) {
@@ -851,20 +881,22 @@ void ControllerImplementation::apply_approve(ApproveRecord *p_ar) {
             }
         }
     } else {
-        if (!block_disapprove[block_hash].insert({addr, p_ar}).second) {
+        if (!block_disapprove[block_hash].insert({ addr, p_ar }).second) {
             delete p_ar;
         }
     }
 }
 
-void ControllerImplementation::distribute(Block *block) {
+void ControllerImplementation::distribute(Block* block)
+{
     std::string send_pack;
     send_pack.insert(send_pack.end(), block->get_data().begin(), block->get_data().end());
 
     cores.send_no_return(RPC_PRETEND_BLOCK, send_pack);
 }
 
-void ControllerImplementation::distribute(ApproveRecord *p_ar) {
+void ControllerImplementation::distribute(ApproveRecord* p_ar)
+{
     std::string approve_str = p_ar->approve ? RPC_APPROVE : RPC_DISAPPROVE;
     std::string send_pack;
     send_pack.insert(send_pack.end(), p_ar->data.begin(), p_ar->data.end());
@@ -872,7 +904,8 @@ void ControllerImplementation::distribute(ApproveRecord *p_ar) {
     cores.send_no_return(approve_str, send_pack);
 }
 
-uint64_t ControllerImplementation::min_approve() {
+uint64_t ControllerImplementation::min_approve()
+{
     uint64_t min_approve = 0;
 
     sha256_2 curr_block = blocks[last_applied_block]->get_prev_hash();
@@ -907,9 +940,10 @@ uint64_t ControllerImplementation::min_approve() {
     }
 }
 
-void ControllerImplementation::write_block(Block *block) {
+void ControllerImplementation::write_block(Block* block)
+{
     auto theTime = static_cast<time_t>(block->get_block_timestamp());
-    struct tm *aTime = localtime(&theTime);
+    struct tm* aTime = localtime(&theTime);
 
     int day = aTime->tm_mday;
     int month = aTime->tm_mon + 1; // Month is 0 - 11, add 1 to get a jan-dec 1-12 concept
@@ -917,14 +951,14 @@ void ControllerImplementation::write_block(Block *block) {
 
     //                          y   m   d   t
     const uint file_name_size = 38; //4 + 2 + 2 + 4 + 1;
-    char file_name[file_name_size] = {0};
+    char file_name[file_name_size] = { 0 };
     std::snprintf(file_name, file_name_size, "%04d%02d%02d.blk", year, month, day);
 
     std::string file_path = path + "/" + file_name;
 
     DEBUG_COUT("file_path\t" + file_path);
 
-    if (dynamic_cast<CommonBlock *>(block)) {
+    if (dynamic_cast<CommonBlock*>(block)) {
         DEBUG_COUT("CommonBlock");
 
         prev_timestamp = block->get_block_timestamp();
@@ -937,23 +971,23 @@ void ControllerImplementation::write_block(Block *block) {
 
         std::ofstream myfile;
         myfile.open(file_path.c_str(), std::ios::out | std::ios::app | std::ios::binary);
-        myfile.write(reinterpret_cast<char *>(&block_size), sizeof(uint64_t));
+        myfile.write(reinterpret_cast<char*>(&block_size), sizeof(uint64_t));
         myfile.write(block->get_data().data(), static_cast<int64_t>(block->get_data().size()));
         myfile.close();
 
         {
             auto approve_block = new ApproveBlock;
-            std::vector<ApproveRecord *> approve_list;
-            for (const auto &tx_pair : block_approve[block->get_block_hash()]) {
+            std::vector<ApproveRecord*> approve_list;
+            for (const auto& tx_pair : block_approve[block->get_block_hash()]) {
                 approve_list.push_back(tx_pair.second);
             }
             if (approve_block->make(block->get_block_timestamp(), block->get_block_hash(), approve_list)) {
                 uint64_t approve_block_size = approve_block->get_data().size() /* + approve_buff.size()*/;
                 std::ofstream out_file;
                 out_file.open(file_path.c_str(), std::ios::out | std::ios::app | std::ios::binary);
-                out_file.write(reinterpret_cast<char *>(&approve_block_size), sizeof(uint64_t));
+                out_file.write(reinterpret_cast<char*>(&approve_block_size), sizeof(uint64_t));
                 out_file.write(approve_block->get_data().data(),
-                               static_cast<int64_t>(approve_block->get_data().size()));
+                    static_cast<int64_t>(approve_block->get_data().size()));
                 out_file.close();
                 delete approve_block;
             }
@@ -961,14 +995,15 @@ void ControllerImplementation::write_block(Block *block) {
 
         {
             uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(
-                    std::chrono::system_clock::now()).time_since_epoch().count());
+                std::chrono::system_clock::now())
+                                                           .time_since_epoch()
+                                                           .count());
             DEBUG_COUT(
-                    "block size and latency\t" + std::to_string(dynamic_cast<CommonBlock *>(block)->get_txs().size()) +
-                    "\t" + std::to_string(timestamp - prev_timestamp));
+                "block size and latency\t" + std::to_string(dynamic_cast<CommonBlock*>(block)->get_txs().size()) + "\t" + std::to_string(timestamp - prev_timestamp));
         }
 
         {
-            auto common_block = dynamic_cast<CommonBlock *>(block);
+            auto common_block = dynamic_cast<CommonBlock*>(block);
             if (common_block && common_block->get_block_type() == BLOCK_TYPE_STATE) {
                 std::ofstream cache_file("last_state.json");
                 if (cache_file.is_open()) {
@@ -988,22 +1023,25 @@ void ControllerImplementation::write_block(Block *block) {
                 }
             }
         }
-    } else if (dynamic_cast<RejectedTXBlock *>(block)) {
+    } else if (dynamic_cast<RejectedTXBlock*>(block)) {
         DEBUG_COUT("RejectedTXBlock");
 
         uint64_t block_size = block->get_data().size() /* + approve_buff.size()*/;
 
         std::ofstream out_file;
         out_file.open(file_path.c_str(), std::ios::out | std::ios::app | std::ios::binary);
-        out_file.write(reinterpret_cast<char *>(&block_size), sizeof(uint64_t));
+        out_file.write(reinterpret_cast<char*>(&block_size), sizeof(uint64_t));
         out_file.write(block->get_data().data(), static_cast<int64_t>(block->get_data().size()));
         out_file.close();
     }
 }
 
-bool ControllerImplementation::try_make_block() {
+bool ControllerImplementation::try_make_block()
+{
     uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(
-            std::chrono::system_clock::now()).time_since_epoch().count());
+        std::chrono::system_clock::now())
+                                                   .time_since_epoch()
+                                                   .count());
     if (last_applied_block == last_created_block) {
         if (prev_timestamp >= timestamp) {
             return false;
@@ -1026,32 +1064,32 @@ bool ControllerImplementation::try_make_block() {
         }
 
         {
-            Block *block = nullptr;
+            Block* block = nullptr;
             switch (block_state) {
-                case BLOCK_TYPE_COMMON:
-                    if (timestamp - statistics_timestamp > 600) {
-                        block = BC->make_statistics_block(timestamp);
-                        statistics_timestamp = timestamp;
-                    } else {
-                        if (!transactions.empty()) {
-                            block = BC->make_common_block(timestamp, transactions);
-                        }
+            case BLOCK_TYPE_COMMON:
+                if (timestamp - statistics_timestamp > 600) {
+                    block = BC->make_statistics_block(timestamp);
+                    statistics_timestamp = timestamp;
+                } else {
+                    if (!transactions.empty()) {
+                        block = BC->make_common_block(timestamp, transactions);
                     }
-                    break;
-                case BLOCK_TYPE_FORGING:
-                    DEBUG_COUT("BLOCK_TYPE_FORGING");
-                    block = BC->make_forging_block(timestamp);
-                    break;
-                case BLOCK_TYPE_STATE:
-                    DEBUG_COUT("BLOCK_TYPE_STATE");
-                    block = BC->make_state_block(timestamp);
-                    break;
+                }
+                break;
+            case BLOCK_TYPE_FORGING:
+                DEBUG_COUT("BLOCK_TYPE_FORGING");
+                block = BC->make_forging_block(timestamp);
+                break;
+            case BLOCK_TYPE_STATE:
+                DEBUG_COUT("BLOCK_TYPE_STATE");
+                block = BC->make_state_block(timestamp);
+                break;
             }
 
             if (block) {
                 if (BC->can_apply_block(block)) {
                     last_created_block = block->get_block_hash();
-                    blocks.insert({block->get_block_hash(), block});
+                    blocks.insert({ block->get_block_hash(), block });
                     distribute(block);
                     approve_block(block);
                     return true;
@@ -1068,12 +1106,11 @@ bool ControllerImplementation::try_make_block() {
             delete tx_list;
 
             auto reject_tx_block = new RejectedTXBlock;
-            if (!rejected_tx_list.empty() && prev_rejected_ts != timestamp &&
-                reject_tx_block->make(timestamp, last_applied_block, rejected_tx_list, PrivKey, PubKey)) {
+            if (!rejected_tx_list.empty() && prev_rejected_ts != timestamp && reject_tx_block->make(timestamp, last_applied_block, rejected_tx_list, PrivKey, PubKey)) {
                 prev_rejected_ts = timestamp;
                 distribute(reject_tx_block);
                 write_block(reject_tx_block);
-                for (auto *tx : rejected_tx_list) {
+                for (auto* tx : rejected_tx_list) {
                     delete tx;
                 }
                 rejected_tx_list.clear();
@@ -1081,7 +1118,7 @@ bool ControllerImplementation::try_make_block() {
             delete reject_tx_block;
         }
     } else if (timestamp - prev_timestamp > 30) {
-        Block *block = blocks[last_created_block];
+        Block* block = blocks[last_created_block];
         if (block->get_prev_hash() == last_applied_block) {
             if (BC->can_apply_block(block)) {
                 if (block->get_block_type() == BLOCK_TYPE_STATE) {
@@ -1100,6 +1137,7 @@ bool ControllerImplementation::try_make_block() {
     return false;
 }
 
-void ControllerImplementation::make_clean() {
+void ControllerImplementation::make_clean()
+{
     ;
 }

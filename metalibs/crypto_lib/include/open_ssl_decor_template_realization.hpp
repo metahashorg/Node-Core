@@ -17,9 +17,6 @@
 #include <openssl/sha.h>
 #include <openssl/x509v3.h>
 
-// XXHASH
-#include <xxhash.h>
-
 const uint8_t BYTED_2 = 0xfa;
 const uint8_t BYTED_4 = 0xfb;
 const uint8_t BYTED_8 = 0xfc;
@@ -257,12 +254,12 @@ std::array<char, 25> get_address(const PubKContainer& bpubk)
         data[datasize - 65] = 0x04;
 
         sha256_2 sha_1;
-        std::array<unsigned char, RIPEMD160_DIGEST_LENGTH> r160{};
+        std::array<unsigned char, RIPEMD160_DIGEST_LENGTH> r160 {};
 
         SHA256(data + (datasize - 65), 65, sha_1.data());
         RIPEMD160(sha_1.data(), SHA256_DIGEST_LENGTH, r160.data());
 
-        std::array<unsigned char, RIPEMD160_DIGEST_LENGTH + 1> wide_h{};
+        std::array<unsigned char, RIPEMD160_DIGEST_LENGTH + 1> wide_h {};
         wide_h[0] = 0;
         for (size_t i = 0; i < RIPEMD160_DIGEST_LENGTH; i++) {
             wide_h[i + 1] = r160[i];
@@ -274,7 +271,7 @@ std::array<char, 25> get_address(const PubKContainer& bpubk)
         sha256_2 hash2;
         SHA256(hash1.data(), SHA256_DIGEST_LENGTH, hash2.data());
 
-        std::array<char, 25> address{};
+        std::array<char, 25> address {};
         uint j = 0;
         {
             for (uint i = 0; i < wide_h.size(); i++, j++) {
@@ -289,7 +286,7 @@ std::array<char, 25> get_address(const PubKContainer& bpubk)
         return address;
     }
 
-    return std::array<char, 25>{ 0 };
+    return std::array<char, 25> { 0 };
 }
 
 template <typename PubKContainer, typename PrivKContainer>

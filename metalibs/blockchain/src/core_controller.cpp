@@ -275,7 +275,7 @@ void CoreController::send_no_return(const std::string& req, const std::string& d
 
     for (const auto& core_pair : cores) {
         if (addresses.insert(core_pair.first).second) {
-            message_queue[core_pair.first].enqueue(new Message{ req, data, sign, pubk, 0, nullptr, nullptr });
+            message_queue[core_pair.first].enqueue(new Message { req, data, sign, pubk, 0, nullptr, nullptr });
         }
     }
 }
@@ -297,7 +297,7 @@ std::map<std::string, std::string> CoreController::send_with_return(const std::s
     for (const auto& core_pair : cores) {
         if (addresses.insert(core_pair.first).second) {
             responses[core_pair.first].first = false;
-            message_queue[core_pair.first].enqueue(new Message{ req, data, sign, pubk, time_milli, &(responses[core_pair.first].first), &(responses[core_pair.first].second) });
+            message_queue[core_pair.first].enqueue(new Message { req, data, sign, pubk, time_milli, &(responses[core_pair.first].first), &(responses[core_pair.first].second) });
         }
     }
 
@@ -325,7 +325,7 @@ void CoreController::send_no_return_to_core(
 
     for (const auto& core_pair : cores) {
         if (core_pair.first == addr) {
-            message_queue[core_pair.first].enqueue(new Message{ req, data, sign, pubk, 0, nullptr, nullptr });
+            message_queue[core_pair.first].enqueue(new Message { req, data, sign, pubk, 0, nullptr, nullptr });
             return;
         }
     }
@@ -352,7 +352,7 @@ std::string CoreController::send_with_return_to_core(
 
     for (const auto& core_pair : cores) {
         if (core_pair.first == addr) {
-            message_queue[core_pair.first].enqueue(new Message{ req, data, sign, pubk, time_milli, &got_resp, &resp_str });
+            message_queue[core_pair.first].enqueue(new Message { req, data, sign, pubk, time_milli, &got_resp, &resp_str });
             break;
         }
     }
