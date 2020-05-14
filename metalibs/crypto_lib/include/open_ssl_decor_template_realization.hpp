@@ -17,6 +17,8 @@
 #include <openssl/sha.h>
 #include <openssl/x509v3.h>
 
+#include <xxhash.h>
+
 const uint8_t BYTED_2 = 0xfa;
 const uint8_t BYTED_4 = 0xfb;
 const uint8_t BYTED_8 = 0xfc;
@@ -25,6 +27,24 @@ const uint8_t BYTED_32 = 0xfe;
 const uint8_t BYTED_64 = 0xff;
 
 using sha256_2 = std::array<unsigned char, 32>;
+
+template <typename Container>
+uint64_t DataHasher::operator()(Container data)
+{
+    return XXH64(data.data(), data.size(), 0);
+}
+
+template <typename Container>
+Signer::Signer(Container private_file)
+{
+    init(std::string_view(private_file.data(), private_file.size()));
+}
+
+template <typename Container>
+std::vector<char> Signer::sign(Container data)
+{
+    return sign(std::string_view(data.data(), data.size()));
+}
 
 template <typename Container>
 std::string bin2hex(const Container& bin_msg)

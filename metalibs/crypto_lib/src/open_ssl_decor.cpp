@@ -2,6 +2,8 @@
 
 #include "keccak.h"
 
+namespace metahash::crypto {
+
 std::vector<unsigned char> int_as_varint_array(uint64_t value)
 {
     auto* p_int = reinterpret_cast<unsigned char*>(&value);
@@ -153,4 +155,34 @@ std::string get_contract_address(const std::string& addr, uint64_t nonce)
     sha256_2 sha2_hash = get_sha256(address);
     address.insert(address.end(), sha2_hash.begin(), sha2_hash.begin() + 4);
     return "0x" + bin2hex(address);
+}
+
+std::vector<char> Signer::sign(std::string_view data)
+{
+    std::vector<char> bin_sign;
+    sign_data(data, bin_sign, private_key);
+    return bin_sign;
+}
+
+std::vector<char> Signer::get_pub_key()
+{
+    return public_key;
+}
+
+std::string Signer::get_mh_addr()
+{
+    return mh_addr;
+}
+
+void Signer::init(std::string_view priv_key_sw)
+{
+    private_key.insert(private_key.end(), priv_key_sw.begin(), priv_key_sw.end());
+
+    if (!generate_public_key(public_key, private_key)) {
+        abort();
+    }
+
+    mh_addr = "0x" + bin2hex(get_address(public_key));
+}
+
 }
