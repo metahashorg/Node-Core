@@ -1,7 +1,3 @@
-//
-// Created by 79173 on 07.05.2020.
-//
-
 #ifndef METANET_META_CLIENT_H
 #define METANET_META_CLIENT_H
 
@@ -12,147 +8,90 @@
 #include <ostream>
 #include <string>
 
-using boost::asio::ip::tcp;
+#include <concurrentqueue.h>
+#include <open_ssl_decor.h>
 
-class client {
+namespace metahash::net_io {
+
+uint32_t METAHASH_MAGIC_NUMBER = 0xabcd0001;
+
+class Response {
 public:
-    client(boost::asio::io_context& io_context,
-        const std::string& server, const std::string& path)
-        : resolver_(io_context)
-        , socket_(io_context)
-    {
-        // Form the request. We specify the "Connection: close" header so that the
-        // server will close the socket after transmitting the response. This will
-        // allow us to treat all data up until the EOF as the content.
-        std::ostream request_stream(&request_);
-        request_stream << "GET " << path << " HTTP/1.0\r\n";
-        request_stream << "Host: " << server << "\r\n";
-        request_stream << "Accept: */*\r\n";
-        request_stream << "Connection: close\r\n\r\n";
+    uint64_t request_id = 0;
+    uint64_t request_type = 0;
+    std::string_view public_key;
+    std::string_view sign;
+    std::string_view message;
 
-        // Start an asynchronous resolve to translate the server and service names
-        // into a list of endpoints.
-        resolver_.async_resolve(server, "http",
-            boost::bind(&client::handle_resolve, this,
-                boost::asio::placeholders::error,
-                boost::asio::placeholders::results));
-    }
+    std::string sender_addr;
+    std::string remote_address;
+
+    int8_t parse(char*, size_t, const std::string &mh_endpoint_addr);
 
 private:
-    void handle_resolve(const boost::system::error_code& err,
-        const tcp::resolver::results_type& endpoints)
-    {
-        if (!err) {
-            // Attempt a connection to each endpoint in the list until we
-            // successfully establish a connection.
-            boost::asio::async_connect(socket_, endpoints,
-                boost::bind(&client::handle_connect, this,
-                    boost::asio::placeholders::error));
-        } else {
-            std::cout << "Error: " << err.message() << "\n";
-        }
-    }
+    std::vector<char> request_full;
+    uint64_t offset = 0;
 
-    void handle_connect(const boost::system::error_code& err)
-    {
-        if (!err) {
-            // The connection was successful. Send the request.
-            boost::asio::async_write(socket_, request_,
-                boost::bind(&client::handle_write_request, this,
-                    boost::asio::placeholders::error));
-        } else {
-            std::cout << "Error: " << err.message() << "\n";
-        }
-    }
+    uint32_t magic_number = 0;
+    uint64_t public_key_size = 0;
+    uint64_t sign_size = 0;
+    uint64_t message_size = 0;
 
-    void handle_write_request(const boost::system::error_code& err)
-    {
-        if (!err) {
-            // Read the response status line. The response_ streambuf will
-            // automatically grow to accommodate the entire line. The growth may be
-            // limited by passing a maximum size to the streambuf constructor.
-            boost::asio::async_read_until(socket_, response_, "\r\n",
-                boost::bind(&client::handle_read_status_line, this,
-                    boost::asio::placeholders::error));
-        } else {
-            std::cout << "Error: " << err.message() << "\n";
-        }
-    }
-
-    void handle_read_status_line(const boost::system::error_code& err)
-    {
-        if (!err) {
-            // Check that response is OK.
-            std::istream response_stream(&response_);
-            std::string http_version;
-            response_stream >> http_version;
-            unsigned int status_code;
-            response_stream >> status_code;
-            std::string status_message;
-            std::getline(response_stream, status_message);
-            if (!response_stream || http_version.substr(0, 5) != "HTTP/") {
-                std::cout << "Invalid response\n";
-                return;
-            }
-            if (status_code != 200) {
-                std::cout << "Response returned with status code ";
-                std::cout << status_code << "\n";
-                return;
-            }
-
-            // Read the response headers, which are terminated by a blank line.
-            boost::asio::async_read_until(socket_, response_, "\r\n\r\n",
-                boost::bind(&client::handle_read_headers, this,
-                    boost::asio::placeholders::error));
-        } else {
-            std::cout << "Error: " << err << "\n";
-        }
-    }
-
-    void handle_read_headers(const boost::system::error_code& err)
-    {
-        if (!err) {
-            // Process the response headers.
-            std::istream response_stream(&response_);
-            std::string header;
-            while (std::getline(response_stream, header) && header != "\r")
-                std::cout << header << "\n";
-            std::cout << "\n";
-
-            // Write whatever content we already have to output.
-            if (response_.size() > 0)
-                std::cout << &response_;
-
-            // Start reading remaining data until EOF.
-            boost::asio::async_read(socket_, response_,
-                boost::asio::transfer_at_least(1),
-                boost::bind(&client::handle_read_content, this,
-                    boost::asio::placeholders::error));
-        } else {
-            std::cout << "Error: " << err << "\n";
-        }
-    }
-
-    void handle_read_content(const boost::system::error_code& err)
-    {
-        if (!err) {
-            // Write all of the data that has been read so far.
-            std::cout << &response_;
-
-            // Continue reading remaining data until EOF.
-            boost::asio::async_read(socket_, response_,
-                boost::asio::transfer_at_least(1),
-                boost::bind(&client::handle_read_content, this,
-                    boost::asio::placeholders::error));
-        } else if (err != boost::asio::error::eof) {
-            std::cout << "Error: " << err << "\n";
-        }
-    }
-
-    tcp::resolver resolver_;
-    tcp::socket socket_;
-    boost::asio::streambuf request_;
-    boost::asio::streambuf response_;
+    bool read_varint(uint64_t& varint);
+    bool fill_sw(std::string_view& sw, uint64_t sw_size);
 };
+
+struct Task {
+    std::vector<char> write_buff;
+    std::function<void(std::vector<char>)> callback;
+};
+
+class Connection {
+private:
+    const std::string mh_endpoint_addr;
+
+    boost::asio::io_context& io_context;
+    const boost::asio::ip::tcp::resolver::results_type endpoints;
+    std::shared_ptr<boost::asio::ip::tcp::socket> socket;
+
+    moodycamel::ConcurrentQueue<Task*>& tasks;
+
+    Task* p_task = nullptr;
+    Response response;
+
+    boost::asio::deadline_timer timer;
+    std::array<char, 0xffff> buffer = { {} };
+
+public:
+    Connection(boost::asio::io_context& io_context,
+        boost::asio::ip::tcp::resolver::results_type& endpoints,
+        moodycamel::ConcurrentQueue<Task*>& tasks, std::string mh_endpoint_addr);
+
+    void try_connect();
+
+private:
+    void check_tasks();
+    void read();
+    void reset();
+};
+
+class meta_client {
+public:
+    meta_client(boost::asio::io_context& io_context, const std::string& mh_endpoint_addr, const std::string& server, const int port, const int max_connections, crypto::Signer& signer);
+
+    void send_message(const uint64_t request_type, const std::vector<char>& message, const std::function<void(std::vector<char>)>& callback);
+
+private:
+    std::atomic<int> request_count = 0;
+    moodycamel::ConcurrentQueue<Task*> tasks;
+
+    boost::asio::io_context& io_context;
+    boost::asio::ip::tcp::resolver resolver;
+    boost::asio::ip::tcp::resolver::results_type endpoints;
+    std::vector<Connection> sockets;
+
+    crypto::Signer& signer;
+};
+}
 
 #endif //METANET_META_CLIENT_H

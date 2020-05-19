@@ -11,9 +11,9 @@
 
 namespace metahash::net_io {
 
-uint32_t METAHASH_MAGIC_NUMBER = 0x01abcdef;
+uint32_t METAHASH_MAGIC_NUMBER = 0xabcd0001;
 
-class request {
+class Request {
 public:
     uint64_t request_id = 0;
     uint64_t request_type = 0;
@@ -39,37 +39,34 @@ private:
     bool fill_sw(std::string_view& sw, uint64_t sw_size);
 };
 
-class reply {
+class Reply {
 public:
     uint64_t reply_id = 0;
     std::vector<char> message;
 
-    std::vector<boost::asio::const_buffer> make(crypto::Signer&);
+    boost::asio::const_buffer make(crypto::Signer&);
+
 private:
+    std::vector<char> write_buff;
 };
 
-class connection : public boost::enable_shared_from_this<connection> {
-public:
-    explicit connection(boost::asio::io_context& io_context, std::function<void(Request&, Reply&)>& handler, crypto::Signer& signer, std::unordered_set<std::string, crypto::DataHasher>& allowed_addreses);
+struct Connection {
+    explicit Connection(boost::asio::io_context& io_context, const std::function<void(Request&, Reply&)>& handler, crypto::Signer& signer, std::unordered_set<std::string, crypto::DataHasher>& allowed_addreses);
 
-    boost::asio::ip::tcp::socket& get_socket();
+    static void start(std::shared_ptr<Connection>);
 
-    void start();
-
-private:
-    void handle_read(const boost::system::error_code& e, std::size_t bytes_transferred);
-    void handle_write(const boost::system::error_code& e);
-    void handle_write_and_close(const boost::system::error_code& e);
+    void read(std::shared_ptr<Connection>);
+    void write(std::shared_ptr<Connection>);
+    void write_and_close(std::shared_ptr<Connection>);
 
     boost::asio::strand<boost::asio::io_context::executor_type> strand;
-
     boost::asio::ip::tcp::socket socket;
-
     boost::array<char, 0xffff> buffer;
-    request request;
-    reply reply;
 
-    std::function<void(Request&, Reply&)>& request_handler;
+    Request request;
+    Reply reply;
+
+    const std::function<void(Request&, Reply&)>& request_handler;
     crypto::Signer& signer;
     std::unordered_set<std::string, crypto::DataHasher>& allowed_addreses;
 };
@@ -79,9 +76,11 @@ public:
     meta_server(boost::asio::io_context& io_context,
         const std::string& address,
         const std::string& port,
-        std::function<void(Request&, Reply&)> request_handler,
+        const std::function<void(Request&, Reply&)>& request_handler,
         crypto::Signer& signer,
         std::unordered_set<std::string, crypto::DataHasher> allowed_addreses);
+
+    void start();
 
 private:
     void start_accept();
@@ -90,11 +89,11 @@ private:
     boost::asio::io_context& io_context;
     boost::asio::ip::tcp::acceptor acceptor;
 
-    std::function<void(Request&, Reply&)> request_handler;
+    const std::function<void(Request&, Reply&)>& request_handler;
     crypto::Signer& signer;
     std::unordered_set<std::string, crypto::DataHasher> allowed_addreses;
 
-    boost::shared_ptr<connection> new_connection;
+    std::shared_ptr<Connection> new_connection;
 };
 
 }
