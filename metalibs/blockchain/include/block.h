@@ -1,8 +1,11 @@
 #ifndef BLOCK_H
 #define BLOCK_H
 
+#include <open_ssl_decor.h>
 #include <thread_pool.hpp>
 #include <transaction.h>
+
+namespace metahash::metachain {
 
 class Block {
 protected:
@@ -64,9 +67,11 @@ public:
     const std::vector<RejectedTXInfo> get_txs();
 
     bool parse(std::string_view block_sw) override;
-    bool make(uint64_t timestamp, const sha256_2& new_prev_hash, const std::vector<RejectedTXInfo*>& new_txs, const std::vector<char>& PrivKey, const std::vector<char>& PubKey);
+    bool make(uint64_t timestamp, const sha256_2& new_prev_hash, const std::vector<RejectedTXInfo*>& new_txs, crypto::Signer& signer);
 };
 
 Block* parse_block(std::string_view);
+
+}
 
 #endif // BLOCK_H

@@ -5,75 +5,37 @@
 #include <mutex>
 #include <set>
 
-#include <curl/curl.h>
-
-//#include <LibEvent.h>
 #include <concurrentqueue.h>
+#include <meta_client.h>
+
+namespace metahash::metachain {
 
 class CoreController {
 private:
-    struct Message {
-        std::string url;
-        std::string msg;
-        std::string sign;
-        std::string pubk;
-        uint64_t milli_time;
-        std::atomic<bool>* get_resp;
-        std::string* resp;
-    };
-
-    struct CoreConnection {
-        CoreConnection(std::pair<std::string, int>);
-
-        std::atomic<bool> goon = true;
-        std::pair<std::string, int> host_port;
-        CURL* curl = nullptr;
-
-        std::string send_with_return(
-            const std::string& request_method,
-            const std::string& reques_string,
-            const std::string& sign,
-            const std::string& bubk);
-
-        void start_loop(moodycamel::ConcurrentQueue<Message*>&);
-
-        bool curl_post(
-            const std::string& request_method,
-            const std::string& reques_string,
-            const std::string& sign,
-            const std::string& bubk,
-            std::string& response);
-    };
-
     std::mutex core_lock;
+    std::map<std::string, net_io::meta_client*> cores;
 
-    std::multimap<std::string, CoreConnection*> cores;
-    std::map<std::string, moodycamel::ConcurrentQueue<Message*>> message_queue;
+    boost::asio::io_context& io_context;
+    std::string my_host;
+    int my_port;
 
-    std::map<std::pair<std::string, int>, CoreConnection> known_core_list;
-
-    std::pair<std::string, int> my_host_port;
-
-    std::vector<unsigned char> bin_priv;
-    std::vector<unsigned char> bin_pubk;
-
-    std::string str_pubk;
+    crypto::Signer& signer;
 
 public:
-    CoreController(const std::set<std::pair<std::string, int>>&, std::pair<std::string, int>, const std::string&);
+    CoreController(boost::asio::io_context& io_context, const std::string&, int, const std::map<std::string, std::pair<std::string, int>>&, crypto::Signer&);
 
     void sync_core_lists();
 
-    void add_core(std::string& host, uint64_t port);
-    std::string get_core_list();
+    void add_core(std::string& addr, std::string& host, int port);
+    std::vector<char> get_core_list();
 
-    void send_no_return(const std::string& req, const std::string& data);
-    std::map<std::string, std::string> send_with_return(const std::string& req, const std::string& data);
+    void send_no_return(uint64_t req_type, const std::vector<char>& req_data);
+    std::map<std::string, std::vector<char>> send_with_return(uint64_t req_type, const std::vector<char>& req_data);
 
-    void send_no_return_to_core(const std::string& addr, const std::string& req, const std::string& data);
-    std::string send_with_return_to_core(const std::string& addr, const std::string& req, const std::string& data);
-
-    std::pair<std::string, std::string> sign_string(const std::string& data);
+    void send_no_return_to_core(const std::string& addr, uint64_t req_type, const std::vector<char>& req_data);
+    std::vector<char> send_with_return_to_core(const std::string& addr, uint64_t req_type, const std::vector<char>& req_data);
 };
+
+}
 
 #endif // CORE_CONTROLLER_HPP

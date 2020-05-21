@@ -116,17 +116,17 @@ const uint64_t TX_REJECT_INVALID_WALLET = 0x0404;
 const uint64_t DAY_IN_SECONDS = 24 * 60 * 60;
 
 /*                          RPC METHODS                           */
-static const std::string RPC_PING = "ping";
-static const std::string RPC_TX = "tx";
-static const std::string RPC_PRETEND_BLOCK = "pretend_block";
-static const std::string RPC_APPROVE = "approve";
-static const std::string RPC_APPROVE_BLOCK = "approve_block";
-static const std::string RPC_DISAPPROVE = "disapprove";
-static const std::string RPC_LAST_BLOCK = "last_block_hash";
-static const std::string RPC_GET_BLOCK = "get_block";
-static const std::string RPC_GET_CHAIN = "get_chain";
-static const std::string RPC_GET_CORE_LIST = "get_core_list";
-static const std::string RPC_GET_CORE_ADDR = "get_core_addr";
+const uint64_t RPC_PING = 0x10;
+const uint64_t RPC_TX = 0x20;
+const uint64_t RPC_PRETEND_BLOCK = 0x30;
+const uint64_t RPC_APPROVE_BLOCK = 0x31;
+const uint64_t RPC_APPROVE = 0x40;
+const uint64_t RPC_DISAPPROVE = 0x41;
+const uint64_t RPC_LAST_BLOCK = 0x50;
+const uint64_t RPC_GET_BLOCK = 0x60;
+const uint64_t RPC_GET_CHAIN = 0x61;
+const uint64_t RPC_GET_CORE_LIST = 0x71;
+const uint64_t RPC_GET_CORE_ADDR = 0x72;
 
 /*                           NODE ROLE CONSTANTS                           */
 static const std::set<std::string> ROLES {

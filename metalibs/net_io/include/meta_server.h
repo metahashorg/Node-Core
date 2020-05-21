@@ -9,9 +9,9 @@
 
 #include <open_ssl_decor.h>
 
-namespace metahash::net_io {
+#include <meta_common.h>
 
-uint32_t METAHASH_MAGIC_NUMBER = 0xabcd0001;
+namespace metahash::net_io {
 
 class Request {
 public:
@@ -21,10 +21,10 @@ public:
     std::string_view sign;
     std::string_view message;
 
-    std::string sender_addr;
-    std::string remote_address;
+    std::string sender_mh_addr;
+    std::string remote_ip_address;
 
-    int8_t parse(char*, size_t, std::unordered_set<std::string, crypto::DataHasher>& allowed_addreses);
+    int8_t parse(char*, size_t, std::unordered_set<std::string, crypto::Hasher>& allowed_addreses);
 
 private:
     std::vector<char> request_full;
@@ -51,7 +51,7 @@ private:
 };
 
 struct Connection {
-    explicit Connection(boost::asio::io_context& io_context, const std::function<void(Request&, Reply&)>& handler, crypto::Signer& signer, std::unordered_set<std::string, crypto::DataHasher>& allowed_addreses);
+    explicit Connection(boost::asio::io_context& io_context, const std::function<void(Request&, Reply&)>& handler, crypto::Signer& signer, std::unordered_set<std::string, crypto::Hasher>& allowed_addreses);
 
     static void start(std::shared_ptr<Connection>);
 
@@ -59,7 +59,6 @@ struct Connection {
     void write(std::shared_ptr<Connection>);
     void write_and_close(std::shared_ptr<Connection>);
 
-    boost::asio::strand<boost::asio::io_context::executor_type> strand;
     boost::asio::ip::tcp::socket socket;
     boost::array<char, 0xffff> buffer;
 
@@ -68,19 +67,20 @@ struct Connection {
 
     const std::function<void(Request&, Reply&)>& request_handler;
     crypto::Signer& signer;
-    std::unordered_set<std::string, crypto::DataHasher>& allowed_addreses;
+    std::unordered_set<std::string, crypto::Hasher>& allowed_addreses;
 };
 
 class meta_server {
 public:
     meta_server(boost::asio::io_context& io_context,
         const std::string& address,
-        const std::string& port,
-        const std::function<void(Request&, Reply&)>& request_handler,
+        int port,
         crypto::Signer& signer,
-        std::unordered_set<std::string, crypto::DataHasher> allowed_addreses);
+        const std::function<void(Request&, Reply&)>& request_handler);
 
     void start();
+
+    void update_allowed_addreses(std::unordered_set<std::string, crypto::Hasher> allowed_addreses);
 
 private:
     void start_accept();
@@ -91,7 +91,7 @@ private:
 
     const std::function<void(Request&, Reply&)>& request_handler;
     crypto::Signer& signer;
-    std::unordered_set<std::string, crypto::DataHasher> allowed_addreses;
+    std::unordered_set<std::string, crypto::Hasher> allowed_addreses;
 
     std::shared_ptr<Connection> new_connection;
 };

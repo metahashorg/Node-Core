@@ -7,6 +7,8 @@
 #include <atomic>
 #include <thread_pool.hpp>
 
+namespace metahash::metachain {
+
 class BlockChain {
 private:
     struct ProxyStat {
@@ -72,5 +74,7 @@ private:
     bool can_apply_forging_block(Block* block);
     void reject(const TX* tx, uint64_t reason);
 };
+
+}
 
 #endif // CHAIN_H

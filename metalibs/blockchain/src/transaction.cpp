@@ -9,6 +9,8 @@
 #include <meta_log.hpp>
 #include <statics.hpp>
 
+namespace metahash::metachain {
+
 TX::TX() = default;
 
 TX::TX(const TX& other)
@@ -151,7 +153,7 @@ bool TX::parse(std::string_view raw_data, bool check_sign_flag)
 
     {
         std::string_view varint_arr(&raw_tx[index], raw_tx.size() - index);
-        varint_size = read_varint(value, varint_arr);
+        varint_size = crypto::read_varint(value, varint_arr);
         if (varint_size < 1) {
             DEBUG_COUT("corrupt varint size");
             return false;
@@ -161,7 +163,7 @@ bool TX::parse(std::string_view raw_data, bool check_sign_flag)
 
     {
         std::string_view varint_arr(&raw_tx[index], raw_tx.size() - index);
-        varint_size = read_varint(fee, varint_arr);
+        varint_size = crypto::read_varint(fee, varint_arr);
         if (varint_size < 1) {
             DEBUG_COUT("corrupt varint size");
             return false;
@@ -171,7 +173,7 @@ bool TX::parse(std::string_view raw_data, bool check_sign_flag)
 
     {
         std::string_view varint_arr(&raw_tx[index], raw_tx.size() - index);
-        varint_size = read_varint(nonce, varint_arr);
+        varint_size = crypto::read_varint(nonce, varint_arr);
         if (varint_size < 1) {
             DEBUG_COUT("corrupt varint size");
             return false;
@@ -182,7 +184,7 @@ bool TX::parse(std::string_view raw_data, bool check_sign_flag)
     {
         uint64_t data_size;
         std::string_view varint_arr(&raw_tx[index], raw_tx.size() - index);
-        varint_size = read_varint(data_size, varint_arr);
+        varint_size = crypto::read_varint(data_size, varint_arr);
         if (varint_size < 1) {
             DEBUG_COUT("corrupt varint size");
             return false;
@@ -202,7 +204,7 @@ bool TX::parse(std::string_view raw_data, bool check_sign_flag)
     {
         uint64_t sign_size;
         std::string_view varint_arr(&raw_tx[index], raw_tx.size() - index);
-        varint_size = read_varint(sign_size, varint_arr);
+        varint_size = crypto::read_varint(sign_size, varint_arr);
         if (varint_size < 1) {
             DEBUG_COUT("corrupt varint size");
             return false;
@@ -220,7 +222,7 @@ bool TX::parse(std::string_view raw_data, bool check_sign_flag)
     {
         uint64_t pubk_size;
         std::string_view varint_arr(&raw_tx[index], raw_tx.size() - index);
-        varint_size = read_varint(pubk_size, varint_arr);
+        varint_size = crypto::read_varint(pubk_size, varint_arr);
         if (varint_size < 1) {
             DEBUG_COUT("corrupt varint size");
             return false;
@@ -239,7 +241,7 @@ bool TX::parse(std::string_view raw_data, bool check_sign_flag)
 
     if (index < raw_tx.size()) {
         std::string_view varint_arr(&raw_tx[index], raw_tx.size() - index);
-        varint_size = read_varint(state, varint_arr);
+        varint_size = crypto::read_varint(state, varint_arr);
         if (varint_size < 1) {
             DEBUG_COUT("corrupt varint size - could not read tx state");
         }
@@ -247,19 +249,19 @@ bool TX::parse(std::string_view raw_data, bool check_sign_flag)
 
     {
         data_for_sign = std::string_view(&raw_tx[0], sign_data_size);
-        hash = get_sha256(raw_tx);
+        hash = crypto::get_sha256(raw_tx);
     }
 
     check_sign_flag = state != TX_STATE_FEE && check_sign_flag;
-    if (check_sign_flag && !check_sign(data_for_sign, sign, pub_key)) {
+    if (check_sign_flag && !crypto::check_sign(data_for_sign, sign, pub_key)) {
         DEBUG_COUT("invalid sign");
         return false;
     }
 
-    addr_to = "0x" + bin2hex(bin_to);
+    addr_to = "0x" + crypto::bin2hex(bin_to);
     if (check_sign_flag) {
-        auto bin_from = get_address(pub_key);
-        addr_from = "0x" + bin2hex(bin_from);
+        auto bin_from = crypto::get_address(pub_key);
+        addr_from = "0x" + crypto::bin2hex(bin_from);
     }
 
     if (state != TX_STATE_APPROVE) {
@@ -332,10 +334,10 @@ bool TX::fill_from_strings(
         return false;
     }
 
-    std::vector<unsigned char> bin_to = hex2bin(param_to);
-    std::vector<unsigned char> bin_data = hex2bin(param_data);
-    std::vector<unsigned char> bin_sign = hex2bin(param_sign);
-    std::vector<unsigned char> bin_pub_key = hex2bin(param_pub_key);
+    std::vector<unsigned char> bin_to = crypto::hex2bin(param_to);
+    std::vector<unsigned char> bin_data = crypto::hex2bin(param_data);
+    std::vector<unsigned char> bin_sign = crypto::hex2bin(param_sign);
+    std::vector<unsigned char> bin_pub_key = crypto::hex2bin(param_pub_key);
 
     return fill_sign_n_raw(bin_to, transaction_value, transaction_fee, transaction_id, bin_data, bin_sign, bin_pub_key);
 }
@@ -358,21 +360,18 @@ void TX::clear()
     addr_to.clear();
 }
 
-void TX::append_tx_varint(std::vector<char>& _raw_tx, uint64_t param)
-{
-    append_varint(_raw_tx, param);
-}
-
 bool TX::check_tx()
 {
-    if (check_sign(data_for_sign, sign, pub_key)) {
-        hash = get_sha256(raw_tx);
-        addr_to = "0x" + bin2hex(bin_to);
-        auto bin_from = get_address(pub_key);
-        addr_from = "0x" + bin2hex(bin_from);
+    if (crypto::check_sign(data_for_sign, sign, pub_key)) {
+        hash = crypto::get_sha256(raw_tx);
+        addr_to = "0x" + crypto::bin2hex(bin_to);
+        auto bin_from = crypto::get_address(pub_key);
+        addr_from = "0x" + crypto::bin2hex(bin_from);
         return true;
     }
 
     DEBUG_COUT("check sign failed");
     return false;
+}
+
 }

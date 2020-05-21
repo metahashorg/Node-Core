@@ -12,7 +12,7 @@ namespace statics {
     };
 }
 
-int8_t Response::parse(char* buff_data, size_t buff_size, const std::string& mh_endpoint_addr)
+int8_t ClientConnection::Response::parse(char* buff_data, size_t buff_size, const std::string& mh_endpoint_addr)
 {
     request_full.insert(request_full.end(), buff_data, buff_data + buff_size);
 
@@ -72,14 +72,14 @@ int8_t Response::parse(char* buff_data, size_t buff_size, const std::string& mh_
     return true;
 }
 
-bool Response::read_varint(uint64_t& varint)
+bool ClientConnection::Response::read_varint(uint64_t& varint)
 {
     auto previous_offset = offset;
     offset += crypto::read_varint(varint, std::string_view(&request_full[offset], request_full.size() - offset));
     return offset != previous_offset;
 }
 
-bool Response::fill_sw(std::string_view& sw, uint64_t sw_size)
+bool ClientConnection::Response::fill_sw(std::string_view& sw, uint64_t sw_size)
 {
     if (offset + sw_size < request_full.size()) {
         return false;
@@ -90,7 +90,7 @@ bool Response::fill_sw(std::string_view& sw, uint64_t sw_size)
     }
 }
 
-Connection::Connection(boost::asio::io_context& io_context, boost::asio::ip::basic_resolver<boost::asio::ip::tcp>::results_type& endpoints, moodycamel::ConcurrentQueue<Task*>& tasks, std::string mh_endpoint_addr)
+ClientConnection::ClientConnection(boost::asio::io_context& io_context, boost::asio::ip::basic_resolver<boost::asio::ip::tcp>::results_type& endpoints, moodycamel::ConcurrentQueue<Task*>& tasks, std::string mh_endpoint_addr)
     : mh_endpoint_addr(mh_endpoint_addr)
     , io_context(io_context)
     , endpoints(endpoints)
@@ -100,9 +100,9 @@ Connection::Connection(boost::asio::io_context& io_context, boost::asio::ip::bas
 {
 }
 
-void Connection::try_connect()
+void ClientConnection::try_connect()
 {
-    boost::asio::async_connect(*socket, endpoints, [this](const boost::system::error_code& err) {
+    boost::asio::async_connect(*socket, endpoints, [this](const boost::system::error_code& err, const boost::asio::ip::basic_endpoint<boost::asio::ip::tcp>&) {
         if (!err) {
             check_tasks();
         } else {
@@ -111,7 +111,7 @@ void Connection::try_connect()
     });
 }
 
-void Connection::check_tasks()
+void ClientConnection::check_tasks()
 {
     if (tasks.try_dequeue(p_task) && p_task) {
         boost::asio::async_write(*socket, boost::asio::buffer(p_task->write_buff), [this](const boost::system::error_code& err, std::size_t bytes_transferred) {
@@ -123,13 +123,13 @@ void Connection::check_tasks()
         });
     } else {
         timer = boost::asio::deadline_timer(io_context, boost::posix_time::milliseconds(10));
-        timer.async_wait([this]() {
+        timer.async_wait([this](const boost::system::error_code&) {
             check_tasks();
         });
     }
 }
 
-void Connection::read()
+void ClientConnection::read()
 {
     socket->async_read_some(boost::asio::buffer(buffer), [this](const boost::system::error_code& err, std::size_t bytes_transferred) {
         if (!err) {
@@ -172,7 +172,7 @@ void Connection::read()
     });
 }
 
-void Connection::reset()
+void ClientConnection::reset()
 {
     socket.reset(new boost::asio::ip::tcp::socket(io_context));
     try_connect();
@@ -182,11 +182,16 @@ meta_client::meta_client(boost::asio::io_context& io_context, const std::string&
     : io_context(io_context)
     , resolver(io_context)
     , signer(signer)
+    , server(server)
+    , port(port)
+    , mh_addr(mh_endpoint_addr)
 {
     endpoints = resolver.resolve(server, std::to_string(port));
 
+    sockets.reserve(max_connections);
+
     for (auto i = 0; i < max_connections; i++) {
-        sockets.emplace_back(io_context, endpoints, tasks, signer, mh_endpoint_addr);
+        sockets.emplace_back(io_context, endpoints, tasks, mh_endpoint_addr);
     }
 
     for (auto& conn : sockets) {
@@ -199,11 +204,12 @@ void meta_client::send_message(uint64_t request_type, const std::vector<char>& m
     std::vector<char> write_buff;
 
     uint64_t request_id = request_count++;
+    uint64_t magic = METAHASH_MAGIC_NUMBER;
 
     std::vector<char> public_key = signer.get_pub_key();
     std::vector<char> sign = signer.sign(message);
 
-    write_buff.insert(write_buff.end(), reinterpret_cast<char*>(&METAHASH_MAGIC_NUMBER), (reinterpret_cast<char*>(&METAHASH_MAGIC_NUMBER) + sizeof(uint32_t)));
+    write_buff.insert(write_buff.end(), reinterpret_cast<char*>(&magic), (reinterpret_cast<char*>(&magic) + sizeof(uint32_t)));
     crypto::append_varint(write_buff, request_id);
     crypto::append_varint(write_buff, request_type);
 
@@ -217,6 +223,19 @@ void meta_client::send_message(uint64_t request_type, const std::vector<char>& m
     write_buff.insert(write_buff.end(), message.begin(), message.end());
 
     tasks.enqueue(new Task { write_buff, callback });
+}
+
+std::tuple<std::string, std::string, int> meta_client::get_definition()
+{
+    return { mh_addr, server, port };
+}
+
+meta_client::~meta_client()
+{
+    Task* task = nullptr;
+    while (tasks.try_dequeue(task)) {
+        delete task;
+    }
 }
 
 }

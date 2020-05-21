@@ -9,15 +9,11 @@
 #include <transaction.h>
 
 #include <thread_pool.hpp>
+#include <meta_server.h>
 
 #include "core_controller.hpp"
 
-struct sha256_2_hasher {
-    std::size_t operator()(const sha256_2& k) const
-    {
-        return get_xxhash64(k);
-    }
-};
+namespace metahash::metachain {
 
 struct Block;
 
@@ -33,14 +29,10 @@ private:
     boost::asio::io_context& io_context;
 
     std::vector<TX*> transactions;
-    std::unordered_map<sha256_2, Block*, sha256_2_hasher> blocks;
+    std::unordered_map<sha256_2, Block*, crypto::Hasher> blocks;
 
-    std::vector<char> PrivKey;
-    std::vector<char> PubKey;
-    std::string Addres;
-
-    std::map<sha256_2, std::map<std::string, ApproveRecord*>> block_approve;
-    std::map<sha256_2, std::map<std::string, ApproveRecord*>> block_disapprove;
+    std::unordered_map<sha256_2, std::map<std::string, ApproveRecord*>, crypto::Hasher> block_approve;
+    std::unordered_map<sha256_2, std::map<std::string, ApproveRecord*>, crypto::Hasher> block_disapprove;
 
     bool master = false;
 
@@ -58,25 +50,26 @@ private:
 
     std::string path;
 
+    crypto::Signer signer;
+
     CoreController cores;
     uint64_t last_sync_timestamp = 0;
     uint64_t last_actualization_timestamp = 0;
 
-    bool goon = true;
-    const bool test = false;
-    //    std::thread* p_thread_main_loop = nullptr;
+    net_io::meta_server *listener;
 
+    bool goon = true;
 public:
     ControllerImplementation(
         boost::asio::io_context& io_context,
         const std::string& priv_key_line,
         const std::string& _path,
         const std::string& proved_hash,
-        const std::set<std::pair<std::string, int>>& core_list,
+        const std::map<std::string, std::pair<std::string, int>>& core_list,
         const std::pair<std::string, int>& host_port,
         bool test);
 
-    std::string add_pack_to_queue(std::string_view pack, std::string_view url, std::string_view sign, std::string_view pubk);
+    void add_pack_to_queue(net_io::Request& request, net_io::Reply& reply);
 
     std::string get_str_address();
     std::string get_last_block_str();
@@ -93,11 +86,11 @@ private:
     void parse_C_APPROVE(std::string_view);
     void parse_C_DISAPPROVE(std::string_view);
     void parse_C_APPROVE_BLOCK(std::string_view);
-    std::string parse_S_LAST_BLOCK(std::string_view);
-    std::string parse_S_GET_BLOCK(std::string_view);
-    std::string parse_S_GET_CHAIN(std::string_view);
-    std::string parse_S_GET_CORE_LIST(std::string_view);
-    std::string parse_S_GET_CORE_ADDR(std::string_view);
+    std::vector<char> parse_S_LAST_BLOCK(std::string_view);
+    std::vector<char> parse_S_GET_BLOCK(std::string_view);
+    std::vector<char> parse_S_GET_CHAIN(std::string_view);
+    std::vector<char> parse_S_GET_CORE_LIST(std::string_view);
+    std::vector<char> parse_S_GET_CORE_ADDR(std::string_view);
 
     void approve_block(Block*);
     void disapprove_block(Block*);
@@ -111,16 +104,17 @@ private:
     void write_block(Block*);
     bool try_make_block();
 
-    void make_clean();
-
     void read_and_apply_local_chain();
     void start_main_loop();
     void actualize_chain();
 
     void apply_block_chain(
-        std::unordered_map<sha256_2, Block*, sha256_2_hasher>& block_tree,
-        std::unordered_map<sha256_2, Block*, sha256_2_hasher>& prev_tree,
+        std::unordered_map<sha256_2, Block*, crypto::Hasher>& block_tree,
+        std::unordered_map<sha256_2, Block*, crypto::Hasher>& prev_tree,
         const std::string& source,
         bool need_write);
 };
+
+}
+
 #endif // CONTROLLER_HPP

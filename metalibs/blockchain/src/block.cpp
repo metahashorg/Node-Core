@@ -3,6 +3,8 @@
 #include <open_ssl_decor.h>
 #include <statics.hpp>
 
+namespace metahash::metachain {
+
 Block* parse_block(std::string_view block_sw)
 {
     uint64_t block_type = 0;
@@ -74,5 +76,7 @@ sha256_2 Block::get_prev_hash()
 
 sha256_2 Block::get_block_hash()
 {
-    return get_sha256(data);
+    return crypto::get_sha256(data);
+}
+
 }

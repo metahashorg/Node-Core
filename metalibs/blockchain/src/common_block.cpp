@@ -5,6 +5,8 @@
 
 #include <future>
 
+namespace metahash::metachain {
+
 const std::vector<TX> CommonBlock::get_txs()
 {
     if (data.empty()) {
@@ -12,10 +14,10 @@ const std::vector<TX> CommonBlock::get_txs()
     }
 
     uint64_t cur_pos = tx_buff;
-    uint64_t tx_size;
+    uint64_t tx_size = 0;
     {
         std::string_view tx_size_arr(&data[cur_pos], data.size() - cur_pos);
-        uint64_t varint_size = read_varint(tx_size, tx_size_arr);
+        uint64_t varint_size = crypto::read_varint(tx_size, tx_size_arr);
         cur_pos += varint_size;
     }
 
@@ -29,7 +31,7 @@ const std::vector<TX> CommonBlock::get_txs()
 
         {
             std::string_view tx_size_arr = std::string_view(&data[cur_pos], data.size() - cur_pos);
-            uint64_t varint_size = read_varint(tx_size, tx_size_arr);
+            uint64_t varint_size = crypto::read_varint(tx_size, tx_size_arr);
             cur_pos += varint_size;
         }
     }
@@ -53,10 +55,10 @@ const std::vector<TX> CommonBlock::get_txs(boost::asio::io_context& io_context)
     }
 
     uint64_t cur_pos = tx_buff;
-    uint64_t tx_size;
+    uint64_t tx_size = 0;
     {
         std::string_view tx_size_arr(&data[cur_pos], data.size() - cur_pos);
-        uint64_t varint_size = read_varint(tx_size, tx_size_arr);
+        uint64_t varint_size = crypto::read_varint(tx_size, tx_size_arr);
         cur_pos += varint_size;
     }
 
@@ -70,7 +72,7 @@ const std::vector<TX> CommonBlock::get_txs(boost::asio::io_context& io_context)
 
         {
             std::string_view tx_size_arr = std::string_view(&data[cur_pos], data.size() - cur_pos);
-            uint64_t varint_size = read_varint(tx_size, tx_size_arr);
+            uint64_t varint_size = crypto::read_varint(tx_size, tx_size_arr);
             cur_pos += varint_size;
         }
     }
@@ -130,7 +132,7 @@ bool CommonBlock::parse(std::string_view block_sw)
         std::string_view tx_size_arr(
             block_sw.begin() + cur_pos,
             block_sw.size() - cur_pos);
-        uint64_t varint_size = read_varint(tx_size, tx_size_arr);
+        uint64_t varint_size = crypto::read_varint(tx_size, tx_size_arr);
         if (varint_size < 1) {
             DEBUG_COUT("VARINT READ ERROR");
             return false;
@@ -159,7 +161,7 @@ bool CommonBlock::parse(std::string_view block_sw)
             std::string_view tx_size_arr = std::string_view(
                 block_sw.begin() + cur_pos,
                 block_sw.size() - cur_pos);
-            uint64_t varint_size = read_varint(tx_size, tx_size_arr);
+            uint64_t varint_size = crypto::read_varint(tx_size, tx_size_arr);
             if (varint_size < 1) {
                 DEBUG_COUT("VARINT READ ERROR");
                 return false;
@@ -169,7 +171,7 @@ bool CommonBlock::parse(std::string_view block_sw)
     }
 
     std::string_view txs_sw(block_sw.begin() + tx_buff, cur_pos - tx_buff);
-    tx_hash_calc = get_sha256(txs_sw);
+    tx_hash_calc = crypto::get_sha256(txs_sw);
     if (tx_hash_calc != tx_hash) {
         DEBUG_COUT("tx_hash_calc != tx_hash");
         return false;
@@ -179,4 +181,6 @@ bool CommonBlock::parse(std::string_view block_sw)
     data.insert(data.end(), block_sw.begin(), block_sw.begin() + cur_pos);
 
     return true;
+}
+
 }

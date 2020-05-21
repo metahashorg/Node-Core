@@ -2,22 +2,23 @@
 #include <meta_log.hpp>
 #include <open_ssl_decor.h>
 
+namespace metahash::metachain {
+
 bool ApproveRecord::make(
-    const sha256_2& block_hash,
-    const std::vector<char>& PrivKey,
-    const std::vector<char>& PubKey)
+    const sha256_2& approving_block_hash,
+    crypto::Signer & signer)
 {
-    std::vector<char> sign;
-    sign_data(block_hash, sign, PrivKey);
+    std::vector<char> PubKey = signer.get_pub_key();
+    std::vector<char> sign_buff = signer.sign(approving_block_hash);
 
     std::vector<char> record_raw;
 
-    record_raw.insert(record_raw.end(), block_hash.begin(), block_hash.end());
+    record_raw.insert(record_raw.end(), approving_block_hash.begin(), approving_block_hash.end());
 
-    append_varint(record_raw, sign.size());
-    record_raw.insert(record_raw.end(), sign.begin(), sign.end());
+    crypto::append_varint(record_raw, sign_buff.size());
+    record_raw.insert(record_raw.end(), sign_buff.begin(), sign_buff.end());
 
-    append_varint(record_raw, PubKey.size());
+    crypto::append_varint(record_raw, PubKey.size());
     record_raw.insert(record_raw.end(), PubKey.begin(), PubKey.end());
 
     std::string_view record_raw_sw(record_raw.data(), record_raw.size());
@@ -44,7 +45,7 @@ bool ApproveRecord::parse(std::string_view ap_sw)
 
     {
         std::string_view varint_arr(&ap_sw[index], ap_sw.size() - index);
-        sign_varint_size = read_varint(sign_size, varint_arr);
+        sign_varint_size = crypto::read_varint(sign_size, varint_arr);
         if (sign_varint_size < 1) {
             DEBUG_COUT("corrupt varint size");
             return false;
@@ -61,7 +62,7 @@ bool ApproveRecord::parse(std::string_view ap_sw)
 
     {
         std::string_view varint_arr(&ap_sw[index], ap_sw.size() - index);
-        pubk_varint_size = read_varint(pubk_size, varint_arr);
+        pubk_varint_size = crypto::read_varint(pubk_size, varint_arr);
         if (pubk_varint_size < 1) {
             DEBUG_COUT("corrupt varint size");
             return false;
@@ -76,7 +77,7 @@ bool ApproveRecord::parse(std::string_view ap_sw)
         index += pubk_size;
     }
 
-    if (!check_sign(block_hash, sign, pub_key)) {
+    if (!crypto::check_sign(block_hash, sign, pub_key)) {
         DEBUG_COUT("invalid sign");
         return false;
     }
@@ -94,4 +95,6 @@ bool ApproveRecord::parse(std::string_view ap_sw)
     }
 
     return true;
+}
+
 }

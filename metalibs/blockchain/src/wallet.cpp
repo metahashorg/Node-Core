@@ -5,6 +5,8 @@
 
 #include <set>
 
+namespace metahash::metachain {
+
 Wallet::Wallet(std::unordered_set<Wallet*>& _changed_wallets)
     : changed_wallets(_changed_wallets)
 {
@@ -79,7 +81,7 @@ Wallet* WalletMap::get_wallet(const std::string& addres)
 
 Wallet* WalletMap::wallet_factory(const std::string& addr)
 {
-    auto bin_addr = hex2bin(addr);
+    auto bin_addr = crypto::hex2bin(addr);
     if (bin_addr.size() != 25) {
         return nullptr;
     }
@@ -126,4 +128,6 @@ void WalletMap::clear_changes()
         wallet->clear();
     }
     changed_wallets.clear();
+}
+
 }

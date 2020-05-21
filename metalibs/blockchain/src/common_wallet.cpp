@@ -7,6 +7,8 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
+namespace metahash::metachain {
+
 CommonWallet::~CommonWallet()
 {
     delete real_addition;
@@ -685,4 +687,6 @@ void CommonWallet::set_trust(uint64_t new_trust)
     addition->trust = new_trust;
 
     changed_wallets.insert(this);
+}
+
 }

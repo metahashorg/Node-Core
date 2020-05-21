@@ -10,6 +10,8 @@
 #include <transaction.h>
 #include <xxhash.h>
 
+namespace metahash::metachain {
+
 class Wallet;
 
 class WalletMap {
@@ -175,5 +177,7 @@ public:
     void apply() override;
     void clear() override;
 };
+
+}
 
 #endif // WALLET_H

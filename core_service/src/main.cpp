@@ -14,8 +14,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include "blockserver.h"
-#include "version.h"
+#include <version.h>
 
 #include <blockchain.h>
 #include <meta_log.hpp>
@@ -30,7 +29,7 @@
 
 [[noreturn]] void print_config_file_params_and_exit()
 {
-    static const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COMMIT_HASH);
+    static const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COUNT) + "." + std::string(GIT_COMMIT_HASH);
     DEBUG_COUT("");
     DEBUG_COUT(version);
     DEBUG_COUT("Configureation file parameters:");
@@ -54,7 +53,7 @@ void parse_settings(
     std::string& path,
     std::string& hash,
     std::string& key,
-    std::set<std::pair<std::string, int>>& core_list);
+    std::map<std::string, std::pair<std::string, int>>& core_list);
 
 void libevent(
     std::atomic<std::map<std::string, std::pair<uint, uint>>*>& statistics,
@@ -70,7 +69,7 @@ int main(int argc, char** argv)
     std::string path;
     std::string known_hash;
     std::string key;
-    std::set<std::pair<std::string, int>> core_list;
+    std::map<std::string, std::pair<std::string, int>> core_list;
 
     bool skip_last_forging_and_state = false;
 
@@ -107,32 +106,6 @@ int main(int argc, char** argv)
     }
 
     std::thread(libevent, std::ref(blockChainController.get_wallet_statistics()), std::ref(blockChainController.get_wallet_request_addreses()), "wsstata.metahash.io", 80, "net-test").detach();
-
-    BLOCK_SERVER BS(tx_port, [&blockChainController](const std::string_view req_post, const std::string_view req_url, const std::string_view req_sign, const std::string_view req_pubk) {
-        if (req_url == "getinfo") {
-            static const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COUNT);
-            rapidjson::StringBuffer s;
-            rapidjson::Writer<rapidjson::StringBuffer> writer(s);
-            writer.StartObject();
-            {
-                writer.String("result");
-                writer.StartObject();
-                {
-                    writer.String("version");
-                    writer.String(version.c_str());
-                    writer.String("mh_addr");
-                    writer.String(blockChainController.get_str_address().c_str());
-                }
-                writer.EndObject();
-            }
-            writer.EndObject();
-            return std::string(s.GetString());
-        } else {
-            //        DEBUG_COUT(url_sw);
-            return blockChainController.add_pack_to_queue(req_post, req_url, req_sign, req_pubk);
-        }
-    });
-    BS.start();
 
     return EXIT_SUCCESS;
 }
@@ -290,7 +263,7 @@ void parse_settings(
     std::string& path,
     std::string& hash,
     std::string& key,
-    std::set<std::pair<std::string, int>>& core_list)
+    std::map<std::string, std::pair<std::string, int>>& core_list)
 {
     std::ifstream file(file_name);
     std::string line;
@@ -345,7 +318,7 @@ void parse_settings(
 
     /********************TRUSTED BLOCK HASH********************/
     if (std::getline(file, line)) {
-        auto hash_as_vec = hex2bin(line);
+        auto hash_as_vec = metahash::crypto::hex2bin(line);
         if (hash_as_vec.size() != 32) {
             DEBUG_COUT("Ivalid trusted block hash");
             print_config_file_params_and_exit();
@@ -360,15 +333,15 @@ void parse_settings(
 
     /********************PRIVATE KEY********************/
     if (std::getline(file, line)) {
-        std::vector<unsigned char> priv_k = hex2bin(line);
+        std::vector<unsigned char> priv_k = metahash::crypto::hex2bin(line);
         std::vector<char> PubKey;
-        if (!generate_public_key(PubKey, priv_k)) {
+        if (!metahash::crypto::generate_public_key(PubKey, priv_k)) {
             DEBUG_COUT("Error while parsing Private key");
             print_config_file_params_and_exit();
         }
 
-        std::array<char, 25> addres = get_address(PubKey);
-        std::string Text_addres = "0x" + bin2hex(addres);
+        std::array<char, 25> addres = metahash::crypto::get_address(PubKey);
+        std::string Text_addres = "0x" + metahash::crypto::bin2hex(addres);
         DEBUG_COUT("got key for address:\t" + Text_addres);
 
         key = line;
@@ -380,16 +353,17 @@ void parse_settings(
     /********************KNOWN CORES********************/
     while (std::getline(file, line)) {
         std::stringstream linestream(line);
+        std::string addr;
         std::string host;
         int port = 0;
 
-        linestream >> host >> port;
-        DEBUG_COUT("Core\t" + host + "\t" + std::to_string(port));
+        linestream >> addr >> host >> port;
+        DEBUG_COUT("Core\t" + addr + "\t" + host + "\t" + std::to_string(port));
 
         if (port == 0) {
             break;
         }
 
-        core_list.insert(std::make_pair(host, port));
+        core_list.insert({ addr, { host, port } });
     }
 }

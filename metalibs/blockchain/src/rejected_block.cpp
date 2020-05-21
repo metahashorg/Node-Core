@@ -3,6 +3,8 @@
 #include <open_ssl_decor.h>
 #include <statics.hpp>
 
+namespace metahash::metachain {
+
 std::string RejectedTXBlock::get_sign()
 {
     return std::string(sign);
@@ -26,10 +28,10 @@ const std::vector<RejectedTXInfo> RejectedTXBlock::get_txs()
     }
 
     uint64_t cur_pos = tx_buff;
-    uint64_t tx_size;
+    uint64_t tx_size = 0;
     {
         std::string_view tx_size_arr(&data[cur_pos], data.size() - cur_pos);
-        uint64_t varint_size = read_varint(tx_size, tx_size_arr);
+        uint64_t varint_size = crypto::read_varint(tx_size, tx_size_arr);
         cur_pos += varint_size;
     }
 
@@ -41,7 +43,7 @@ const std::vector<RejectedTXInfo> RejectedTXBlock::get_txs()
 
         {
             std::string_view tx_size_arr = std::string_view(&data[cur_pos], data.size() - cur_pos);
-            uint64_t varint_size = read_varint(tx_size, tx_size_arr);
+            uint64_t varint_size = crypto::read_varint(tx_size, tx_size_arr);
             cur_pos += varint_size;
         }
     }
@@ -77,7 +79,7 @@ bool RejectedTXBlock::parse(std::string_view block_sw)
 
     {
         std::string_view varint_arr(&block_sw[cur_pos], block_sw.size() - cur_pos);
-        uint64_t varint_size = read_varint(sign_size, varint_arr);
+        uint64_t varint_size = crypto::read_varint(sign_size, varint_arr);
         if (varint_size < 1) {
             DEBUG_COUT("corrupt varint size");
             return false;
@@ -95,7 +97,7 @@ bool RejectedTXBlock::parse(std::string_view block_sw)
 
     {
         std::string_view varint_arr(&block_sw[cur_pos], block_sw.size() - cur_pos);
-        uint64_t varint_size = read_varint(pubk_size, varint_arr);
+        uint64_t varint_size = crypto::read_varint(pubk_size, varint_arr);
         if (varint_size < 1) {
             DEBUG_COUT("corrupt varint size");
             return false;
@@ -115,7 +117,7 @@ bool RejectedTXBlock::parse(std::string_view block_sw)
     data_size = block_sw.size() - cur_pos;
     tmp_data_for_sign = std::string_view(&block_sw[data_start], data_size);
 
-    if (!check_sign(tmp_data_for_sign, tmp_sign, tmp_pubk)) {
+    if (!crypto::check_sign(tmp_data_for_sign, tmp_sign, tmp_pubk)) {
         DEBUG_COUT("Invalid Block Sign");
         return false;
     }
@@ -127,7 +129,7 @@ bool RejectedTXBlock::parse(std::string_view block_sw)
         std::string_view tx_size_arr(
             block_sw.begin() + cur_pos,
             block_sw.size() - cur_pos);
-        uint64_t varint_size = read_varint(tx_size, tx_size_arr);
+        uint64_t varint_size = crypto::read_varint(tx_size, tx_size_arr);
         if (varint_size < 1) {
             DEBUG_COUT("VARINT READ ERROR");
             return false;
@@ -155,7 +157,7 @@ bool RejectedTXBlock::parse(std::string_view block_sw)
             std::string_view tx_size_arr = std::string_view(
                 block_sw.begin() + cur_pos,
                 block_sw.size() - cur_pos);
-            uint64_t varint_size = read_varint(tx_size, tx_size_arr);
+            uint64_t varint_size = crypto::read_varint(tx_size, tx_size_arr);
             if (varint_size < 1) {
                 DEBUG_COUT("VARINT READ ERROR");
                 return false;
@@ -178,10 +180,9 @@ bool RejectedTXBlock::make(
     uint64_t timestamp,
     const sha256_2& new_prev_hash,
     const std::vector<RejectedTXInfo*>& new_txs,
-    const std::vector<char>& PrivKey,
-    const std::vector<char>& PubKey)
+    crypto::Signer& signer)
 {
-    std::vector<char> tx_buff;
+    std::vector<char> tx_data_buff;
 
     std::map<sha256_2, RejectedTXInfo*> tx_map;
     for (auto tx : new_txs) {
@@ -190,14 +191,14 @@ bool RejectedTXBlock::make(
 
     {
         for (auto [hash, tx] : tx_map) {
-            append_varint(tx_buff, tx->data.size());
-            tx_buff.insert(tx_buff.end(), tx->data.begin(), tx->data.end());
+            crypto::append_varint(tx_data_buff, tx->data.size());
+            tx_data_buff.insert(tx_data_buff.end(), tx->data.begin(), tx->data.end());
         }
-        append_varint(tx_buff, 0);
+        crypto::append_varint(tx_data_buff, 0);
     }
 
-    std::vector<char> sign_buff;
-    sign_data(tx_buff, sign_buff, PrivKey);
+    std::vector<char> sign_buff = signer.sign(tx_data_buff);
+    std::vector<char> PubKey = signer.get_pub_key();
 
     uint64_t b_type = BLOCK_TYPE_TECH_BAD_TX;
     std::vector<char> block_buff;
@@ -205,13 +206,15 @@ bool RejectedTXBlock::make(
     block_buff.insert(block_buff.end(), reinterpret_cast<char*>(&b_type), (reinterpret_cast<char*>(&b_type) + sizeof(uint64_t)));
     block_buff.insert(block_buff.end(), reinterpret_cast<char*>(&timestamp), (reinterpret_cast<char*>(&timestamp) + sizeof(uint64_t)));
     block_buff.insert(block_buff.end(), new_prev_hash.begin(), new_prev_hash.end());
-    append_varint(block_buff, sign_buff.size());
+    crypto::append_varint(block_buff, sign_buff.size());
     block_buff.insert(block_buff.end(), sign_buff.begin(), sign_buff.end());
-    append_varint(block_buff, PubKey.size());
+    crypto::append_varint(block_buff, PubKey.size());
     block_buff.insert(block_buff.end(), PubKey.begin(), PubKey.end());
-    block_buff.insert(block_buff.end(), tx_buff.begin(), tx_buff.end());
+    block_buff.insert(block_buff.end(), tx_data_buff.begin(), tx_data_buff.end());
 
     std::string_view block_as_sw(block_buff.data(), block_buff.size());
 
     return parse(block_as_sw);
+}
+
 }

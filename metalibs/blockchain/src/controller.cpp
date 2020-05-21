@@ -16,10 +16,12 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
-namespace fs = std::experimental::filesystem;
+namespace metahash::metachain {
 
 std::set<std::string> get_files_in_dir(std::string& path)
 {
+    namespace fs = std::experimental::filesystem;
+
     std::set<std::string> files;
 
     //                          y   m   d   t
@@ -71,6 +73,7 @@ std::future<Block*> parse_block_async(
 
         return block;
     });
+
     std::future<Block*> fut(task.get_future());
     boost::asio::post(io_context, std::move(task));
 
@@ -80,43 +83,29 @@ std::future<Block*> parse_block_async(
 ControllerImplementation::ControllerImplementation(
     boost::asio::io_context& io_context,
     const std::string& priv_key_line,
-    const std::string& _path,
+    const std::string& path,
     const std::string& proved_hash,
-    const std::set<std::pair<std::string, int>>& core_list,
+    const std::map<std::string, std::pair<std::string, int>>& core_list,
     const std::pair<std::string, int>& host_port,
     bool test)
     : BC(new BlockChain(io_context))
     , io_context(io_context)
-    , path(_path)
-    , cores(core_list, host_port, priv_key_line)
-    , test(test)
+    , path(path)
+    , signer(priv_key_line)
+    , cores(io_context, host_port.first, host_port.second, core_list, signer)
 {
-    std::this_thread::sleep_for(std::chrono::seconds(2));
     {
-        std::vector<unsigned char> priv_k = hex2bin(priv_key_line);
-        PrivKey.insert(PrivKey.end(), priv_k.begin(), priv_k.end());
-        if (!generate_public_key(PubKey, PrivKey)) {
-            DEBUG_COUT("ERROR INVALID PRIVATE KEY");
-            std::this_thread::sleep_for(std::chrono::seconds(2));
-            exit(1);
-        }
-
-        auto bin_addres = get_address(PubKey);
-        Addres = "0x" + bin2hex(bin_addres);
-
-        DEBUG_COUT("Core address is\t" + Addres);
-    }
-
-    {
-        std::vector<unsigned char> bin_proved_hash = hex2bin(proved_hash);
+        std::vector<unsigned char> bin_proved_hash = crypto::hex2bin(proved_hash);
         std::copy_n(bin_proved_hash.begin(), 32, proved_block.begin());
     }
-
-    master = Addres == "0x00fca67778165988703a302c1dfc34fd6036e209a20666969e";
 
     read_and_apply_local_chain();
 
     start_main_loop();
+
+    listener = new net_io::meta_server(io_context, host_port.first, host_port.second, signer, [this](net_io::Request& request, net_io::Reply& reply) {
+        add_pack_to_queue(request, reply);
+    });
 }
 
 void ControllerImplementation::read_and_apply_local_chain()
@@ -141,7 +130,7 @@ void ControllerImplementation::read_and_apply_local_chain()
                 DEBUG_COUT("got last state info. file:\t" + last_file + "\t and block:\t" + last_block);
 
                 {
-                    std::vector<unsigned char> bin_proved_hash = hex2bin(last_block);
+                    std::vector<unsigned char> bin_proved_hash = crypto::hex2bin(last_block);
                     std::copy_n(bin_proved_hash.begin(), 32, proved_block.begin());
                 }
             }
@@ -151,7 +140,7 @@ void ControllerImplementation::read_and_apply_local_chain()
     }
 
     std::vector<std::future<Block*>> pending_data;
-    std::unordered_map<sha256_2, Block*, sha256_2_hasher> prev_tree;
+    std::unordered_map<sha256_2, Block*, crypto::Hasher> prev_tree;
 
     char uint64_buff[8];
     std::set<std::string> files = get_files_in_dir(path);
@@ -185,10 +174,10 @@ void ControllerImplementation::read_and_apply_local_chain()
         auto block = fut.get();
         if (block) {
             if (!blocks.insert({ block->get_block_hash(), block }).second) {
-                DEBUG_COUT("Duplicate block in chain\t" + bin2hex(block->get_block_hash()));
+                DEBUG_COUT("Duplicate block in chain\t" + crypto::bin2hex(block->get_block_hash()));
                 delete block;
             } else if (!prev_tree.insert({ block->get_prev_hash(), block }).second) {
-                DEBUG_COUT("Branches in block chain\t" + bin2hex(block->get_prev_hash()) + "\t->\t" + bin2hex(block->get_block_hash()));
+                DEBUG_COUT("Branches in block chain\t" + crypto::bin2hex(block->get_prev_hash()) + "\t->\t" + crypto::bin2hex(block->get_block_hash()));
                 blocks.erase(block->get_block_hash());
                 delete block;
             }
@@ -202,8 +191,8 @@ void ControllerImplementation::read_and_apply_local_chain()
     DEBUG_COUT("READ BLOCK COMPLETE");
 }
 
-void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Block*, sha256_2_hasher>& block_tree,
-    std::unordered_map<sha256_2, Block*, sha256_2_hasher>& prev_tree,
+void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Block*, crypto::Hasher>& block_tree,
+    std::unordered_map<sha256_2, Block*, crypto::Hasher>& prev_tree,
     const std::string& source, bool need_write)
 {
     static const sha256_2 zero_block = { { 0 } };
@@ -212,15 +201,15 @@ void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Bl
     if (last_applied_block == zero_block) {
         if (proved_block == zero_block) {
             if (prev_tree.find(zero_block) == prev_tree.end()) {
-                DEBUG_COUT("blockchain from " + source + " have no blocks to connect with my chain to zero_block\t" + bin2hex(zero_block));
+                DEBUG_COUT("blockchain from " + source + " have no blocks to connect with my chain to zero_block\t" + crypto::bin2hex(zero_block));
                 do_clean_and_return = true;
             }
         } else if (block_tree.find(proved_block) == block_tree.end()) {
-            DEBUG_COUT("blockchain from " + source + " have no blocks to connect with my chain to proved_block\t" + bin2hex(proved_block));
+            DEBUG_COUT("blockchain from " + source + " have no blocks to connect with my chain to proved_block\t" + crypto::bin2hex(proved_block));
             do_clean_and_return = true;
         }
     } else if (prev_tree.find(last_applied_block) == prev_tree.end()) {
-        DEBUG_COUT("blockchain from " + source + " have no blocks to connect with my chain to last_applied_block\t" + bin2hex(last_applied_block));
+        DEBUG_COUT("blockchain from " + source + " have no blocks to connect with my chain to last_applied_block\t" + crypto::bin2hex(last_applied_block));
         do_clean_and_return = true;
     }
 
@@ -269,33 +258,9 @@ void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Bl
         }
     }
 
-    if (test) {
-        for (auto block_it = block_chain.begin(); block_it != block_chain.end(); block_it++) {
-            if ((*block_it)->get_block_type() == BLOCK_TYPE_FORGING) {
-                DEBUG_COUT("Found forging block");
-                bool last = true;
-                auto find_block = block_it;
-                for (find_block++; find_block != block_chain.end(); find_block++) {
-                    if ((*find_block)->get_block_type() == BLOCK_TYPE_FORGING) {
-                        DEBUG_COUT("Not last one");
-                        last = false;
-                        break;
-                    }
-                }
-                if (last) {
-                    DEBUG_COUT("Last one");
-                    for (auto delete_block = block_it; delete_block != block_chain.end();) {
-                        delete_block = block_chain.erase(delete_block);
-                    }
-                    break;
-                }
-            }
-        }
-    }
-
     for (auto block : block_chain) {
         if (!BC->apply_block(block)) {
-            DEBUG_COUT("blockchain from " + source + " have have errors in block " + bin2hex(block->get_block_hash()));
+            DEBUG_COUT("blockchain from " + source + " have have errors in block " + crypto::bin2hex(block->get_block_hash()));
             break;
         }
 
@@ -307,7 +272,7 @@ void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Bl
 
             if (timestamp - block->get_block_timestamp() < 60) {
                 auto* p_ar = new ApproveRecord;
-                p_ar->make(block->get_block_hash(), PrivKey, PubKey);
+                p_ar->make(block->get_block_hash(), signer);
                 p_ar->approve = true;
                 distribute(p_ar);
                 delete p_ar;
@@ -351,24 +316,21 @@ void ControllerImplementation::actualize_chain()
         return;
     }
 
-    // DEBUG_COUT("actualize_chain");
-
-    std::map<std::string, std::string> last_block_on_cores = cores.send_with_return(RPC_LAST_BLOCK, "");
+    std::map<std::string, std::vector<char>> last_block_on_cores = cores.send_with_return(RPC_LAST_BLOCK, std::vector<char>());
 
     std::set<std::string> cores_with_missing_block;
     std::set<sha256_2> missing_blocks;
-    for (auto last_block_on_core : last_block_on_cores) {
-        if (last_block_on_core.second.size() >= 40) {
+    for (auto&& [core_addr, block_as_vector] : last_block_on_cores) {
+        if (block_as_vector.size() >= 40) {
             sha256_2 last_block_return;
-            std::copy_n(last_block_on_core.second.begin(), 32, last_block_return.begin());
+            std::copy_n(block_as_vector.begin(), 32, last_block_return.begin());
 
             uint64_t block_timestamp = 0;
-            std::copy_n(last_block_on_core.second.begin() + 32, 8, reinterpret_cast<char*>(&block_timestamp));
+            std::copy_n(block_as_vector.begin() + 32, 8, reinterpret_cast<char*>(&block_timestamp));
 
             if (block_timestamp > prev_timestamp && blocks.find(last_block_return) == blocks.end()) {
-                DEBUG_COUT(
-                    "core\t" + last_block_on_core.first + "have more recent block\t" + bin2hex(last_block_return));
-                cores_with_missing_block.insert(last_block_on_core.first);
+                DEBUG_COUT("core\t" + core_addr + "have more recent block\t" + crypto::bin2hex(last_block_return));
+                cores_with_missing_block.insert(core_addr);
                 missing_blocks.insert(last_block_return);
             }
         }
@@ -377,8 +339,8 @@ void ControllerImplementation::actualize_chain()
     if (!cores_with_missing_block.empty()) {
         DEBUG_COUT("GET BLOCKCHAIN START");
 
-        std::unordered_map<sha256_2, Block*, sha256_2_hasher> block_tree;
-        std::unordered_map<sha256_2, Block*, sha256_2_hasher> prev_tree;
+        std::unordered_map<sha256_2, Block*, crypto::Hasher> block_tree;
+        std::unordered_map<sha256_2, Block*, crypto::Hasher> prev_tree;
 
         for (;;) {
             for (const auto& core : cores_with_missing_block) {
@@ -391,11 +353,11 @@ void ControllerImplementation::actualize_chain()
 
                 sha256_2 requested_block = *missing_blocks.begin();
 
-                std::string block_as_sting;
-                std::copy_n(requested_block.begin(), 32, std::back_inserter(block_as_sting));
+                std::vector<char> block_as_vector;
+                block_as_vector.insert(block_as_vector.end(), requested_block.begin(), requested_block.end());
 
-                DEBUG_COUT("trying to get block\t" + bin2hex(requested_block) + "\tfrom:\t" + core);
-                std::string return_data = cores.send_with_return_to_core(core, RPC_GET_BLOCK, block_as_sting);
+                DEBUG_COUT("trying to get block\t" + crypto::bin2hex(requested_block) + "\tfrom:\t" + core);
+                std::vector<char> return_data = cores.send_with_return_to_core(core, RPC_GET_BLOCK, block_as_vector);
 
                 if (return_data.empty()) {
                     DEBUG_COUT("Block is empty");
@@ -403,15 +365,16 @@ void ControllerImplementation::actualize_chain()
                     missing_blocks.erase(missing_blocks.begin());
                 }
 
-                Block* block = parse_block(return_data);
+                std::string_view block_as_sw(return_data.data(), return_data.size());
+                Block* block = parse_block(block_as_sw);
                 if (block) {
                     if (dynamic_cast<CommonBlock*>(block)) {
                         if (!block_tree.insert({ block->get_block_hash(), block }).second) {
-                            DEBUG_COUT("Duplicate block in chain\t" + bin2hex(block->get_block_hash()));
+                            DEBUG_COUT("Duplicate block in chain\t" + crypto::bin2hex(block->get_block_hash()));
                             delete block;
                             block = nullptr;
                         } else if (!prev_tree.insert({ block->get_prev_hash(), block }).second) {
-                            DEBUG_COUT("Branches in block chain\t" + bin2hex(block->get_prev_hash()) + "\t->\t" + bin2hex(block->get_block_hash()));
+                            DEBUG_COUT("Branches in block chain\t" + crypto::bin2hex(block->get_prev_hash()) + "\t->\t" + crypto::bin2hex(block->get_block_hash()));
                             block_tree.erase(block->get_block_hash());
                             delete block;
                             block = nullptr;
@@ -436,64 +399,64 @@ void ControllerImplementation::start_main_loop()
     std::thread(&ControllerImplementation::main_loop, this).detach();
 }
 
-std::string
-ControllerImplementation::add_pack_to_queue(std::string_view pack, std::string_view url, std::string_view sign,
-    std::string_view pubk)
+void ControllerImplementation::add_pack_to_queue(net_io::Request& request, net_io::Reply& reply)
 {
-    auto&& bin_pubk = hex2bin(pubk);
-    auto&& bin_sign = hex2bin(sign);
-    if (check_sign(pack, bin_sign, bin_pubk)) {
-        auto&& sender_addr = "0x" + bin2hex(get_address(bin_pubk));
-        auto rights = BC->check_addr(sender_addr);
+    auto rights = BC->check_addr(request.sender_mh_addr);
+    auto url = request.request_type;
+    std::string_view pack(request.message.data(), request.message.size());
 
-        if (rights >= 50) {
-            if (url == RPC_PING) {
-                parse_S_PING(pack);
-            } else if (url == RPC_TX && master) {
-                parse_B_TX(pack);
-            }
+    if (rights >= 50) {
+        if (url == RPC_PING) {
+            parse_S_PING(pack);
+        } else if (url == RPC_TX && master) {
+            parse_B_TX(pack);
+        }
 
-            if (rights >= 100) {
-                if (url == RPC_APPROVE) {
-                    parse_C_APPROVE(pack);
-                } else if (url == RPC_DISAPPROVE) {
-                    parse_C_DISAPPROVE(pack);
-                } else if (url == RPC_APPROVE_BLOCK) {
-                    parse_C_APPROVE_BLOCK(pack);
-                } else if (url == RPC_LAST_BLOCK) {
-                    return parse_S_LAST_BLOCK(pack);
-                } else if (url == RPC_GET_BLOCK) {
-                    return parse_S_GET_BLOCK(pack);
-                } else if (url == RPC_GET_CHAIN) {
-                    return parse_S_GET_CHAIN(pack);
-                } else if (url == RPC_GET_CORE_LIST) {
-                    return parse_S_GET_CORE_LIST(pack);
-                } else if (url == RPC_GET_CORE_ADDR) {
-                    return parse_S_GET_CORE_ADDR(pack);
-                }
-            }
-
-            if (rights >= 150) {
-                if (url == RPC_PRETEND_BLOCK) {
-                    parse_C_PRETEND_BLOCK(pack);
-                }
+        if (rights >= 100) {
+            switch (url) {
+            case RPC_APPROVE:
+                parse_C_APPROVE(pack);
+                break;
+            case RPC_DISAPPROVE:
+                parse_C_DISAPPROVE(pack);
+                break;
+            case RPC_APPROVE_BLOCK:
+                parse_C_APPROVE_BLOCK(pack);
+                break;
+            case RPC_LAST_BLOCK:
+                reply.message = parse_S_LAST_BLOCK(pack);
+                break;
+            case RPC_GET_BLOCK:
+                reply.message = parse_S_GET_BLOCK(pack);
+                break;
+            case RPC_GET_CHAIN:
+                reply.message = parse_S_GET_CHAIN(pack);
+                break;
+            case RPC_GET_CORE_LIST:
+                reply.message = parse_S_GET_CORE_LIST(pack);
+                break;
+            case RPC_GET_CORE_ADDR:
+                reply.message = parse_S_GET_CORE_ADDR(pack);
+                break;
             }
         }
-    } else if (url == RPC_TX && master) {
-        parse_B_TX(pack);
-    }
 
-    return "";
+        if (rights >= 150) {
+            if (url == RPC_PRETEND_BLOCK) {
+                parse_C_PRETEND_BLOCK(pack);
+            }
+        }
+    }
 }
 
 std::string ControllerImplementation::get_str_address()
 {
-    return Addres;
+    return signer.get_mh_addr();
 }
 
 std::string ControllerImplementation::get_last_block_str()
 {
-    return bin2hex(last_applied_block);
+    return crypto::bin2hex(last_applied_block);
 }
 
 std::atomic<std::map<std::string, std::pair<uint, uint>>*>& ControllerImplementation::get_wallet_statistics()
@@ -553,8 +516,8 @@ void ControllerImplementation::main_loop()
             }
 
             for (std::pair<sha256_2, Block*> block_pair : blocks) {
-                if (block_approve[block_pair.first].find(Addres) == block_approve[block_pair.first].end()
-                    && block_disapprove[block_pair.first].find(Addres) == block_disapprove[block_pair.first].end()) {
+                if (block_approve[block_pair.first].find(signer.get_mh_addr()) == block_approve[block_pair.first].end()
+                    && block_disapprove[block_pair.first].find(signer.get_mh_addr()) == block_disapprove[block_pair.first].end()) {
 
                     Block* block = block_pair.second;
                     if (block->get_prev_hash() == last_applied_block) {
@@ -632,7 +595,7 @@ void ControllerImplementation::parse_B_TX(std::string_view pack)
 
     uint64_t tx_size;
     std::string_view tx_size_arr(&pack[index], pack.size() - index);
-    uint64_t varint_size = read_varint(tx_size, tx_size_arr);
+    uint64_t varint_size = crypto::read_varint(tx_size, tx_size_arr);
     if (varint_size < 1) {
         DEBUG_COUT("corrupt varint size");
         return;
@@ -656,7 +619,7 @@ void ControllerImplementation::parse_B_TX(std::string_view pack)
         }
 
         tx_size_arr = std::string_view(&pack[index], pack.size() - index);
-        varint_size = read_varint(tx_size, tx_size_arr);
+        varint_size = crypto::read_varint(tx_size, tx_size_arr);
         if (varint_size < 1) {
             DEBUG_COUT("corrupt varint size");
             return;
@@ -670,7 +633,7 @@ void ControllerImplementation::parse_C_APPROVE_BLOCK(std::string_view pack)
     uint64_t block_size;
     uint64_t approve_size;
 
-    uint64_t offset = read_varint(approve_size, pack);
+    uint64_t offset = crypto::read_varint(approve_size, pack);
     if (!offset) {
         DEBUG_COUT("corrupt pack");
     }
@@ -687,7 +650,7 @@ void ControllerImplementation::parse_C_APPROVE_BLOCK(std::string_view pack)
 
     std::string_view block_raw(pack.data() + offset + approve_size, pack.size() - (offset + approve_size));
 
-    offset = read_varint(block_size, block_raw);
+    offset = crypto::read_varint(block_size, block_raw);
     if (!offset) {
         DEBUG_COUT("corrupt pack");
     }
@@ -739,47 +702,48 @@ void ControllerImplementation::parse_C_DISAPPROVE(std::string_view pack)
     }
 }
 
-std::string ControllerImplementation::parse_S_LAST_BLOCK(std::string_view)
+std::vector<char> ControllerImplementation::parse_S_LAST_BLOCK(std::string_view)
 {
-    std::string last_block;
+    std::vector<char> last_block;
     last_block.insert(last_block.end(), last_applied_block.begin(), last_applied_block.end());
     char* p_timestamp = reinterpret_cast<char*>(&prev_timestamp);
     last_block.insert(last_block.end(), p_timestamp, p_timestamp + 8);
     return last_block;
 }
 
-std::string ControllerImplementation::parse_S_GET_BLOCK(std::string_view pack)
+std::vector<char> ControllerImplementation::parse_S_GET_BLOCK(std::string_view pack)
 {
     if (pack.size() < 32) {
-        return "";
+        return std::vector<char>();
     }
 
     sha256_2 block_hash;
     std::copy_n(pack.begin(), 32, block_hash.begin());
 
     if (blocks.find(block_hash) != blocks.end()) {
-        std::string return_string;
+        std::vector<char> return_string;
         {
             auto& block_data = blocks[block_hash]->get_data();
             return_string.insert(return_string.end(), block_data.begin(), block_data.end());
         }
         return return_string;
     }
-    return "";
+
+    return std::vector<char>();
 }
 
-std::string ControllerImplementation::parse_S_GET_CHAIN(std::string_view pack)
+std::vector<char> ControllerImplementation::parse_S_GET_CHAIN(std::string_view pack)
 {
     sha256_2 prev_block = { { 0 } };
     //    DEBUG_COUT(std::to_string(pack.size()));
 
     if (pack.size() < 32) {
-        return "";
+        return std::vector<char>();
     }
 
     std::copy_n(pack.begin(), 32, prev_block.begin());
 
-    std::string chain;
+    std::vector<char> chain;
     sha256_2 got_block = master ? last_created_block : last_applied_block;
 
     //    DEBUG_COUT(bin2hex(prev_block));
@@ -799,12 +763,12 @@ std::string ControllerImplementation::parse_S_GET_CHAIN(std::string_view pack)
     return chain;
 }
 
-std::string ControllerImplementation::parse_S_GET_CORE_LIST(std::string_view)
+std::vector<char> ControllerImplementation::parse_S_GET_CORE_LIST(std::string_view)
 {
     return cores.get_core_list();
 }
 
-std::string ControllerImplementation::parse_S_GET_CORE_ADDR(std::string_view pack)
+std::vector<char> ControllerImplementation::parse_S_GET_CORE_ADDR(std::string_view pack)
 {
     std::string addr_req_str(pack);
     std::stringstream ss(addr_req_str);
@@ -814,17 +778,20 @@ std::string ControllerImplementation::parse_S_GET_CORE_ADDR(std::string_view pac
         elems.push_back(std::move(item));
     }
 
-    if (elems.size() == 2) {
-        cores.add_core(elems[0], std::stoi(elems[1]));
+    if (elems.size() == 3) {
+        cores.add_core(elems[0], elems[1], std::stoi(elems[2]));
     }
 
-    return Addres;
+    auto mh_addr = signer.get_mh_addr();
+    std::vector<char> addr_as_vector;
+    addr_as_vector.insert(addr_as_vector.end(), mh_addr.begin(), mh_addr.end());
+    return addr_as_vector;
 }
 
 void ControllerImplementation::approve_block(Block* p_block)
 {
     auto* p_ar = new ApproveRecord;
-    p_ar->make(p_block->get_block_hash(), PrivKey, PubKey);
+    p_ar->make(p_block->get_block_hash(), signer);
     p_ar->approve = true;
 
     distribute(p_ar);
@@ -834,7 +801,7 @@ void ControllerImplementation::approve_block(Block* p_block)
 void ControllerImplementation::disapprove_block(Block* p_block)
 {
     auto* p_ar = new ApproveRecord;
-    p_ar->make(p_block->get_block_hash(), PrivKey, PubKey);
+    p_ar->make(p_block->get_block_hash(), signer);
     p_ar->approve = false;
 
     distribute(p_ar);
@@ -846,8 +813,8 @@ void ControllerImplementation::apply_approve(ApproveRecord* p_ar)
     sha256_2 block_hash;
     std::copy(p_ar->block_hash.begin(), p_ar->block_hash.end(), block_hash.begin());
 
-    auto bin_addres = get_address(p_ar->pub_key);
-    std::string addr = "0x" + bin2hex(bin_addres);
+    auto bin_addres = crypto::get_address(p_ar->pub_key);
+    std::string addr = "0x" + crypto::bin2hex(bin_addres);
 
     if (p_ar->approve) {
         if (!block_approve[block_hash].insert({ addr, p_ar }).second) {
@@ -864,10 +831,6 @@ void ControllerImplementation::apply_approve(ApproveRecord* p_ar)
                 Block* block = blocks[block_hash];
                 if (block->get_prev_hash() == last_applied_block) {
                     if (BC->can_apply_block(block)) {
-                        if (block->get_block_type() == BLOCK_TYPE_STATE) {
-                            make_clean();
-                        }
-
                         BC->apply_block(block);
                         write_block(block);
                     } else {
@@ -889,7 +852,7 @@ void ControllerImplementation::apply_approve(ApproveRecord* p_ar)
 
 void ControllerImplementation::distribute(Block* block)
 {
-    std::string send_pack;
+    std::vector<char> send_pack;
     send_pack.insert(send_pack.end(), block->get_data().begin(), block->get_data().end());
 
     cores.send_no_return(RPC_PRETEND_BLOCK, send_pack);
@@ -897,8 +860,8 @@ void ControllerImplementation::distribute(Block* block)
 
 void ControllerImplementation::distribute(ApproveRecord* p_ar)
 {
-    std::string approve_str = p_ar->approve ? RPC_APPROVE : RPC_DISAPPROVE;
-    std::string send_pack;
+    auto approve_str = p_ar->approve ? RPC_APPROVE : RPC_DISAPPROVE;
+    std::vector<char> send_pack;
     send_pack.insert(send_pack.end(), p_ar->data.begin(), p_ar->data.end());
 
     cores.send_no_return(approve_str, send_pack);
@@ -1012,7 +975,7 @@ void ControllerImplementation::write_block(Block* block)
                     writer.StartObject();
                     {
                         writer.String("hash");
-                        writer.String(bin2hex(common_block->get_block_hash()).c_str());
+                        writer.String(crypto::bin2hex(common_block->get_block_hash()).c_str());
                         writer.String("file");
                         writer.String(file_path.c_str());
                     }
@@ -1106,7 +1069,7 @@ bool ControllerImplementation::try_make_block()
             delete tx_list;
 
             auto reject_tx_block = new RejectedTXBlock;
-            if (!rejected_tx_list.empty() && prev_rejected_ts != timestamp && reject_tx_block->make(timestamp, last_applied_block, rejected_tx_list, PrivKey, PubKey)) {
+            if (!rejected_tx_list.empty() && prev_rejected_ts != timestamp && reject_tx_block->make(timestamp, last_applied_block, rejected_tx_list, signer)) {
                 prev_rejected_ts = timestamp;
                 distribute(reject_tx_block);
                 write_block(reject_tx_block);
@@ -1121,10 +1084,6 @@ bool ControllerImplementation::try_make_block()
         Block* block = blocks[last_created_block];
         if (block->get_prev_hash() == last_applied_block) {
             if (BC->can_apply_block(block)) {
-                if (block->get_block_type() == BLOCK_TYPE_STATE) {
-                    make_clean();
-                }
-
                 BC->apply_block(block);
                 write_block(block);
             } else {
@@ -1137,7 +1096,4 @@ bool ControllerImplementation::try_make_block()
     return false;
 }
 
-void ControllerImplementation::make_clean()
-{
-    ;
 }

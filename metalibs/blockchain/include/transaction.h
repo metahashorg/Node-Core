@@ -7,7 +7,11 @@
 #include <string_view>
 #include <vector>
 
+#include <open_ssl_decor.h>
+
 using sha256_2 = std::array<unsigned char, 32>;
+
+namespace metahash::metachain {
 
 struct TX {
 public:
@@ -76,17 +80,17 @@ public:
         //        uint64_t bin_to_index = _raw_tx.size();
         _raw_tx.insert(_raw_tx.end(), param_to.begin(), param_to.end());
 
-        append_tx_varint(_raw_tx, param_value);
-        append_tx_varint(_raw_tx, param_fee);
-        append_tx_varint(_raw_tx, param_nonce);
+        crypto::append_varint(_raw_tx, param_value);
+        crypto::append_varint(_raw_tx, param_fee);
+        crypto::append_varint(_raw_tx, param_nonce);
 
-        append_tx_varint(_raw_tx, param_data.size());
+        crypto::append_varint(_raw_tx, param_data.size());
         _raw_tx.insert(_raw_tx.end(), param_data.begin(), param_data.end());
 
-        append_tx_varint(_raw_tx, param_sign.size());
+        crypto::append_varint(_raw_tx, param_sign.size());
         _raw_tx.insert(_raw_tx.end(), param_sign.begin(), param_sign.end());
 
-        append_tx_varint(_raw_tx, param_pub_key.size());
+        crypto::append_varint(_raw_tx, param_pub_key.size());
         _raw_tx.insert(_raw_tx.end(), param_pub_key.begin(), param_pub_key.end());
 
         std::string_view tx_sw(_raw_tx.data(), _raw_tx.size());
@@ -96,7 +100,6 @@ public:
 
 private:
     void clear();
-    void append_tx_varint(std::vector<char>& _raw_tx, uint64_t);
     bool check_tx();
 };
 
@@ -108,7 +111,7 @@ struct ApproveRecord {
     bool approve;
 
     bool parse(std::string_view);
-    bool make(const sha256_2& block_hash, const std::vector<char>& PrivKey, const std::vector<char>& PubKey);
+    bool make(const sha256_2& approving_block_hash, crypto::Signer & signer);
 };
 
 struct RejectedTXInfo {
@@ -119,5 +122,7 @@ struct RejectedTXInfo {
     bool parse(std::string_view);
     bool make(const sha256_2& tx_hash, uint64_t reason);
 };
+
+}
 
 #endif // CRYPTO_TEMPLATES_HPP

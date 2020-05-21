@@ -7,6 +7,8 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
+namespace metahash::metachain {
+
 DecentralizedApplication::DecentralizedApplication(std::unordered_set<Wallet*>& _changed_wallets)
     : Wallet(_changed_wallets)
 {
@@ -127,7 +129,7 @@ bool DecentralizedApplication::try_dapp_create(const TX* tx)
         return false;
     }
 
-    std::string dapp_addr = get_contract_address(addr_from, tx->nonce);
+    std::string dapp_addr = crypto::get_contract_address(addr_from, tx->nonce);
     if (addr_to != dapp_addr) {
         DEBUG_COUT("not an owner");
         return false;
@@ -163,7 +165,7 @@ bool DecentralizedApplication::try_dapp_modify(const TX* tx)
         return false;
     }
 
-    std::string dapp_addr = get_contract_address(addr_from, init_nonce);
+    std::string dapp_addr = crypto::get_contract_address(addr_from, init_nonce);
     if (addr_to != dapp_addr) {
         DEBUG_COUT("not an owner");
         return false;
@@ -232,4 +234,6 @@ void DecentralizedApplication::clear()
     host = real_host;
 
     Wallet::clear();
+}
+
 }

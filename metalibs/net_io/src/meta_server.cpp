@@ -33,27 +33,23 @@ namespace statics {
         write_buff.insert(write_buff.end(), data_size_str.begin(), data_size_str.end());
         write_buff.insert(write_buff.end(), rnrn.begin(), rnrn.end());
         write_buff.insert(write_buff.end(), resp_data.begin(), resp_data.end());
+
+        return write_buff;
     }
 
     const std::string unkown_sender = R"({"result":"error","error":"unkown sender"})";
     const std::string invalid_sign = R"({"result":"error","error":"invalid sign"})";
 }
 
-meta_server::meta_server(boost::asio::io_context& io_context,
-    const std::string& address,
-    const std::string& port,
-    const std::function<void(Request&, Reply&)>& request_handler,
-    crypto::Signer& signer,
-    std::unordered_set<std::string, crypto::DataHasher> allowed_addreses)
+meta_server::meta_server(boost::asio::io_context& io_context, const std::string& address, int port, crypto::Signer& signer, const std::function<void(Request&, Reply&)>& request_handler)
     : io_context(io_context)
     , acceptor(io_context)
     , request_handler(request_handler)
     , signer(signer)
-    , allowed_addreses(std::move(allowed_addreses))
     , new_connection()
 {
     boost::asio::ip::tcp::resolver resolver(io_context);
-    boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(address, port).begin();
+    boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(address, std::to_string(port)).begin();
 
     acceptor.open(endpoint.protocol());
     acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
@@ -81,8 +77,12 @@ void meta_server::handle_accept(const boost::system::error_code& e)
 
     start_accept();
 }
+void meta_server::update_allowed_addreses(std::unordered_set<std::string, crypto::Hasher> _allowed_addreses)
+{
+    allowed_addreses = _allowed_addreses;
+}
 
-Connection::Connection(boost::asio::io_context& io_context, const std::function<void(Request&, Reply&)>& handler, crypto::Signer& signer, std::unordered_set<std::string, crypto::DataHasher>& allowed_addreses)
+Connection::Connection(boost::asio::io_context& io_context, const std::function<void(Request&, Reply&)>& handler, crypto::Signer& signer, std::unordered_set<std::string, crypto::Hasher>& allowed_addreses)
     : socket(io_context)
     , request_handler(handler)
     , signer(signer)
@@ -106,7 +106,7 @@ void Connection::read(std::shared_ptr<Connection> pThis)
 
             switch (result) {
             case statics::SUCCESS: {
-                pThis->request.remote_address = pThis->socket.remote_endpoint().address().to_string();
+                pThis->request.remote_ip_address = pThis->socket.remote_endpoint().address().to_string();
                 pThis->reply.reply_id = pThis->request.request_id;
 
                 pThis->request_handler(pThis->request, pThis->reply);
@@ -156,8 +156,9 @@ boost::asio::const_buffer Reply::make(crypto::Signer& signer)
 {
     std::vector<char> public_key = signer.get_pub_key();
     std::vector<char> sign = signer.sign(message);
+    uint64_t magic = METAHASH_MAGIC_NUMBER;
 
-    write_buff.insert(write_buff.end(), reinterpret_cast<char*>(&METAHASH_MAGIC_NUMBER), (reinterpret_cast<char*>(&METAHASH_MAGIC_NUMBER) + sizeof(uint32_t)));
+    write_buff.insert(write_buff.end(), reinterpret_cast<char*>(&magic), (reinterpret_cast<char*>(&magic) + sizeof(uint32_t)));
     crypto::append_varint(write_buff, reply_id);
 
     crypto::append_varint(write_buff, public_key.size());
@@ -190,7 +191,7 @@ bool Request::fill_sw(std::string_view& sw, uint64_t sw_size)
     }
 }
 
-int8_t Request::parse(char* buff_data, size_t buff_size, std::unordered_set<std::string, crypto::DataHasher>& allowed_addreses)
+int8_t Request::parse(char* buff_data, size_t buff_size, std::unordered_set<std::string, crypto::Hasher>& allowed_addreses)
 {
     request_full.insert(request_full.end(), buff_data, buff_data + buff_size);
 
@@ -220,9 +221,9 @@ int8_t Request::parse(char* buff_data, size_t buff_size, std::unordered_set<std:
 
     if (public_key.empty()) {
         if (fill_sw(public_key, public_key_size)) {
-            sender_addr = "0x" + crypto::bin2hex(crypto::get_address(public_key));
+            sender_mh_addr = "0x" + crypto::bin2hex(crypto::get_address(public_key));
             if (!allowed_addreses.empty()) {
-                if (allowed_addreses.find(sender_addr) == allowed_addreses.end()) {
+                if (allowed_addreses.find(sender_mh_addr) == allowed_addreses.end()) {
                     return statics::UNKNOWN_SENDER_METAHASH_ADDRESS;
                 }
             }

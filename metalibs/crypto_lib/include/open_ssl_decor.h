@@ -13,10 +13,9 @@
 
 namespace metahash::crypto {
 
-struct DataHasher
-{
+struct Hasher {
     template <typename Container>
-    uint64_t operator()(Container data);
+    uint64_t operator()(const Container& data) const;
 };
 
 class Signer {
@@ -27,10 +26,10 @@ private:
 
 public:
     template <typename Container>
-    Signer(Container private_file);
+    Signer(const Container& private_file);
 
     template <typename Container>
-    std::vector<char> sign(Container data);
+    std::vector<char> sign(const Container& data);
 
     std::vector<char> get_pub_key();
     std::string get_mh_addr();
@@ -92,8 +91,8 @@ bool generate_public_key(PubKContainer& pub_key, const PrivKContainer& private_k
 template <typename DataContainer, typename SignContainer, typename PrivKContainer>
 bool sign_data(const DataContainer& data, SignContainer& sign, const PrivKContainer& private_key);
 
-#include "open_ssl_decor_template_realization.hpp"
-
 }
+
+#include "open_ssl_decor_template_realization.hpp"
 
 #endif // CRYPTO_TEMPLATES_HPP

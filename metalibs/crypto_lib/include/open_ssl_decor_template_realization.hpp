@@ -19,6 +19,8 @@
 
 #include <xxhash.h>
 
+namespace metahash::crypto {
+
 const uint8_t BYTED_2 = 0xfa;
 const uint8_t BYTED_4 = 0xfb;
 const uint8_t BYTED_8 = 0xfc;
@@ -29,21 +31,23 @@ const uint8_t BYTED_64 = 0xff;
 using sha256_2 = std::array<unsigned char, 32>;
 
 template <typename Container>
-uint64_t DataHasher::operator()(Container data)
+uint64_t Hasher::operator()(const Container& data) const
 {
     return XXH64(data.data(), data.size(), 0);
 }
 
 template <typename Container>
-Signer::Signer(Container private_file)
+Signer::Signer(const Container& private_file)
 {
     init(std::string_view(private_file.data(), private_file.size()));
 }
 
 template <typename Container>
-std::vector<char> Signer::sign(Container data)
+std::vector<char> Signer::sign(const Container& data)
 {
-    return sign(std::string_view(data.data(), data.size()));
+    std::vector<char> bin_sign;
+    sign_data(data, bin_sign, private_key);
+    return bin_sign;
 }
 
 template <typename Container>
@@ -371,6 +375,8 @@ bool sign_data(const DataContainer& data, SignContainer& sign, const PrivKContai
     EVP_MD_CTX_destroy(mdctx);
 
     return true;
+}
+
 }
 
 #endif // OPEN_SSL_DECOR_TEMPLATE_REALIZATION_HPP
