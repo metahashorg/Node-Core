@@ -47,13 +47,17 @@ std::set<std::string> get_files_in_dir(std::string& path)
     return files;
 }
 
-std::future<Block*> parse_block_async(
+void parse_block_async(
     boost::asio::io_context& io_context,
+    std::list<std::future<Block*>>& futures,
     char* block_buff,
     int64_t block_size,
     bool delete_buff)
 {
-    std::packaged_task<Block*()> task([block_buff, block_size, delete_buff]() {
+    auto promise = std::make_shared<std::promise<Block*>>();
+    futures.emplace_back(promise->get_future());
+
+    boost::asio::post(io_context, [block_buff, block_size, delete_buff, promise]() {
         std::string_view block_as_string(block_buff, block_size);
         Block* block = parse_block(block_as_string);
 
@@ -71,13 +75,8 @@ std::future<Block*> parse_block_async(
             delete[] block_buff;
         }
 
-        return block;
+        promise->set_value(block);
     });
-
-    std::future<Block*> fut(task.get_future());
-    boost::asio::post(io_context, std::move(task));
-
-    return fut;
 }
 
 ControllerImplementation::ControllerImplementation(
@@ -91,9 +90,14 @@ ControllerImplementation::ControllerImplementation(
     : BC(new BlockChain(io_context))
     , io_context(io_context)
     , path(path)
-    , signer(priv_key_line)
+    , signer(crypto::hex2bin(priv_key_line))
     , cores(io_context, host_port.first, host_port.second, core_list, signer)
 {
+    if (signer.get_mh_addr() == "0x00fca67778165988703a302c1dfc34fd6036e209a20666969e") {
+        DEBUG_COUT("master");
+        master = true;
+    }
+
     {
         std::vector<unsigned char> bin_proved_hash = crypto::hex2bin(proved_hash);
         std::copy_n(bin_proved_hash.begin(), 32, proved_block.begin());
@@ -106,6 +110,7 @@ ControllerImplementation::ControllerImplementation(
     listener = new net_io::meta_server(io_context, host_port.first, host_port.second, signer, [this](net_io::Request& request, net_io::Reply& reply) {
         add_pack_to_queue(request, reply);
     });
+    //    listener->start();
 }
 
 void ControllerImplementation::read_and_apply_local_chain()
@@ -139,7 +144,7 @@ void ControllerImplementation::read_and_apply_local_chain()
         last_known_state_file.close();
     }
 
-    std::vector<std::future<Block*>> pending_data;
+    std::list<std::future<Block*>> pending_data;
     std::unordered_map<sha256_2, Block*, crypto::Hasher> prev_tree;
 
     char uint64_buff[8];
@@ -154,7 +159,7 @@ void ControllerImplementation::read_and_apply_local_chain()
                 char* block_buff = new char[block_size];
 
                 if (ifile.read(block_buff, static_cast<int64_t>(block_size))) {
-                    pending_data.push_back(parse_block_async(io_context, block_buff, block_size, true));
+                    parse_block_async(io_context, pending_data, block_buff, block_size, true);
                 } else {
                     std::string msg = "read file error\t" + file;
                     DEBUG_COUT(msg);
@@ -312,6 +317,8 @@ void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Bl
 
 void ControllerImplementation::actualize_chain()
 {
+    DEBUG_COUT("actualize_chain");
+
     if (master) {
         return;
     }
@@ -320,13 +327,13 @@ void ControllerImplementation::actualize_chain()
 
     std::set<std::string> cores_with_missing_block;
     std::set<sha256_2> missing_blocks;
-    for (auto&& [core_addr, block_as_vector] : last_block_on_cores) {
-        if (block_as_vector.size() >= 40) {
+    for (auto&& [core_addr, block_info] : last_block_on_cores) {
+        if (block_info.size() >= 40) {
             sha256_2 last_block_return;
-            std::copy_n(block_as_vector.begin(), 32, last_block_return.begin());
+            std::copy_n(block_info.begin(), 32, last_block_return.begin());
 
             uint64_t block_timestamp = 0;
-            std::copy_n(block_as_vector.begin() + 32, 8, reinterpret_cast<char*>(&block_timestamp));
+            std::copy_n(block_info.begin() + 32, 8, reinterpret_cast<char*>(&block_timestamp));
 
             if (block_timestamp > prev_timestamp && blocks.find(last_block_return) == blocks.end()) {
                 DEBUG_COUT("core\t" + core_addr + "have more recent block\t" + crypto::bin2hex(last_block_return));
@@ -379,10 +386,13 @@ void ControllerImplementation::actualize_chain()
                             delete block;
                             block = nullptr;
                         } else if (blocks.find(block->get_prev_hash()) == blocks.end()) {
-                            missing_blocks.insert(block->get_prev_hash());
+                            if (block->get_prev_hash() == sha256_2{}) {
+                                DEBUG_COUT("Got complete chain. Previous block is zero block");
+                            } else {
+                                missing_blocks.insert(block->get_prev_hash());
+                            }
                         }
                     } else {
-                        DEBUG_COUT("Not Common Block");
                         delete block;
                         block = nullptr;
                     }
@@ -405,48 +415,59 @@ void ControllerImplementation::add_pack_to_queue(net_io::Request& request, net_i
     auto url = request.request_type;
     std::string_view pack(request.message.data(), request.message.size());
 
-    if (rights >= 50) {
-        if (url == RPC_PING) {
-            parse_S_PING(pack);
-        } else if (url == RPC_TX && master) {
-            parse_B_TX(pack);
-        }
-
-        if (rights >= 100) {
-            switch (url) {
-            case RPC_APPROVE:
-                parse_C_APPROVE(pack);
-                break;
-            case RPC_DISAPPROVE:
-                parse_C_DISAPPROVE(pack);
-                break;
-            case RPC_APPROVE_BLOCK:
-                parse_C_APPROVE_BLOCK(pack);
-                break;
-            case RPC_LAST_BLOCK:
-                reply.message = parse_S_LAST_BLOCK(pack);
-                break;
-            case RPC_GET_BLOCK:
-                reply.message = parse_S_GET_BLOCK(pack);
-                break;
-            case RPC_GET_CHAIN:
-                reply.message = parse_S_GET_CHAIN(pack);
-                break;
-            case RPC_GET_CORE_LIST:
-                reply.message = parse_S_GET_CORE_LIST(pack);
-                break;
-            case RPC_GET_CORE_ADDR:
-                reply.message = parse_S_GET_CORE_ADDR(pack);
-                break;
-            }
-        }
-
-        if (rights >= 150) {
-            if (url == RPC_PRETEND_BLOCK) {
-                parse_C_PRETEND_BLOCK(pack);
-            }
-        }
+    //    if (rights >= 50) {
+    if (url == RPC_PING) {
+        DEBUG_COUT("RPC_PING");
+        parse_S_PING(pack);
+    } else if (url == RPC_TX && master) {
+        DEBUG_COUT("RPC_TX");
+        parse_B_TX(pack);
     }
+
+    //        if (rights >= 100) {
+    switch (url) {
+    case RPC_APPROVE:
+        DEBUG_COUT("RPC_APPROVE");
+        parse_C_APPROVE(pack);
+        break;
+    case RPC_DISAPPROVE:
+        DEBUG_COUT("RPC_DISAPPROVE");
+        parse_C_DISAPPROVE(pack);
+        break;
+    case RPC_APPROVE_BLOCK:
+        DEBUG_COUT("RPC_APPROVE_BLOCK");
+        parse_C_APPROVE_BLOCK(pack);
+        break;
+    case RPC_LAST_BLOCK:
+        DEBUG_COUT("RPC_LAST_BLOCK");
+        reply.message = parse_S_LAST_BLOCK(pack);
+        break;
+    case RPC_GET_BLOCK:
+        DEBUG_COUT("RPC_GET_BLOCK");
+        reply.message = parse_S_GET_BLOCK(pack);
+        break;
+    case RPC_GET_CHAIN:
+        DEBUG_COUT("RPC_GET_CHAIN");
+        reply.message = parse_S_GET_CHAIN(pack);
+        break;
+    case RPC_GET_CORE_LIST:
+        DEBUG_COUT("RPC_GET_CORE_LIST");
+        reply.message = parse_S_GET_CORE_LIST(pack);
+        break;
+    case RPC_GET_CORE_ADDR:
+        DEBUG_COUT("RPC_GET_CORE_ADDR");
+        reply.message = parse_S_GET_CORE_ADDR(pack);
+        break;
+    }
+    //        }
+
+    //        if (rights >= 150) {
+    if (url == RPC_PRETEND_BLOCK) {
+        DEBUG_COUT("RPC_PRETEND_BLOCK");
+        parse_C_PRETEND_BLOCK(pack);
+    }
+    //        }
+    //    }
 }
 
 std::string ControllerImplementation::get_str_address()
@@ -475,7 +496,7 @@ void ControllerImplementation::main_loop()
     std::this_thread::sleep_for(std::chrono::seconds(15));
     while (goon) {
         const uint64_t get_arr_size = 128;
-        bool need_actualize = true;
+        bool need_actualize = false;
 
         bool no_sleep = false;
 
@@ -549,14 +570,11 @@ void ControllerImplementation::main_loop()
         }
 
         {
-            uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(
-                std::chrono::system_clock::now())
-                                                           .time_since_epoch()
-                                                           .count());
+            uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
 
             if (timestamp - last_sync_timestamp > 60) {
                 DEBUG_COUT("sync_core_lists");
-                std::thread(&CoreController::sync_core_lists, &cores).detach();
+                io_context.post([this] { cores.sync_core_lists(); });
 
                 last_sync_timestamp = timestamp;
             }
@@ -708,6 +726,11 @@ std::vector<char> ControllerImplementation::parse_S_LAST_BLOCK(std::string_view)
     last_block.insert(last_block.end(), last_applied_block.begin(), last_applied_block.end());
     char* p_timestamp = reinterpret_cast<char*>(&prev_timestamp);
     last_block.insert(last_block.end(), p_timestamp, p_timestamp + 8);
+
+    DEBUG_COUT("parse_S_LAST_BLOCK");
+    DEBUG_COUT(prev_timestamp);
+    DEBUG_COUT(crypto::bin2hex(last_applied_block));
+
     return last_block;
 }
 

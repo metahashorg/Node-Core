@@ -39,7 +39,7 @@ uint64_t Hasher::operator()(const Container& data) const
 template <typename Container>
 Signer::Signer(const Container& private_file)
 {
-    init(std::string_view(private_file.data(), private_file.size()));
+    init(std::string_view(reinterpret_cast<const char*>(private_file.data()), private_file.size()));
 }
 
 template <typename Container>

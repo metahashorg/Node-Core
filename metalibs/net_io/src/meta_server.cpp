@@ -3,6 +3,7 @@
 #include <boost/shared_ptr.hpp>
 #include <utility>
 
+#include <meta_log.hpp>
 #include <meta_server.h>
 #include <version.h>
 
@@ -37,23 +38,19 @@ namespace statics {
         return write_buff;
     }
 
-    const std::string unkown_sender = R"({"result":"error","error":"unkown sender"})";
-    const std::string invalid_sign = R"({"result":"error","error":"invalid sign"})";
+    static const std::string unkown_sender = R"({"result":"error","error":"unkown sender"})";
+    static const std::string invalid_sign = R"({"result":"error","error":"invalid sign"})";
 }
 
-meta_server::meta_server(boost::asio::io_context& io_context, const std::string& address, int port, crypto::Signer& signer, const std::function<void(Request&, Reply&)>& request_handler)
+meta_server::meta_server(boost::asio::io_context& io_context, const std::string& address, const int port, crypto::Signer& signer, std::function<void(Request&, Reply&)> request_handler)
     : io_context(io_context)
-    , acceptor(io_context)
-    , request_handler(request_handler)
+    , endpoint(boost::asio::ip::tcp::v4(), static_cast<unsigned short>(port))
+    , acceptor(io_context, endpoint)
+    , request_handler(std::move(request_handler))
     , signer(signer)
     , new_connection()
 {
-    boost::asio::ip::tcp::resolver resolver(io_context);
-    boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(address, std::to_string(port)).begin();
-
-    acceptor.open(endpoint.protocol());
-    acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
-    acceptor.bind(endpoint);
+    start();
 }
 
 void meta_server::start()
@@ -73,18 +70,21 @@ void meta_server::handle_accept(const boost::system::error_code& e)
 {
     if (!e) {
         new_connection->start(new_connection);
+    } else {
+        DEBUG_COUT("fail");
+        DEBUG_COUT(e.message());
     }
 
     start_accept();
 }
 void meta_server::update_allowed_addreses(std::unordered_set<std::string, crypto::Hasher> _allowed_addreses)
 {
-    allowed_addreses = _allowed_addreses;
+    allowed_addreses = std::move(_allowed_addreses);
 }
 
-Connection::Connection(boost::asio::io_context& io_context, const std::function<void(Request&, Reply&)>& handler, crypto::Signer& signer, std::unordered_set<std::string, crypto::Hasher>& allowed_addreses)
+Connection::Connection(boost::asio::io_context& io_context, std::function<void(Request&, Reply&)> handler, crypto::Signer& signer, std::unordered_set<std::string, crypto::Hasher>& allowed_addreses)
     : socket(io_context)
-    , request_handler(handler)
+    , request_handler(std::move(handler))
     , signer(signer)
     , allowed_addreses(allowed_addreses)
 {
@@ -118,7 +118,7 @@ void Connection::read(std::shared_ptr<Connection> pThis)
             } break;
             case statics::WRONG_MAGIC_NUMBER: {
                 pThis->reply.message = statics::version_info(pThis->signer.get_mh_addr());
-                pThis->write_and_close(pThis);
+                pThis->write_http_close(pThis);
             } break;
             case statics::UNKNOWN_SENDER_METAHASH_ADDRESS: {
                 std::copy(statics::unkown_sender.begin(), statics::unkown_sender.end(), std::back_inserter(pThis->reply.message));
@@ -129,6 +129,9 @@ void Connection::read(std::shared_ptr<Connection> pThis)
                 pThis->write_and_close(pThis);
             } break;
             }
+        } else {
+            DEBUG_COUT("error");
+            DEBUG_COUT(e.message());
         }
     });
 }
@@ -145,6 +148,16 @@ void Connection::write(std::shared_ptr<Connection> pThis)
 void Connection::write_and_close(std::shared_ptr<Connection> pThis)
 {
     boost::asio::async_write(pThis->socket, pThis->reply.make(signer), [pThis](const boost::system::error_code& e, std::size_t bytes_transferred) {
+        if (!e) {
+            boost::system::error_code ignored_ec;
+            pThis->socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignored_ec);
+        }
+    });
+}
+
+void Connection::write_http_close(std::shared_ptr<Connection> pThis)
+{
+    boost::asio::async_write(pThis->socket, boost::asio::const_buffer(pThis->reply.message.data(), pThis->reply.message.size()), [pThis](const boost::system::error_code& e, std::size_t bytes_transferred) {
         if (!e) {
             boost::system::error_code ignored_ec;
             pThis->socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignored_ec);
@@ -182,7 +195,7 @@ bool Request::read_varint(uint64_t& varint)
 
 bool Request::fill_sw(std::string_view& sw, uint64_t sw_size)
 {
-    if (offset + sw_size < request_full.size()) {
+    if (offset + sw_size > request_full.size()) {
         return false;
     } else {
         sw = std::string_view(&request_full[offset], sw_size);
@@ -236,7 +249,7 @@ int8_t Request::parse(char* buff_data, size_t buff_size, std::unordered_set<std:
         return statics::INCOMPLETE;
     }
 
-    if (sign.empty() && fill_sw(sign, sign_size)) {
+    if (sign.empty() && !fill_sw(sign, sign_size)) {
         return statics::INCOMPLETE;
     }
 
@@ -244,7 +257,7 @@ int8_t Request::parse(char* buff_data, size_t buff_size, std::unordered_set<std:
         return statics::INCOMPLETE;
     }
 
-    if (message.empty()) {
+    if (message_size && message.empty()) {
         if (fill_sw(message, message_size)) {
             if (!crypto::check_sign(message, sign, public_key)) {
                 return statics::INVALID_SIGN;

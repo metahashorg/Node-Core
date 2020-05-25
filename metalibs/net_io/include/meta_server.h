@@ -51,21 +51,22 @@ private:
 };
 
 struct Connection {
-    explicit Connection(boost::asio::io_context& io_context, const std::function<void(Request&, Reply&)>& handler, crypto::Signer& signer, std::unordered_set<std::string, crypto::Hasher>& allowed_addreses);
+    explicit Connection(boost::asio::io_context& io_context, std::function<void(Request&, Reply&)> handler, crypto::Signer& signer, std::unordered_set<std::string, crypto::Hasher>& allowed_addreses);
 
     static void start(std::shared_ptr<Connection>);
 
     void read(std::shared_ptr<Connection>);
     void write(std::shared_ptr<Connection>);
     void write_and_close(std::shared_ptr<Connection>);
+    void write_http_close(std::shared_ptr<Connection>);
 
     boost::asio::ip::tcp::socket socket;
-    boost::array<char, 0xffff> buffer;
+    boost::array<char, 0xffff> buffer{};
 
     Request request;
     Reply reply;
 
-    const std::function<void(Request&, Reply&)>& request_handler;
+    std::function<void(Request&, Reply&)> request_handler;
     crypto::Signer& signer;
     std::unordered_set<std::string, crypto::Hasher>& allowed_addreses;
 };
@@ -76,7 +77,7 @@ public:
         const std::string& address,
         int port,
         crypto::Signer& signer,
-        const std::function<void(Request&, Reply&)>& request_handler);
+        std::function<void(Request&, Reply&)> request_handler);
 
     void start();
 
@@ -87,9 +88,10 @@ private:
     void handle_accept(const boost::system::error_code& e);
 
     boost::asio::io_context& io_context;
+    boost::asio::ip::tcp::endpoint endpoint;
     boost::asio::ip::tcp::acceptor acceptor;
 
-    const std::function<void(Request&, Reply&)>& request_handler;
+    std::function<void(Request&, Reply&)> request_handler;
     crypto::Signer& signer;
     std::unordered_set<std::string, crypto::Hasher> allowed_addreses;
 

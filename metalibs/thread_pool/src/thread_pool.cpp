@@ -6,10 +6,9 @@ std::tuple<std::vector<boost::thread>, boost::asio::io_context::work> thread_poo
     boost::asio::io_context::work work(io_context);
 
     for (uint i = 0; i < thread_count; i++) {
-        threadpool.push_back(
-            boost::thread([&io_context]() {
+        threadpool.emplace_back([&io_context]() {
                 io_context.run();
-            }));
+            });
     }
 
     return { std::move(threadpool), std::move(work) };

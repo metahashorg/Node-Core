@@ -87,25 +87,19 @@ int main(int argc, char** argv)
 
     parse_settings(std::string(argv[1]), network, host, tx_port, path, known_hash, key, core_list);
 
-    int threads = std::thread::hardware_concurrency();
-    boost::asio::io_context io_context(threads);
+    int thread_count = std::thread::hardware_concurrency();
+    boost::asio::io_context io_context(thread_count);
+    auto&& [threads, work] = thread_pool(io_context, thread_count);
+
     BlockChainController blockChainController(io_context, key, path, known_hash, core_list, { host, tx_port }, skip_last_forging_and_state);
 
-    std::vector<std::thread> thread_pool;
-    thread_pool.reserve(threads - 1);
-    for (auto i = 1; i < threads; i++) {
-        thread_pool.emplace_back(
-            [&io_context] {
-                io_context.run();
-            });
-    }
+    std::thread(libevent, std::ref(blockChainController.get_wallet_statistics()), std::ref(blockChainController.get_wallet_request_addreses()), "wsstata.metahash.io", 80, "net-test").detach();
+
     io_context.run();
 
-    for (auto& t : thread_pool) {
+    for (auto& t : threads) {
         t.join();
     }
-
-    std::thread(libevent, std::ref(blockChainController.get_wallet_statistics()), std::ref(blockChainController.get_wallet_request_addreses()), "wsstata.metahash.io", 80, "net-test").detach();
 
     return EXIT_SUCCESS;
 }

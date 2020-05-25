@@ -12,6 +12,8 @@ namespace metahash::metachain {
 
 class CoreController {
 private:
+    const uint64_t concurrent_connections_count = 2;
+
     std::mutex core_lock;
     std::map<std::string, net_io::meta_client*> cores;
 

@@ -80,7 +80,7 @@ public:
     meta_client(boost::asio::io_context& io_context, const std::string& mh_endpoint_addr, const std::string& server, const int port, const int max_connections, crypto::Signer& signer);
     ~meta_client();
 
-    void send_message(const uint64_t request_type, const std::vector<char>& message, const std::function<void(std::vector<char>)>& callback);
+    void send_message(uint64_t request_type, const std::vector<char>& message, const std::function<void(std::vector<char>)>& callback);
     std::tuple<std::string, std::string, int> get_definition();
 
 private:

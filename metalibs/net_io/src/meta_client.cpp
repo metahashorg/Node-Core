@@ -1,4 +1,5 @@
 #include <meta_client.h>
+#include <meta_log.hpp>
 
 namespace metahash::net_io {
 
@@ -51,7 +52,7 @@ int8_t ClientConnection::Response::parse(char* buff_data, size_t buff_size, cons
         return statics::INCOMPLETE;
     }
 
-    if (sign.empty() && fill_sw(sign, sign_size)) {
+    if (sign.empty() && !fill_sw(sign, sign_size)) {
         return statics::INCOMPLETE;
     }
 
@@ -59,7 +60,7 @@ int8_t ClientConnection::Response::parse(char* buff_data, size_t buff_size, cons
         return statics::INCOMPLETE;
     }
 
-    if (message.empty()) {
+    if (message_size && message.empty()) {
         if (fill_sw(message, message_size)) {
             if (!crypto::check_sign(message, sign, public_key)) {
                 return statics::INVALID_SIGN;
@@ -69,7 +70,7 @@ int8_t ClientConnection::Response::parse(char* buff_data, size_t buff_size, cons
         }
     }
 
-    return true;
+    return statics::SUCCESS;
 }
 
 bool ClientConnection::Response::read_varint(uint64_t& varint)
@@ -81,7 +82,7 @@ bool ClientConnection::Response::read_varint(uint64_t& varint)
 
 bool ClientConnection::Response::fill_sw(std::string_view& sw, uint64_t sw_size)
 {
-    if (offset + sw_size < request_full.size()) {
+    if (offset + sw_size > request_full.size()) {
         return false;
     } else {
         sw = std::string_view(&request_full[offset], sw_size);
@@ -137,7 +138,7 @@ void ClientConnection::read()
 
             switch (result) {
             case statics::SUCCESS: {
-                std::vector<char> buff(response.message.size());
+                std::vector<char> buff;
                 buff.insert(buff.end(), response.message.begin(), response.message.end());
 
                 p_task->callback(buff);
@@ -151,14 +152,8 @@ void ClientConnection::read()
             case statics::INCOMPLETE: {
                 read();
             } break;
-            case statics::WRONG_MAGIC_NUMBER: {
-                p_task->callback(std::vector<char>());
-                reset();
-            } break;
-            case statics::UNKNOWN_SENDER_METAHASH_ADDRESS: {
-                p_task->callback(std::vector<char>());
-                reset();
-            } break;
+            case statics::WRONG_MAGIC_NUMBER:
+            case statics::UNKNOWN_SENDER_METAHASH_ADDRESS:
             case statics::INVALID_SIGN: {
                 p_task->callback(std::vector<char>());
                 reset();
@@ -182,9 +177,9 @@ meta_client::meta_client(boost::asio::io_context& io_context, const std::string&
     : io_context(io_context)
     , resolver(io_context)
     , signer(signer)
+    , mh_addr(mh_endpoint_addr)
     , server(server)
     , port(port)
-    , mh_addr(mh_endpoint_addr)
 {
     endpoints = resolver.resolve(server, std::to_string(port));
 
@@ -203,11 +198,11 @@ void meta_client::send_message(uint64_t request_type, const std::vector<char>& m
 {
     std::vector<char> write_buff;
 
-    uint64_t request_id = request_count++;
+    const uint64_t request_id = request_count++;
     uint64_t magic = METAHASH_MAGIC_NUMBER;
 
-    std::vector<char> public_key = signer.get_pub_key();
-    std::vector<char> sign = signer.sign(message);
+    const std::vector<char> public_key = signer.get_pub_key();
+    const std::vector<char> sign = signer.sign(message);
 
     write_buff.insert(write_buff.end(), reinterpret_cast<char*>(&magic), (reinterpret_cast<char*>(&magic) + sizeof(uint32_t)));
     crypto::append_varint(write_buff, request_id);
