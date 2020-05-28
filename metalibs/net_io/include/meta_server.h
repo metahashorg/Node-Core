@@ -39,26 +39,44 @@ private:
     bool fill_sw(std::string_view& sw, uint64_t sw_size);
 };
 
-class Reply {
-public:
-    uint64_t reply_id = 0;
-    std::vector<char> message;
-
-    boost::asio::const_buffer make(crypto::Signer&);
-
-private:
-    std::vector<char> write_buff;
-};
-
 struct Connection {
-    explicit Connection(boost::asio::io_context& io_context, std::function<void(Request&, Reply&)> handler, crypto::Signer& signer, std::unordered_set<std::string, crypto::Hasher>& allowed_addreses);
+private:
+    class Reply {
+    public:
+        template <typename Container>
+        void make(crypto::Signer& _signer,uint64_t reply_id, const Container& data)
+        {
+            std::vector<char> message;
+            message.insert(message.end(), data.begin(), data.end());
+
+            serialize(_signer, reply_id, message);
+        }
+
+        template <typename Container>
+        void make_http(const Container& data)
+        {
+            write_buff.clear();
+            write_buff.insert(write_buff.end(), data.begin(), data.end());
+        }
+
+        boost::asio::const_buffer make_buff();
+        bool is_complete(uint64_t);
+
+    private:
+
+        void serialize(crypto::Signer&, uint64_t , std::vector<char>&);
+
+        uint64_t offset = 0;
+        std::vector<char> write_buff;
+    };
+public:
+    explicit Connection(boost::asio::io_context& io_context, std::function<std::vector<char>(Request&)> handler, crypto::Signer& signer, std::unordered_set<std::string, crypto::Hasher>& allowed_addreses);
 
     static void start(std::shared_ptr<Connection>);
 
     void read(std::shared_ptr<Connection>);
-    void write(std::shared_ptr<Connection>);
-    void write_and_close(std::shared_ptr<Connection>);
-    void write_http_close(std::shared_ptr<Connection>);
+    static void write(std::shared_ptr<Connection>);
+    static void write_and_close(std::shared_ptr<Connection>);
 
     boost::asio::ip::tcp::socket socket;
     boost::array<char, 0xffff> buffer{};
@@ -66,7 +84,7 @@ struct Connection {
     Request request;
     Reply reply;
 
-    std::function<void(Request&, Reply&)> request_handler;
+    std::function<std::vector<char>(Request&)> request_handler;
     crypto::Signer& signer;
     std::unordered_set<std::string, crypto::Hasher>& allowed_addreses;
 };
@@ -77,7 +95,7 @@ public:
         const std::string& address,
         int port,
         crypto::Signer& signer,
-        std::function<void(Request&, Reply&)> request_handler);
+        std::function<std::vector<char>(Request&)> request_handler);
 
     void start();
 
@@ -91,7 +109,7 @@ private:
     boost::asio::ip::tcp::endpoint endpoint;
     boost::asio::ip::tcp::acceptor acceptor;
 
-    std::function<void(Request&, Reply&)> request_handler;
+    std::function<std::vector<char>(Request&)> request_handler;
     crypto::Signer& signer;
     std::unordered_set<std::string, crypto::Hasher> allowed_addreses;
 

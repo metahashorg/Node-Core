@@ -107,10 +107,9 @@ ControllerImplementation::ControllerImplementation(
 
     start_main_loop();
 
-    listener = new net_io::meta_server(io_context, host_port.first, host_port.second, signer, [this](net_io::Request& request, net_io::Reply& reply) {
-        add_pack_to_queue(request, reply);
+    listener = new net_io::meta_server(io_context, host_port.first, host_port.second, signer, [this](net_io::Request& request) -> std::vector<char> {
+        return add_pack_to_queue(request);
     });
-    //    listener->start();
 }
 
 void ControllerImplementation::read_and_apply_local_chain()
@@ -119,25 +118,20 @@ void ControllerImplementation::read_and_apply_local_chain()
 
     std::ifstream last_known_state_file("last_state.json");
     if (last_known_state_file.is_open()) {
-        std::string content((std::istreambuf_iterator<char>(last_known_state_file)),
-            (std::istreambuf_iterator<char>()));
+        std::string content((std::istreambuf_iterator<char>(last_known_state_file)), (std::istreambuf_iterator<char>()));
 
         rapidjson::Document last_known_state_json;
         if (!last_known_state_json.Parse(content.c_str()).HasParseError()) {
 
             if (last_known_state_json.HasMember("hash") && last_known_state_json["hash"].IsString()
                 && last_known_state_json.HasMember("file") && last_known_state_json["file"].IsString()) {
-                std::string last_block = std::string(last_known_state_json["hash"].GetString(),
-                    last_known_state_json["hash"].GetStringLength());
-                last_file = std::string(last_known_state_json["file"].GetString(),
-                    last_known_state_json["file"].GetStringLength());
+
+                last_file = std::string(last_known_state_json["file"].GetString(), last_known_state_json["file"].GetStringLength());
+                std::string last_block = std::string(last_known_state_json["hash"].GetString(), last_known_state_json["hash"].GetStringLength());
+                std::vector<unsigned char> bin_proved_hash = crypto::hex2bin(last_block);
+                std::copy_n(bin_proved_hash.begin(), 32, proved_block.begin());
 
                 DEBUG_COUT("got last state info. file:\t" + last_file + "\t and block:\t" + last_block);
-
-                {
-                    std::vector<unsigned char> bin_proved_hash = crypto::hex2bin(last_block);
-                    std::copy_n(bin_proved_hash.begin(), 32, proved_block.begin());
-                }
             }
         }
 
@@ -270,10 +264,7 @@ void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Bl
         }
 
         if (need_write) {
-            uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(
-                std::chrono::system_clock::now())
-                                                           .time_since_epoch()
-                                                           .count());
+            uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
 
             if (timestamp - block->get_block_timestamp() < 60) {
                 auto* p_ar = new ApproveRecord;
@@ -386,7 +377,7 @@ void ControllerImplementation::actualize_chain()
                             delete block;
                             block = nullptr;
                         } else if (blocks.find(block->get_prev_hash()) == blocks.end()) {
-                            if (block->get_prev_hash() == sha256_2{}) {
+                            if (block->get_prev_hash() == sha256_2 {}) {
                                 DEBUG_COUT("Got complete chain. Previous block is zero block");
                             } else {
                                 missing_blocks.insert(block->get_prev_hash());
@@ -409,7 +400,7 @@ void ControllerImplementation::start_main_loop()
     std::thread(&ControllerImplementation::main_loop, this).detach();
 }
 
-void ControllerImplementation::add_pack_to_queue(net_io::Request& request, net_io::Reply& reply)
+std::vector<char> ControllerImplementation::add_pack_to_queue(net_io::Request& request)
 {
     auto rights = BC->check_addr(request.sender_mh_addr);
     auto url = request.request_type;
@@ -440,23 +431,23 @@ void ControllerImplementation::add_pack_to_queue(net_io::Request& request, net_i
         break;
     case RPC_LAST_BLOCK:
         DEBUG_COUT("RPC_LAST_BLOCK");
-        reply.message = parse_S_LAST_BLOCK(pack);
+        return parse_S_LAST_BLOCK(pack);
         break;
     case RPC_GET_BLOCK:
         DEBUG_COUT("RPC_GET_BLOCK");
-        reply.message = parse_S_GET_BLOCK(pack);
+        return parse_S_GET_BLOCK(pack);
         break;
     case RPC_GET_CHAIN:
         DEBUG_COUT("RPC_GET_CHAIN");
-        reply.message = parse_S_GET_CHAIN(pack);
+        return parse_S_GET_CHAIN(pack);
         break;
     case RPC_GET_CORE_LIST:
         DEBUG_COUT("RPC_GET_CORE_LIST");
-        reply.message = parse_S_GET_CORE_LIST(pack);
+        return parse_S_GET_CORE_LIST(pack);
         break;
     case RPC_GET_CORE_ADDR:
         DEBUG_COUT("RPC_GET_CORE_ADDR");
-        reply.message = parse_S_GET_CORE_ADDR(pack);
+        return parse_S_GET_CORE_ADDR(pack);
         break;
     }
     //        }
@@ -468,6 +459,8 @@ void ControllerImplementation::add_pack_to_queue(net_io::Request& request, net_i
     }
     //        }
     //    }
+
+    return std::vector<char>();
 }
 
 std::string ControllerImplementation::get_str_address()
@@ -737,6 +730,8 @@ std::vector<char> ControllerImplementation::parse_S_LAST_BLOCK(std::string_view)
 std::vector<char> ControllerImplementation::parse_S_GET_BLOCK(std::string_view pack)
 {
     if (pack.size() < 32) {
+        DEBUG_COUT("pack.size() < 32");
+        DEBUG_COUT(crypto::bin2hex(pack));
         return std::vector<char>();
     }
 
@@ -744,12 +739,11 @@ std::vector<char> ControllerImplementation::parse_S_GET_BLOCK(std::string_view p
     std::copy_n(pack.begin(), 32, block_hash.begin());
 
     if (blocks.find(block_hash) != blocks.end()) {
-        std::vector<char> return_string;
-        {
-            auto& block_data = blocks[block_hash]->get_data();
-            return_string.insert(return_string.end(), block_data.begin(), block_data.end());
-        }
-        return return_string;
+        DEBUG_COUT("blocks[block_hash]->get_data().size()\t" + std::to_string(blocks[block_hash]->get_data().size()));
+        return blocks[block_hash]->get_data();
+    } else {
+        DEBUG_COUT("blocks.find(block_hash) != blocks.end()");
+        DEBUG_COUT(crypto::bin2hex(block_hash));
     }
 
     return std::vector<char>();
@@ -776,8 +770,7 @@ std::vector<char> ControllerImplementation::parse_S_GET_CHAIN(std::string_view p
         auto& block_data = blocks[got_block]->get_data();
 
         uint64_t block_size = block_data.size();
-        chain.insert(chain.end(), reinterpret_cast<char*>(&block_size),
-            reinterpret_cast<char*>(&block_size) + sizeof(uint64_t));
+        chain.insert(chain.end(), reinterpret_cast<char*>(&block_size), reinterpret_cast<char*>(&block_size) + sizeof(uint64_t));
         chain.insert(chain.end(), block_data.begin(), block_data.end());
 
         got_block = blocks[got_block]->get_prev_hash();
@@ -972,20 +965,15 @@ void ControllerImplementation::write_block(Block* block)
                 std::ofstream out_file;
                 out_file.open(file_path.c_str(), std::ios::out | std::ios::app | std::ios::binary);
                 out_file.write(reinterpret_cast<char*>(&approve_block_size), sizeof(uint64_t));
-                out_file.write(approve_block->get_data().data(),
-                    static_cast<int64_t>(approve_block->get_data().size()));
+                out_file.write(approve_block->get_data().data(), static_cast<int64_t>(approve_block->get_data().size()));
                 out_file.close();
                 delete approve_block;
             }
         }
 
         {
-            uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(
-                std::chrono::system_clock::now())
-                                                           .time_since_epoch()
-                                                           .count());
-            DEBUG_COUT(
-                "block size and latency\t" + std::to_string(dynamic_cast<CommonBlock*>(block)->get_txs().size()) + "\t" + std::to_string(timestamp - prev_timestamp));
+            uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
+            DEBUG_COUT("block size and latency\t" + std::to_string(dynamic_cast<CommonBlock*>(block)->get_txs().size()) + "\t" + std::to_string(timestamp - prev_timestamp));
         }
 
         {
@@ -1024,10 +1012,7 @@ void ControllerImplementation::write_block(Block* block)
 
 bool ControllerImplementation::try_make_block()
 {
-    uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(
-        std::chrono::system_clock::now())
-                                                   .time_since_epoch()
-                                                   .count());
+    uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
     if (last_applied_block == last_created_block) {
         if (prev_timestamp >= timestamp) {
             return false;

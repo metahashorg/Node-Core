@@ -45,7 +45,7 @@ const std::vector<ApproveRecord> ApproveBlock::get_txs()
 
 bool ApproveBlock::parse(std::string_view block_sw)
 {
-    if (block_sw.size() < 80) {
+    if (block_sw.size() < 48) {
         DEBUG_COUT("if (size < 80)");
         return false;
     }

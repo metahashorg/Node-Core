@@ -25,13 +25,11 @@ private:
     class Response {
     public:
         uint64_t request_id = 0;
-        uint64_t request_type = 0;
-        std::string_view public_key;
-        std::string_view sign;
-        std::string_view message;
+        std::vector<char> public_key;
+        std::vector<char> sign;
+        std::vector<char> message;
 
         std::string sender_addr;
-        std::string remote_address;
 
         int8_t parse(char*, size_t, const std::string& mh_endpoint_addr);
 
@@ -45,7 +43,7 @@ private:
         uint64_t message_size = 0;
 
         bool read_varint(uint64_t& varint);
-        bool fill_sw(std::string_view& sw, uint64_t sw_size);
+        bool fill_sw(std::vector<char>& sw, uint64_t sw_size);
     };
 
     const std::string mh_endpoint_addr;

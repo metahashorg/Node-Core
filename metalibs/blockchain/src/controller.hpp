@@ -69,7 +69,7 @@ public:
         const std::pair<std::string, int>& host_port,
         bool test);
 
-    void add_pack_to_queue(net_io::Request& request, net_io::Reply& reply);
+    std::vector<char> add_pack_to_queue(net_io::Request& request);
 
     std::string get_str_address();
     std::string get_last_block_str();
