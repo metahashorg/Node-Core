@@ -34,7 +34,7 @@ private:
     std::unordered_map<sha256_2, std::map<std::string, ApproveRecord*>, crypto::Hasher> block_approve;
     std::unordered_map<sha256_2, std::map<std::string, ApproveRecord*>, crypto::Hasher> block_disapprove;
 
-    bool master = false;
+//    bool master = false;
 
     sha256_2 last_applied_block = { { 0 } };
     sha256_2 last_created_block = { { 0 } };
@@ -113,6 +113,9 @@ private:
         std::unordered_map<sha256_2, Block*, crypto::Hasher>& prev_tree,
         const std::string& source,
         bool need_write);
+
+    void apply_block(Block* block);
+    bool master();
 };
 
 }

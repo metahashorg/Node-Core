@@ -164,12 +164,12 @@ std::vector<char> Signer::sign(std::string_view data)
     return bin_sign;
 }
 
-std::vector<char> Signer::get_pub_key()
+const std::vector<char>& Signer::get_pub_key()
 {
     return public_key;
 }
 
-std::string Signer::get_mh_addr()
+const std::string& Signer::get_mh_addr()
 {
     return mh_addr;
 }

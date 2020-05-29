@@ -1,7 +1,6 @@
 #ifndef STATICS_HPP
 #define STATICS_HPP
 
-// #include <cinttypes>
 #include <map>
 #include <set>
 #include <string>
@@ -113,7 +112,7 @@ const uint64_t TX_REJECT_INSUFFICIENT_FUNDS_EXT = 0xff05;
 const uint64_t TX_REJECT_FOUNDER_LIMIT = 0xff06;
 const uint64_t TX_REJECT_INVALID_WALLET = 0x0404;
 
-const uint64_t DAY_IN_SECONDS = 60;//24 * 60 * 60;
+const uint64_t DAY_IN_SECONDS = 24 * 60 * 60;
 
 /*                          RPC METHODS                           */
 const uint64_t RPC_PING = 0x10;
@@ -136,6 +135,7 @@ static const std::set<std::string> ROLES {
     "Verifier",
     "Core"
 };
+static const std::string MASTER_CORE_ROLE = "Master";
 
 const uint64_t MINIMUM_AVERAGE_PROXY_RPS = 1000;
 const uint64_t MINIMUM_PROXY_RPS = 0;

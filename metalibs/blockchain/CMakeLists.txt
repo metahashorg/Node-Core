@@ -9,12 +9,14 @@ add_library(${PROJECT_NAME}
         src/common_block.cpp
         src/common_wallet.cpp
         src/controller.cpp
+        src/controller_local_chain.cpp
         src/core_controller.cpp
         src/decentralized_application_wallet.cpp
         src/rejected_block.cpp
         src/rejected_tx.cpp
         src/transaction.cpp
-        src/wallet.cpp)
+        src/wallet.cpp
+        src/controller_process_requests.cpp)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

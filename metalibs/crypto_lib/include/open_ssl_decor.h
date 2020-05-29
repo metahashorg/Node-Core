@@ -31,8 +31,8 @@ public:
     template <typename Container>
     std::vector<char> sign(const Container& data);
 
-    std::vector<char> get_pub_key();
-    std::string get_mh_addr();
+    const std::vector<char>& get_pub_key();
+    const std::string& get_mh_addr();
 
 private:
     std::vector<char> sign(std::string_view data);

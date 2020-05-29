@@ -29,8 +29,8 @@ private:
 
     WalletMap wallet_map;
 
-    std::map<std::string, uint64_t> node_state;
-    std::map<std::string, std::map<std::string, ProxyStat>> node_statistics;
+    std::unordered_map<std::string, std::string, crypto::Hasher> node_state;
+    std::unordered_map<std::string, std::map<std::string, ProxyStat>, crypto::Hasher> node_statistics;
 
     std::vector<TX*> statistics_tx_list;
     std::vector<RejectedTXInfo*> rejected_tx_list;
@@ -60,7 +60,7 @@ public:
     std::atomic<std::map<std::string, std::pair<uint, uint>>*>& get_wallet_statistics();
     std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& get_wallet_request_addreses();
 
-    uint8_t check_addr(const std::string& addr);
+    const std::string& check_addr(const std::string& addr);
 
 private:
     Block* make_block(uint64_t b_type, uint64_t b_time, sha256_2 prev_b_hash, std::vector<char>& tx_buff);
@@ -73,6 +73,8 @@ private:
     bool can_apply_state_block(Block* block, bool);
     bool can_apply_forging_block(Block* block);
     void reject(const TX* tx, uint64_t reason);
+
+    void fill_node_state();
 };
 
 }

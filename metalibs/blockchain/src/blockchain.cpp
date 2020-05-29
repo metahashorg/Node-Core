@@ -7,7 +7,6 @@
 #include <statics.hpp>
 
 #include <rapidjson/document.h>
-#include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
 namespace metahash::metachain {
@@ -33,11 +32,12 @@ bool BlockChain::apply_block(Block* block)
                 std::time_t now = block->get_block_timestamp();
                 std::tm* ptm = std::localtime(&now);
                 char buffer[32] = { 0 };
-                // Format: Mo, 15.06.2009 20:20:00
+                // Format: Mo, 20.02.2002 20:20:02
                 std::strftime(buffer, 32, "%a, %d.%m.%Y %H:%M:%S", ptm);
 
                 DEBUG_COUT(buffer);
             }
+            fill_node_state();
         }
 
         return true;
@@ -772,23 +772,13 @@ std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& BlockChain::get_wall
     return wallet_request_addreses;
 }
 
-uint8_t BlockChain::check_addr(const std::string& addr)
+const std::string& BlockChain::check_addr(const std::string& addr)
 {
-    auto* wallet = dynamic_cast<CommonWallet*>(wallet_map.get_wallet(addr));
-    if (wallet) {
-        const auto w_state = wallet->get_state();
-
-        if ((w_state & NODE_STATE_FLAG_VERIFIER_FORGING) == NODE_STATE_FLAG_VERIFIER_FORGING) {
-            return 50;
-        }
-        if ((w_state & NODE_STATE_FLAG_CORE_FORGING) == NODE_STATE_FLAG_CORE_FORGING) {
-            if (addr == "0x00fca67778165988703a302c1dfc34fd6036e209a20666969e") {
-                return 150;
-            }
-            return 100;
-        }
+    if (node_state.find(addr) == node_state.end()) {
+        return std::string();
+    } else {
+        return node_state[addr];
     }
-    return 0;
 }
 
 Block* BlockChain::make_block(uint64_t b_type, uint64_t b_time, sha256_2 prev_b_hash, std::vector<char>& tx_buff)
@@ -1348,6 +1338,42 @@ std::vector<RejectedTXInfo*>* BlockChain::make_rejected_tx_block(uint64_t)
         rejected_tx_list.clear();
         return new_list;
     }
+}
+
+void BlockChain::fill_node_state()
+{
+    std::unordered_map<std::string, std::string, crypto::Hasher> states;
+
+    for (auto&& [addr, p_wallet] : wallet_map) {
+        auto* wallet = dynamic_cast<CommonWallet*>(p_wallet);
+        if (!wallet) {
+            DEBUG_COUT("invalid wallet type");
+            DEBUG_COUT(addr);
+            continue;
+        }
+
+        uint64_t w_state = wallet->get_state();
+
+        for (auto&& [role, mask] : NODE_STATE_FLAG_FORGING) {
+            if ((w_state & mask) == mask) {
+                states[addr] = role;
+            }
+        }
+    }
+
+    uint64_t max_money = 0;
+    for (auto&& [addr, role]: states) {
+        if (role == "Core") {
+            auto* wallet = dynamic_cast<CommonWallet*>(wallet_map.get_wallet(addr));
+            auto&& [balance, state, data] = wallet->serialize();
+            if (balance > max_money) {
+                max_money = balance;
+                states[addr] = MASTER_CORE_ROLE;
+            }
+        }
+    }
+
+    node_state.swap(states);
 }
 
 }
