@@ -1,6 +1,7 @@
 #include "controller.hpp"
 #include "block.h"
 
+#include <statics.hpp>
 #include <meta_log.hpp>
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>

@@ -1,70 +1,75 @@
 #include "controller.hpp"
 
+#include "block.h"
+#include "chain.h"
+
+#include <meta_log.hpp>
+#include <statics.hpp>
+
 namespace metahash::metachain {
 
 std::vector<char> ControllerImplementation::add_pack_to_queue(net_io::Request& request)
 {
-    auto rights = BC->check_addr(request.sender_mh_addr);
+    auto roles = BC->check_addr(request.sender_mh_addr);
     auto url = request.request_type;
     std::string_view pack(request.message.data(), request.message.size());
 
-    //    if (rights >= 50) {
-    if (url == RPC_PING) {
-        DEBUG_COUT("RPC_PING");
-        parse_S_PING(pack);
-    } else if (url == RPC_TX && master()) {
-        DEBUG_COUT("RPC_TX");
-        parse_B_TX(pack);
+    if (roles.find(META_ROLE_VERIF) != roles.end()) {
+        if (url == RPC_PING) {
+            DEBUG_COUT("RPC_PING");
+            parse_S_PING(pack);
+        } else if (url == RPC_TX && master()) {
+            DEBUG_COUT("RPC_TX");
+            parse_B_TX(pack);
+        }
     }
 
-    //        if (rights >= 100) {
-    switch (url) {
-    case RPC_APPROVE:
-        DEBUG_COUT("RPC_APPROVE");
-        parse_C_APPROVE(pack);
-        break;
-    case RPC_DISAPPROVE:
-        DEBUG_COUT("RPC_DISAPPROVE");
-        parse_C_DISAPPROVE(pack);
-        break;
-    case RPC_APPROVE_BLOCK:
-        DEBUG_COUT("RPC_APPROVE_BLOCK");
-        parse_C_APPROVE_BLOCK(pack);
-        break;
-    case RPC_LAST_BLOCK:
-        DEBUG_COUT("RPC_LAST_BLOCK");
-        return parse_S_LAST_BLOCK(pack);
-        break;
-    case RPC_GET_BLOCK:
-        DEBUG_COUT("RPC_GET_BLOCK");
-        return parse_S_GET_BLOCK(pack);
-        break;
-    case RPC_GET_CHAIN:
-        DEBUG_COUT("RPC_GET_CHAIN");
-        return parse_S_GET_CHAIN(pack);
-        break;
-    case RPC_GET_CORE_LIST:
-        DEBUG_COUT("RPC_GET_CORE_LIST");
-        return parse_S_GET_CORE_LIST(pack);
-        break;
-    case RPC_GET_CORE_ADDR:
-        DEBUG_COUT("RPC_GET_CORE_ADDR");
-        return parse_S_GET_CORE_ADDR(pack);
-        break;
+    if (roles.find(META_ROLE_CORE) != roles.end()) {
+        switch (url) {
+        case RPC_APPROVE:
+            DEBUG_COUT("RPC_APPROVE");
+            parse_C_APPROVE(pack);
+            break;
+        case RPC_DISAPPROVE:
+            DEBUG_COUT("RPC_DISAPPROVE");
+            parse_C_DISAPPROVE(pack);
+            break;
+        case RPC_APPROVE_BLOCK:
+            DEBUG_COUT("RPC_APPROVE_BLOCK");
+            parse_C_APPROVE_BLOCK(pack);
+            break;
+        case RPC_LAST_BLOCK:
+            DEBUG_COUT("RPC_LAST_BLOCK");
+            return parse_S_LAST_BLOCK(pack);
+            break;
+        case RPC_GET_BLOCK:
+            DEBUG_COUT("RPC_GET_BLOCK");
+            return parse_S_GET_BLOCK(pack);
+            break;
+        case RPC_GET_CHAIN:
+            DEBUG_COUT("RPC_GET_CHAIN");
+            return parse_S_GET_CHAIN(pack);
+            break;
+        case RPC_GET_CORE_LIST:
+            DEBUG_COUT("RPC_GET_CORE_LIST");
+            return parse_S_GET_CORE_LIST(pack);
+            break;
+        case RPC_GET_CORE_ADDR:
+            DEBUG_COUT("RPC_GET_CORE_ADDR");
+            return parse_S_GET_CORE_ADDR(pack);
+            break;
+        }
     }
-    //        }
 
-    //        if (rights >= 150) {
-    if (url == RPC_PRETEND_BLOCK) {
-        DEBUG_COUT("RPC_PRETEND_BLOCK");
-        parse_C_PRETEND_BLOCK(pack);
+    if (roles.find(META_ROLE_MASTER) != roles.end()) {
+        if (url == RPC_PRETEND_BLOCK) {
+            DEBUG_COUT("RPC_PRETEND_BLOCK");
+            parse_C_PRETEND_BLOCK(pack);
+        }
     }
-    //        }
-    //    }
 
     return std::vector<char>();
 }
-
 
 void ControllerImplementation::parse_S_PING(std::string_view)
 {
@@ -111,8 +116,8 @@ void ControllerImplementation::parse_B_TX(std::string_view pack)
 
 void ControllerImplementation::parse_C_APPROVE_BLOCK(std::string_view pack)
 {
-    uint64_t block_size;
-    uint64_t approve_size;
+    uint64_t block_size = 0;
+    uint64_t approve_size = 0;
 
     uint64_t offset = crypto::read_varint(approve_size, pack);
     if (!offset) {

@@ -246,12 +246,12 @@ void ControllerImplementation::actualize_chain()
                             }
                         }
                     } else {
-                        failed ++;
+                        failed++;
                         delete block;
                         block = nullptr;
                     }
                 } else {
-                    failed ++;
+                    failed++;
                     DEBUG_COUT("Parse block error");
                 }
             }
@@ -263,7 +263,6 @@ void ControllerImplementation::start_main_loop()
 {
     std::thread(&ControllerImplementation::main_loop, this).detach();
 }
-
 
 std::string ControllerImplementation::get_str_address()
 {
@@ -398,7 +397,6 @@ void ControllerImplementation::main_loop()
     }
 }
 
-
 void ControllerImplementation::approve_block(Block* p_block)
 {
     auto* p_ar = new ApproveRecord;
@@ -461,7 +459,17 @@ void ControllerImplementation::apply_block(Block* block)
         write_block(block);
 
         if (block->get_block_type() == BLOCK_TYPE_STATE) {
-            listener->update_allowed_addreses();
+            std::unordered_set<std::string, crypto::Hasher> allowed_addreses;
+            auto nodes = BC->get_node_state();
+            for (auto&& [addr, roles] : nodes) {
+                if (roles.find(META_ROLE_CORE) != roles.end()
+                    || roles.find(META_ROLE_VERIF) != roles.end()
+                    || roles.find(META_ROLE_MASTER) != roles.end()) {
+
+                    allowed_addreses.insert(addr);
+                }
+            }
+            listener->update_allowed_addreses(allowed_addreses);
         }
     } else {
         DEBUG_COUT("!BC->can_apply_block(block)");
@@ -618,7 +626,10 @@ bool ControllerImplementation::master()
         return false;
     }
 
-    BC->check_addr(signer.get_mh_addr()) == MASTER_CORE_ROLE;
+    auto roles = BC->check_addr(signer.get_mh_addr());
+    if (roles.find(META_ROLE_MASTER) != roles.end()) {
+        return true;
+    }
 
     return false;
 }

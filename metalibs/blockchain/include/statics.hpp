@@ -128,14 +128,20 @@ const uint64_t RPC_GET_CORE_LIST = 0x71;
 const uint64_t RPC_GET_CORE_ADDR = 0x72;
 
 /*                           NODE ROLE CONSTANTS                           */
+
+static const std::string META_ROLE_MASTER = "Master";
+static const std::string META_ROLE_CORE = "Core";
+static const std::string META_ROLE_PROXY = "Proxy";
+static const std::string META_ROLE_VERIF = "Verifier";
+static const std::string META_ROLE_TORR = "Torrent";
+static const std::string META_ROLE_I_TORR = "InfrastructureTorrent";
 static const std::set<std::string> ROLES {
-    "Proxy",
-    "InfrastructureTorrent",
-    "Torrent",
-    "Verifier",
-    "Core"
+    META_ROLE_PROXY,
+    META_ROLE_TORR,
+    META_ROLE_I_TORR,
+    META_ROLE_VERIF,
+    META_ROLE_CORE
 };
-static const std::string MASTER_CORE_ROLE = "Master";
 
 const uint64_t MINIMUM_AVERAGE_PROXY_RPS = 1000;
 const uint64_t MINIMUM_PROXY_RPS = 0;

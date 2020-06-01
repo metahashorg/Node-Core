@@ -16,7 +16,7 @@ add_library(${PROJECT_NAME}
         src/rejected_tx.cpp
         src/transaction.cpp
         src/wallet.cpp
-        src/controller_process_requests.cpp)
+        src/controller_process_requests.cpp src/blockchain_make_new_block.cpp)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

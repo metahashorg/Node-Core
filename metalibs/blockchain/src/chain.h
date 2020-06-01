@@ -29,7 +29,7 @@ private:
 
     WalletMap wallet_map;
 
-    std::unordered_map<std::string, std::string, crypto::Hasher> node_state;
+    std::unordered_map<std::string, std::set<std::string>, crypto::Hasher> node_state;
     std::unordered_map<std::string, std::map<std::string, ProxyStat>, crypto::Hasher> node_statistics;
 
     std::vector<TX*> statistics_tx_list;
@@ -60,13 +60,13 @@ public:
     std::atomic<std::map<std::string, std::pair<uint, uint>>*>& get_wallet_statistics();
     std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& get_wallet_request_addreses();
 
-    const std::string& check_addr(const std::string& addr);
-
+    std::set<std::string> check_addr(const std::string& addr);
+    const std::unordered_map<std::string, std::set<std::string>, crypto::Hasher>& get_node_state();
 private:
-    Block* make_block(uint64_t b_type, uint64_t b_time, sha256_2 prev_b_hash, std::vector<char>& tx_buff);
+    static Block* make_block(uint64_t b_type, uint64_t b_time, sha256_2 prev_b_hash, std::vector<char>& tx_buff);
 
-    uint64_t get_fee(uint64_t cnt) const;
-    uint64_t FORGING_POOL(uint64_t ts) const;
+    static uint64_t get_fee(uint64_t cnt) ;
+    static uint64_t FORGING_POOL(uint64_t ts) ;
 
     bool try_apply_block(Block* block, bool apply);
     bool can_apply_common_block(Block* block);
