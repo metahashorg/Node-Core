@@ -64,15 +64,15 @@ void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Bl
     bool do_clean_and_return = false;
     if (last_applied_block == zero_block) {
         if (proved_block == zero_block) {
-            if (prev_tree.find(zero_block) == prev_tree.end()) {
+            if (!prev_tree.count(zero_block)) {
                 DEBUG_COUT("blockchain from " + source + " have no blocks to connect with my chain to zero_block\t" + crypto::bin2hex(zero_block));
                 do_clean_and_return = true;
             }
-        } else if (block_tree.find(proved_block) == block_tree.end()) {
+        } else if (!block_tree.count(proved_block)) {
             DEBUG_COUT("blockchain from " + source + " have no blocks to connect with my chain to proved_block\t" + crypto::bin2hex(proved_block));
             do_clean_and_return = true;
         }
-    } else if (prev_tree.find(last_applied_block) == prev_tree.end()) {
+    } else if (!prev_tree.count(last_applied_block)) {
         DEBUG_COUT("blockchain from " + source + " have no blocks to connect with my chain to last_applied_block\t" + crypto::bin2hex(last_applied_block));
         do_clean_and_return = true;
     }
@@ -90,7 +90,7 @@ void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Bl
         sha256_2 curr_block = proved_block;
 
         bool got_start = false;
-        while (block_tree.find(curr_block) != block_tree.end()) {
+        while (block_tree.count(curr_block)) {
             Block* block = block_tree[curr_block];
             block_chain.push_front(block);
             if (block->get_block_type() == BLOCK_TYPE_STATE || block->get_prev_hash() == zero_block) {
@@ -114,7 +114,7 @@ void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Bl
     {
         sha256_2 curr_block = last_applied_block != zero_block ? last_applied_block : proved_block;
 
-        while (prev_tree.find(curr_block) != prev_tree.end()) {
+        while (prev_tree.count(curr_block)) {
             Block* block = prev_tree[curr_block];
             block_chain.push_back(block);
             curr_block = block->get_block_hash();
@@ -157,7 +157,7 @@ void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Bl
         for (auto&& [hash, block] : block_tree) {
             jobs++;
             boost::asio::post(io_context, [hash, block, this, &jobs]() {
-                if (blocks.find(hash) == blocks.end()) {
+                if (!blocks.count(hash)) {
                     delete block;
                 }
                 jobs--;
@@ -190,7 +190,7 @@ void ControllerImplementation::actualize_chain()
             uint64_t block_timestamp = 0;
             std::copy_n(block_info.begin() + 32, 8, reinterpret_cast<char*>(&block_timestamp));
 
-            if (block_timestamp > prev_timestamp && blocks.find(last_block_return) == blocks.end()) {
+            if (block_timestamp > prev_timestamp && !blocks.count(last_block_return)) {
                 DEBUG_COUT("core\t" + core_addr + "have more recent block\t" + crypto::bin2hex(last_block_return));
                 cores_with_missing_block.insert(core_addr);
                 missing_blocks.insert(last_block_return);
@@ -243,7 +243,7 @@ void ControllerImplementation::actualize_chain()
                             block_tree.erase(block->get_block_hash());
                             delete block;
                             block = nullptr;
-                        } else if (blocks.find(block->get_prev_hash()) == blocks.end()) {
+                        } else if (!blocks.count(block->get_prev_hash())) {
                             if (block->get_prev_hash() == sha256_2 {}) {
                                 DEBUG_COUT("Got complete chain. Previous block is zero block");
                             } else {
@@ -417,7 +417,7 @@ void ControllerImplementation::apply_approve(ApproveRecord* p_ar)
                     DEBUG_COUT("block->get_prev_hash != last_applied_block");
                 }
             } else {
-                DEBUG_COUT("blocks.find(block_hash) == blocks.end()");
+                DEBUG_COUT("!blocks.contains(block_hash)");
             }
         }
     } else {
