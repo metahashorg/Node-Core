@@ -60,12 +60,15 @@ private:
     boost::asio::deadline_timer timer;
     std::array<char, 0xffff> buffer = { {} };
 
+    bool connected = false;
+
 public:
     ClientConnection(boost::asio::io_context& io_context,
         boost::asio::ip::tcp::resolver::results_type& endpoints,
         moodycamel::ConcurrentQueue<Task*>& tasks, std::string mh_endpoint_addr);
 
     void try_connect();
+    bool online();
 
 private:
     void check_tasks();
@@ -80,6 +83,8 @@ public:
 
     void send_message(uint64_t request_type, const std::vector<char>& message, const std::function<void(std::vector<char>)>& callback);
     std::tuple<std::string, std::string, int> get_definition();
+
+    bool online();
 
 private:
     std::atomic<int> request_count = 0;

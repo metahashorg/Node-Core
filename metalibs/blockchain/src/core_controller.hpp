@@ -36,6 +36,9 @@ public:
 
     void send_no_return_to_core(const std::string& addr, uint64_t req_type, const std::vector<char>& req_data);
     std::vector<char> send_with_return_to_core(const std::string& addr, uint64_t req_type, const std::vector<char>& req_data);
+
+    bool online(const std::string& addr);
+    std::set<std::string> get_online_cores();
 };
 
 }

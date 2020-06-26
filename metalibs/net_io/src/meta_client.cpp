@@ -1,5 +1,6 @@
 #include <meta_client.h>
 #include <meta_log.hpp>
+#include <utility>
 
 namespace metahash::net_io {
 
@@ -104,7 +105,7 @@ bool ClientConnection::Response::fill_sw(std::vector<char>& sw, uint64_t sw_size
 }
 
 ClientConnection::ClientConnection(boost::asio::io_context& io_context, boost::asio::ip::basic_resolver<boost::asio::ip::tcp>::results_type& endpoints, moodycamel::ConcurrentQueue<Task*>& tasks, std::string mh_endpoint_addr)
-    : mh_endpoint_addr(mh_endpoint_addr)
+    : mh_endpoint_addr(std::move(mh_endpoint_addr))
     , io_context(io_context)
     , endpoints(endpoints)
     , socket(new boost::asio::ip::tcp::socket(io_context))
@@ -117,9 +118,13 @@ void ClientConnection::try_connect()
 {
     boost::asio::async_connect(*socket, endpoints, [this](const boost::system::error_code& err, const boost::asio::ip::basic_endpoint<boost::asio::ip::tcp>&) {
         if (!err) {
+            connected = true;
             check_tasks();
         } else {
-            try_connect();
+            timer = boost::asio::deadline_timer(io_context, boost::posix_time::milliseconds(100));
+            timer.async_wait([this](const boost::system::error_code&) {
+                try_connect();
+            });
         }
     });
 }
@@ -189,8 +194,13 @@ void ClientConnection::read()
 
 void ClientConnection::reset()
 {
+    connected = false;
     socket.reset(new boost::asio::ip::tcp::socket(io_context));
     try_connect();
+}
+bool ClientConnection::online()
+{
+    return connected;
 }
 
 meta_client::meta_client(boost::asio::io_context& io_context, const std::string& mh_endpoint_addr, const std::string& server, const int port, const int max_connections, metahash::crypto::Signer& signer)
@@ -255,6 +265,16 @@ meta_client::~meta_client()
     while (tasks.try_dequeue(task)) {
         delete task;
     }
+}
+
+bool meta_client::online()
+{
+    for (auto& connection : sockets) {
+        if (connection.online()) {
+            return true;
+        }
+    }
+    return false;
 }
 
 }

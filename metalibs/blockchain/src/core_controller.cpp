@@ -164,4 +164,26 @@ std::vector<char> CoreController::send_with_return_to_core(const std::string& ad
     return future.get();
 }
 
+bool CoreController::online(const std::string& addr)
+{
+    std::lock_guard lock(core_lock);
+    if (cores.find(addr) != cores.end()) {
+        return cores[addr]->online();
+    } else {
+        return false;
+    }
+}
+
+std::set<std::string> CoreController::get_online_cores() {
+    std::set<std::string> online_cores;
+    std::lock_guard lock(core_lock);
+    for (auto&& [mh_addr, core] : cores) {
+        if (core->online()) {
+            online_cores.insert(mh_addr);
+        }
+    }
+    online_cores.insert(signer.get_mh_addr());
+    return online_cores;
+}
+
 }
