@@ -12,7 +12,7 @@
 
 namespace metahash::metachain {
 
-std::set<std::string> get_files_in_dir(std::string& path)
+std::set<std::string> get_files_in_dir(const std::string& path)
 {
     namespace fs = std::experimental::filesystem;
 

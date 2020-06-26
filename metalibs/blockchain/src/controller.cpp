@@ -27,6 +27,9 @@ ControllerImplementation::ControllerImplementation(
     bool test)
     : BC(new BlockChain(io_context))
     , io_context(io_context)
+    , serial_execution(io_context)
+    , main_loop_timer(io_context, boost::posix_time::milliseconds(10))
+    , min_approve(std::ceil(METAHASH_PRIMARY_CORES_COUNT * 51.0 / 100.0))
     , path(path)
     , signer(crypto::hex2bin(priv_key_line))
     , cores(io_context, host_port.first, host_port.second, core_list, signer)
@@ -43,7 +46,9 @@ ControllerImplementation::ControllerImplementation(
 
     read_and_apply_local_chain();
 
-    start_main_loop();
+    serial_execution.post([this] {
+        main_loop();
+    });
 
     listener = new net_io::meta_server(io_context, host_port.first, host_port.second, signer, [this](net_io::Request& request) -> std::vector<char> {
         return add_pack_to_queue(request);
@@ -259,11 +264,6 @@ void ControllerImplementation::actualize_chain()
     }
 }
 
-void ControllerImplementation::start_main_loop()
-{
-    std::thread(&ControllerImplementation::main_loop, this).detach();
-}
-
 std::string ControllerImplementation::get_str_address()
 {
     return signer.get_mh_addr();
@@ -276,7 +276,6 @@ std::string ControllerImplementation::get_last_block_str()
 
 std::atomic<std::map<std::string, std::pair<uint, uint>>*>& ControllerImplementation::get_wallet_statistics()
 {
-
     return BC->get_wallet_statistics();
 }
 
@@ -287,74 +286,43 @@ std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& ControllerImplementa
 
 void ControllerImplementation::main_loop()
 {
-    std::this_thread::sleep_for(std::chrono::seconds(15));
-    while (goon) {
-        const uint64_t get_arr_size = 128;
-        bool need_actualize = false;
+    uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
+    bool no_sleep = false;
 
-        bool no_sleep = false;
+    if (timestamp - last_sync_timestamp > 60) {
+        DEBUG_COUT("sync_core_lists");
+        io_context.post([this] { cores.sync_core_lists(); });
 
-        if (transactions.size() < 1024) {
-            static TX* tx_arr[get_arr_size];
-            uint64_t got_tx = tx_queue.try_dequeue_bulk(tx_arr, get_arr_size);
+        last_sync_timestamp = timestamp;
+    }
 
-            if (got_tx) {
+        {
+            if (prev_timestamp > last_actualization_timestamp) {
+                last_actualization_timestamp = prev_timestamp;
+            }
+
+            uint64_t sync_interval = master() ? 60 : 1;
+
+            if (timestamp - last_actualization_timestamp > sync_interval) {
+                last_actualization_timestamp = timestamp;
+                io_context.post([this] {
+                    check_if_chain_actual();
+                });
+
                 no_sleep = true;
-                std::copy(&tx_arr[0], &tx_arr[got_tx], std::back_inserter(transactions));
             }
         }
 
-        {
-            static Block* block_arr[get_arr_size];
-            uint64_t got_block = block_queue.try_dequeue_bulk(block_arr, get_arr_size);
-
-            if (got_block) {
-                no_sleep = true;
-
-                for (uint i = 0; i < got_block; i++) {
-                    Block* block = block_arr[i];
-
-                    if (dynamic_cast<CommonBlock*>(block)) {
-                        if (blocks.find(block->get_prev_hash()) == blocks.end()) {
-                            need_actualize = true;
-                        }
-
-                        if (blocks.insert({ block->get_block_hash(), block }).second) {
-                            ;
-                        } else {
-                            delete block;
-                        }
-                    } else if (dynamic_cast<RejectedTXBlock*>(block)) {
-                        write_block(block);
+        for (auto&& [hash, block] : blocks) {
+            if (!block_approve[hash].count(signer.get_mh_addr()) && !block_disapprove[hash].count(signer.get_mh_addr())) {
+                if (block->get_prev_hash() == last_applied_block) {
+                    if (BC->can_apply_block(block)) {
+                        approve_block(block);
+                    } else {
+                        disapprove_block(block);
                     }
-                }
-            }
 
-            for (std::pair<sha256_2, Block*> block_pair : blocks) {
-                if (block_approve[block_pair.first].find(signer.get_mh_addr()) == block_approve[block_pair.first].end()
-                    && block_disapprove[block_pair.first].find(signer.get_mh_addr()) == block_disapprove[block_pair.first].end()) {
-
-                    Block* block = block_pair.second;
-                    if (block->get_prev_hash() == last_applied_block) {
-                        if (BC->can_apply_block(block)) {
-                            approve_block(block);
-                        } else {
-                            disapprove_block(block);
-                        }
-                    }
-                }
-            }
-        }
-
-        {
-            static ApproveRecord* approve_arr[get_arr_size];
-            uint64_t got_approve = approve_queue.try_dequeue_bulk(approve_arr, get_arr_size);
-
-            if (got_approve) {
-                no_sleep = true;
-
-                for (uint i = 0; i < got_approve; i++) {
-                    apply_approve(approve_arr[i]);
+                    no_sleep = true;
                 }
             }
         }
@@ -389,11 +357,17 @@ void ControllerImplementation::main_loop()
             }
         }
 
-        if (no_sleep) {
-            ;
-        } else {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
+    if (no_sleep) {
+        serial_execution.post([this] {
+            main_loop();
+        });
+    } else {
+        main_loop_timer = boost::asio::deadline_timer(io_context, boost::posix_time::milliseconds(1));
+        main_loop_timer.async_wait([this](const boost::system::error_code&) {
+            serial_execution.post([this] {
+                main_loop();
+            });
+        });
     }
 }
 
@@ -491,42 +465,6 @@ void ControllerImplementation::distribute(ApproveRecord* p_ar)
     send_pack.insert(send_pack.end(), p_ar->data.begin(), p_ar->data.end());
 
     cores.send_no_return(approve_str, send_pack);
-}
-
-uint64_t ControllerImplementation::min_approve()
-{
-    uint64_t min_approve = 0;
-
-    sha256_2 curr_block = blocks[last_applied_block]->get_prev_hash();
-    uint i = 0;
-
-    while (blocks.find(curr_block) != blocks.end() && i < 5) {
-        i++;
-
-        uint64_t curr_block_approve = block_approve[curr_block].size() + block_disapprove[curr_block].size();
-
-        if (min_approve) {
-            if (min_approve > curr_block_approve) {
-                min_approve = curr_block_approve;
-            }
-        } else {
-            min_approve = curr_block_approve;
-        }
-
-        curr_block = blocks[curr_block]->get_prev_hash();
-    }
-
-    min_approve = min_approve * 51 / 100;
-
-    if (min_approve > 1) {
-        return min_approve;
-    } else {
-        if (master()) {
-            return 1;
-        } else {
-            return 2;
-        }
-    }
 }
 
 bool ControllerImplementation::try_make_block()

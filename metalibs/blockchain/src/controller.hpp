@@ -8,8 +8,8 @@
 #include <open_ssl_decor.h>
 #include <transaction.h>
 
-#include <thread_pool.hpp>
 #include <meta_server.h>
+#include <thread_pool.hpp>
 
 #include "core_controller.hpp"
 
@@ -21,12 +21,10 @@ class BlockChain;
 
 struct ControllerImplementation {
 private:
-    moodycamel::ConcurrentQueue<TX*> tx_queue;
-    moodycamel::ConcurrentQueue<Block*> block_queue;
-    moodycamel::ConcurrentQueue<ApproveRecord*> approve_queue;
-
     BlockChain* BC;
     boost::asio::io_context& io_context;
+    boost::asio::io_context::strand serial_execution;
+    boost::asio::deadline_timer main_loop_timer;
 
     std::vector<TX*> transactions;
     std::unordered_map<sha256_2, Block*, crypto::Hasher> blocks;
@@ -38,6 +36,8 @@ private:
     sha256_2 last_created_block = { { 0 } };
     sha256_2 proved_block = { { 0 } };
 
+    uint64_t min_approve = 0;
+
     uint64_t statistics_timestamp = 0;
     uint64_t prev_timestamp = 0;
     uint64_t prev_day = 0;
@@ -46,7 +46,7 @@ private:
     std::vector<RejectedTXInfo*> rejected_tx_list;
     uint64_t prev_rejected_ts = 0;
 
-    std::string path;
+    const std::string path;
 
     crypto::Signer signer;
 
@@ -96,14 +96,11 @@ private:
 
     void distribute(Block*);
     void distribute(ApproveRecord*);
-    //    void distribute(Block* block, ApproveRecord* p_ar);
 
-    uint64_t min_approve();
     void write_block(Block*);
     bool try_make_block();
 
     void read_and_apply_local_chain();
-    void start_main_loop();
     void actualize_chain();
 
     void apply_block_chain(

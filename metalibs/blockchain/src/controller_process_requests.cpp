@@ -65,8 +65,9 @@ void ControllerImplementation::parse_S_PING(std::string_view)
 
 void ControllerImplementation::parse_B_TX(std::string_view pack)
 {
-    uint64_t index = 0;
+    auto* tx_list = new std::list<TX*>();
 
+    uint64_t index = 0;
     uint64_t tx_size;
     std::string_view tx_size_arr(&pack[index], pack.size() - index);
     uint64_t varint_size = crypto::read_varint(tx_size, tx_size_arr);
@@ -86,7 +87,7 @@ void ControllerImplementation::parse_B_TX(std::string_view pack)
 
         TX* p_tx = new TX;
         if (p_tx->parse(tx_sw)) {
-            tx_queue.enqueue(p_tx);
+            tx_list->push_back(p_tx);
         } else {
             delete p_tx;
             DEBUG_COUT("corrupt tx");
@@ -100,41 +101,14 @@ void ControllerImplementation::parse_B_TX(std::string_view pack)
         }
         index += varint_size;
     }
-}
 
-void ControllerImplementation::parse_C_APPROVE_BLOCK(std::string_view pack)
-{
-    uint64_t block_size = 0;
-    uint64_t approve_size = 0;
-
-    uint64_t offset = crypto::read_varint(approve_size, pack);
-    if (!offset) {
-        DEBUG_COUT("corrupt pack");
-    }
-
-    std::string_view approve_sw(pack.data() + offset, approve_size);
-    auto* p_ar = new ApproveRecord;
-    if (p_ar->parse(approve_sw)) {
-        p_ar->approve = true;
-        approve_queue.enqueue(p_ar);
+    if (tx_list->empty()) {
+        delete tx_list;
     } else {
-        DEBUG_COUT("corrupt pack");
-        delete p_ar;
-    }
-
-    std::string_view block_raw(pack.data() + offset + approve_size, pack.size() - (offset + approve_size));
-
-    offset = crypto::read_varint(block_size, block_raw);
-    if (!offset) {
-        DEBUG_COUT("corrupt pack");
-    }
-    std::string_view block_sw(block_raw.data() + offset, block_size);
-    Block* block = parse_block(block_sw);
-
-    if (block) {
-        block_queue.enqueue(block);
-    } else {
-        DEBUG_COUT("corrupt pack");
+        serial_execution.post([this, tx_list] {
+            transactions.insert(transactions.end(), tx_list->begin(), tx_list->end());
+            delete tx_list;
+        });
     }
 }
 
@@ -144,8 +118,22 @@ void ControllerImplementation::parse_C_PRETEND_BLOCK(std::string_view pack)
     Block* block = parse_block(block_sw);
 
     if (block) {
-        if (dynamic_cast<CommonBlock*>(block) || dynamic_cast<RejectedTXBlock*>(block)) {
-            block_queue.enqueue(block);
+        if (dynamic_cast<CommonBlock*>(block)) {
+            serial_execution.post([this, block] {
+                if (blocks.find(block->get_prev_hash()) == blocks.end()) {
+                    serial_execution.post([this] {
+                        actualize_chain();
+                    });
+                }
+
+                if (!blocks.insert({ block->get_block_hash(), block }).second) {
+                    delete block;
+                }
+            });
+        } else if (dynamic_cast<RejectedTXBlock*>(block)) {
+            serial_execution.post([this, block] {
+                write_block(block);
+            });
         } else {
             delete block;
         }
@@ -158,7 +146,10 @@ void ControllerImplementation::parse_C_APPROVE(std::string_view pack)
     auto* p_ar = new ApproveRecord;
     if (p_ar->parse(approve_sw)) {
         p_ar->approve = true;
-        approve_queue.enqueue(p_ar);
+
+        serial_execution.post([this, p_ar] {
+            apply_approve(p_ar);
+        });
     } else {
         delete p_ar;
     }
@@ -170,7 +161,10 @@ void ControllerImplementation::parse_C_DISAPPROVE(std::string_view pack)
     auto* p_ar = new ApproveRecord;
     if (p_ar->parse(approve_sw)) {
         p_ar->approve = false;
-        approve_queue.enqueue(p_ar);
+
+        serial_execution.post([this, p_ar] {
+            apply_approve(p_ar);
+        });
     } else {
         delete p_ar;
     }
