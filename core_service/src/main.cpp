@@ -275,7 +275,7 @@ void parse_settings(
         network = line;
         DEBUG_COUT("Network name:\t" + network);
     } else {
-        DEBUG_COUT("Ivalid Configuration File");
+        DEBUG_COUT("Invalid Configuration File");
         print_config_file_params_and_exit();
     }
 
@@ -285,13 +285,13 @@ void parse_settings(
         linestream >> tx_host >> tx_port;
 
         if (tx_port <= 0) {
-            DEBUG_COUT("Ivalid listening port:\t" + line);
+            DEBUG_COUT("Invalid listening port:\t" + line);
             print_config_file_params_and_exit();
         }
 
         DEBUG_COUT("Listening host port:\t" + tx_host + "\t" + std::to_string(tx_port));
     } else {
-        DEBUG_COUT("Ivalid Configuration File");
+        DEBUG_COUT("Invalid Configuration File");
         print_config_file_params_and_exit();
     }
 
@@ -300,13 +300,13 @@ void parse_settings(
         path = line;
 
         if (std::filesystem::path dir(path); !std::filesystem::exists(dir) || !std::filesystem::is_directory(dir)) {
-            DEBUG_COUT("Ivalid metachain path");
+            DEBUG_COUT("Invalid metachain path");
             print_config_file_params_and_exit();
         }
 
         DEBUG_COUT("Metachain path:\t" + path);
     } else {
-        DEBUG_COUT("Ivalid Configuration File");
+        DEBUG_COUT("Invalid Configuration File");
         print_config_file_params_and_exit();
     }
 
@@ -314,14 +314,14 @@ void parse_settings(
     if (std::getline(file, line)) {
         auto hash_as_vec = metahash::crypto::hex2bin(line);
         if (hash_as_vec.size() != 32) {
-            DEBUG_COUT("Ivalid trusted block hash");
+            DEBUG_COUT("Invalid trusted block hash");
             print_config_file_params_and_exit();
         }
 
         hash = line;
         DEBUG_COUT("Trusted block hash:\t" + hash);
     } else {
-        DEBUG_COUT("Ivalid Configuration File");
+        DEBUG_COUT("Invalid Configuration File");
         print_config_file_params_and_exit();
     }
 
@@ -340,7 +340,7 @@ void parse_settings(
 
         key = line;
     } else {
-        DEBUG_COUT("Ivalid Configuration File");
+        DEBUG_COUT("Invalid Configuration File");
         print_config_file_params_and_exit();
     }
 
