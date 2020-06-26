@@ -1,7 +1,7 @@
 #include "chain.h"
 
-#include <statics.hpp>
 #include <meta_log.hpp>
+#include <statics.hpp>
 
 #include <random>
 
@@ -75,7 +75,7 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
         std::map<std::string, std::map<std::string, std::map<std::string, uint64_t>>> type_geo_node_delegates;
         std::set<std::string> revard_nodes;
 
-        {
+        /*{
             std::map<std::string, std::string> msgs;
             std::vector<char> addr_msg;
 
@@ -105,13 +105,13 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
                     msgs[type].insert(msgs[type].end(), addr_msg.begin(), addr_msg.end());
                     addr_msg.clear();
                     // }
-                };
+                }
             }
             for (auto&& [type, info] : msgs) {
                 DEBUG_COUT(type);
                 DEBUG_COUT(info);
             }
-        }
+        }*/
 
         {
 
@@ -144,13 +144,7 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
                             }
 
                             uint64_t min_for_reward = node_stat.count * 95 / 100;
-                            if (success_size
-                                && success_size > min_for_reward
-                                && average >= MINIMUM_AVERAGE_PROXY_RPS
-                                && revard_nodes.insert(addr).second) {
-
-                                DEBUG_COUT(addr + "\t" + std::to_string(average) + "\t" + geo + "\t" + type + "\t" + crypto::int2bin(w_state) + "\t" + crypto::int2bin(state_mask));
-
+                            if (success_size > min_for_reward && average >= MINIMUM_AVERAGE_PROXY_RPS && revard_nodes.insert(addr).second) {
                                 uint64_t node_total_delegate = 0;
                                 for (auto&& [d_addr, d_value] : wallet->get_delegated_from_list()) {
 
@@ -225,8 +219,6 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
                     for (auto&& [node_name, node_delegate] : geo_nodes) {
                         geo_total_units[type][geo_name] += node_delegate;
                         forging_node_units += node_delegate;
-
-                        DEBUG_COUT(node_name + "\t" + type + "\t" + geo_name + "\t" + std::to_string(node_delegate));
                     }
                 }
             }
@@ -355,24 +347,6 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
             }
         }
 
-        if (address_statistics) {
-            DEBUG_COUT("online addr");
-            std::string msg = "\t";
-            for (const auto& add_pair : *address_statistics) {
-                msg += add_pair.first + ":" + std::to_string(add_pair.second.first) + ":" + std::to_string(add_pair.second.second) + ";";
-            }
-            DEBUG_COUT(msg);
-        }
-
-        {
-            DEBUG_COUT("delegate addr");
-            std::string msg = "\t";
-            for (const auto& add_pair : father_of_wallets->get_delegated_from_list()) {
-                msg += add_pair.first + ":" + std::to_string(add_pair.second) + ";";
-            }
-            DEBUG_COUT(msg);
-        }
-
         std::deque<std::string> active_forging;
         std::map<std::string, uint64_t> pasive_forging;
 
@@ -391,15 +365,6 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
             }
         } else {
             DEBUG_COUT("no statistics");
-        }
-
-        {
-            DEBUG_COUT("delegate list before sort");
-            std::string msg = "\t";
-            for (const auto& addr : active_forging) {
-                msg += addr + ";";
-            }
-            DEBUG_COUT(msg);
         }
 
         if (!pasive_forging.empty()) {
@@ -439,15 +404,6 @@ Block* BlockChain::make_forging_block(uint64_t timestamp)
                         }
                     }
                 }
-            }
-
-            {
-                DEBUG_COUT("delegate list after sort with uniques");
-                std::string msg = "\t";
-                for (const auto& addr : active_forging) {
-                    msg += addr + ";";
-                }
-                DEBUG_COUT(msg);
             }
 
             const uint64_t forging_count_total = ((FORGING_POOL(timestamp) + state_fee->get_value()) * 1) / 10;

@@ -57,7 +57,6 @@ void parse_block_async(
 
         if (block) {
             if (!dynamic_cast<CommonBlock*>(block)) {
-                DEBUG_COUT("Not common block");
                 delete block;
                 block = nullptr;
             }

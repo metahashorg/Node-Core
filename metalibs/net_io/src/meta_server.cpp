@@ -140,8 +140,6 @@ void Connection::read(std::shared_ptr<Connection> pThis)
 void Connection::write(std::shared_ptr<Connection> pThis)
 {
     boost::asio::async_write(pThis->socket, pThis->reply.make_buff(), [pThis](const boost::system::error_code& e, std::size_t bytes_transferred) {
-//        DEBUG_COUT("write");
-//        DEBUG_COUT(bytes_transferred);
         if (!e) {
             if (pThis->reply.is_complete(bytes_transferred)) {
                 pThis->start(pThis);
@@ -186,11 +184,6 @@ void Connection::Reply::serialize(crypto::Signer& _signer, uint64_t reply_id, st
 
     crypto::append_varint(write_buff, message.size());
     write_buff.insert(write_buff.end(), message.begin(), message.end());
-
-//    DEBUG_COUT(crypto::bin2hex(sign));
-//    DEBUG_COUT(crypto::bin2hex(public_key));
-//    DEBUG_COUT("reply_id\t" + std::to_string(reply_id));
-//    DEBUG_COUT("message.size()\t" + std::to_string(message.size()));
 }
 
 boost::asio::const_buffer Connection::Reply::make_buff()
@@ -200,8 +193,6 @@ boost::asio::const_buffer Connection::Reply::make_buff()
 
 bool Connection::Reply::is_complete(uint64_t bytes_transferred)
 {
-//    DEBUG_COUT("bytes_transferred\t" + std::to_string(bytes_transferred));
-//    DEBUG_COUT("write_buff.size()\t" + std::to_string(write_buff.size()));
     offset += bytes_transferred;
     return offset >= write_buff.size();
 }
@@ -276,7 +267,6 @@ int8_t Request::parse(char* buff_data, size_t buff_size, std::unordered_set<std:
     if (message_size == 0 && !read_varint(message_size)) {
         return statics::INCOMPLETE;
     }
-//    DEBUG_COUT(message_size);
 
     if (message_size && message.empty()) {
         if (fill_sw(message, message_size)) {
@@ -287,8 +277,8 @@ int8_t Request::parse(char* buff_data, size_t buff_size, std::unordered_set<std:
             return statics::INCOMPLETE;
         }
     }
-//    DEBUG_COUT(message.size());
 
     return statics::SUCCESS;
 }
+
 }

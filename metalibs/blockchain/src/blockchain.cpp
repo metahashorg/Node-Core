@@ -408,7 +408,6 @@ bool BlockChain::can_apply_forging_block(Block* block)
                     return false;
                 }
 
-//                const std::string& addr_from = crypto::bin2hex(tx.data);
                 auto* wallet_from = dynamic_cast<DecentralizedApplication*>(wallet_map.get_wallet(addr_to));
                 if (!wallet_from) {
                     DEBUG_COUT("wrong wallet type");

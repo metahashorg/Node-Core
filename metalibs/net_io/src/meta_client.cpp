@@ -41,13 +41,10 @@ int8_t ClientConnection::Response::parse(char* buff_data, size_t buff_size, cons
     if (public_key.empty()) {
         if (fill_sw(public_key, public_key_size)) {
             sender_addr = "0x" + crypto::bin2hex(crypto::get_address(public_key));
-//            DEBUG_COUT(sender_addr);
-//            DEBUG_COUT(mh_endpoint_addr);
             if (mh_endpoint_addr != sender_addr) {
                 DEBUG_COUT("UNKNOWN_SENDER_METAHASH_ADDRESS");
                 return statics::UNKNOWN_SENDER_METAHASH_ADDRESS;
             }
-//            DEBUG_COUT(crypto::bin2hex(public_key));
         } else {
             return statics::INCOMPLETE;
         }
@@ -64,11 +61,9 @@ int8_t ClientConnection::Response::parse(char* buff_data, size_t buff_size, cons
     if (message_size == 0 && !read_varint(message_size)) {
         return statics::INCOMPLETE;
     }
-//    DEBUG_COUT(message_size);
 
     if (message_size && message.empty()) {
         if (fill_sw(message, message_size)) {
-//            DEBUG_COUT("fill_sw");
             if (!crypto::check_sign(message, sign, public_key)) {
                 DEBUG_COUT(crypto::bin2hex(sign));
                 DEBUG_COUT(crypto::bin2hex(public_key));
@@ -79,7 +74,6 @@ int8_t ClientConnection::Response::parse(char* buff_data, size_t buff_size, cons
             return statics::INCOMPLETE;
         }
     }
-//    DEBUG_COUT(message.size());
 
     return statics::SUCCESS;
 }
@@ -96,7 +90,6 @@ bool ClientConnection::Response::fill_sw(std::vector<char>& sw, uint64_t sw_size
     if (offset + sw_size > request_full.size()) {
         return false;
     } else {
-//        sw = std::vector<char>(&request_full[offset], sw_size);
         sw.clear();
         sw.insert(sw.end(), &request_full[offset], &request_full[offset] + sw_size);
         offset += sw_size;
@@ -170,7 +163,6 @@ void ClientConnection::read()
                 check_tasks();
             } break;
             case statics::INCOMPLETE: {
-//                DEBUG_COUT("INCOMPLETE");
                 read();
             } break;
             case statics::WRONG_MAGIC_NUMBER:
@@ -246,10 +238,6 @@ void meta_client::send_message(uint64_t request_type, const std::vector<char>& m
 
     crypto::append_varint(write_buff, message.size());
     write_buff.insert(write_buff.end(), message.begin(), message.end());
-
-//    DEBUG_COUT("reply_id\t" + std::to_string(request_id));
-//    DEBUG_COUT("request_type\t" + std::to_string(request_type));
-//    DEBUG_COUT("message.size()\t" + std::to_string(message.size()));
 
     tasks.enqueue(new Task { write_buff, callback });
 }

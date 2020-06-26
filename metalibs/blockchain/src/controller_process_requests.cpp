@@ -27,31 +27,19 @@ std::vector<char> ControllerImplementation::add_pack_to_queue(net_io::Request& r
     if (roles.find(META_ROLE_CORE) != roles.end()) {
         switch (url) {
         case RPC_APPROVE:
-            DEBUG_COUT("RPC_APPROVE");
             parse_C_APPROVE(pack);
-            break;
+            return std::vector<char>();
         case RPC_DISAPPROVE:
             DEBUG_COUT("RPC_DISAPPROVE");
             parse_C_DISAPPROVE(pack);
-            break;
-        case RPC_APPROVE_BLOCK:
-            DEBUG_COUT("RPC_APPROVE_BLOCK");
-            parse_C_APPROVE_BLOCK(pack);
-            break;
+            return std::vector<char>();
         case RPC_LAST_BLOCK:
-            DEBUG_COUT("RPC_LAST_BLOCK");
             return parse_S_LAST_BLOCK(pack);
-            break;
         case RPC_GET_BLOCK:
-            DEBUG_COUT("RPC_GET_BLOCK");
             return parse_S_GET_BLOCK(pack);
-            break;
         case RPC_GET_CHAIN:
-            DEBUG_COUT("RPC_GET_CHAIN");
             return parse_S_GET_CHAIN(pack);
-            break;
         case RPC_GET_CORE_LIST:
-            DEBUG_COUT("RPC_GET_CORE_LIST");
             return parse_S_GET_CORE_LIST(pack);
             break;
         case RPC_GET_CORE_ADDR:
@@ -194,10 +182,6 @@ std::vector<char> ControllerImplementation::parse_S_LAST_BLOCK(std::string_view)
     last_block.insert(last_block.end(), last_applied_block.begin(), last_applied_block.end());
     char* p_timestamp = reinterpret_cast<char*>(&prev_timestamp);
     last_block.insert(last_block.end(), p_timestamp, p_timestamp + 8);
-
-    DEBUG_COUT("parse_S_LAST_BLOCK");
-    DEBUG_COUT(prev_timestamp);
-    DEBUG_COUT(crypto::bin2hex(last_applied_block));
 
     return last_block;
 }
