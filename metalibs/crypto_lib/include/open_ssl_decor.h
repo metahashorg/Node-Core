@@ -41,6 +41,8 @@ private:
 
 using sha256_2 = std::array<unsigned char, 32>;
 
+std::vector<std::string> split(const std::string& s, char delim);
+
 std::vector<unsigned char> hex2bin(const std::string_view src);
 
 template <typename Container>
