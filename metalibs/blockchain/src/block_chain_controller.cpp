@@ -21,9 +21,9 @@ std::atomic<std::map<std::string, std::pair<uint, uint>>*>& BlockChainController
     return CI->get_wallet_statistics();
 }
 
-std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& BlockChainController::get_wallet_request_addreses()
+std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& BlockChainController::get_wallet_request_addresses()
 {
-    return CI->get_wallet_request_addreses();
+    return CI->get_wallet_request_addresses();
 }
 
 BlockChainController::~BlockChainController()

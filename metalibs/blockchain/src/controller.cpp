@@ -280,9 +280,9 @@ std::atomic<std::map<std::string, std::pair<uint, uint>>*>& ControllerImplementa
     return BC->get_wallet_statistics();
 }
 
-std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& ControllerImplementation::get_wallet_request_addreses()
+std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& ControllerImplementation::get_wallet_request_addresses()
 {
-    return BC->get_wallet_request_addreses();
+    return BC->get_wallet_request_addresses();
 }
 
 void ControllerImplementation::main_loop()

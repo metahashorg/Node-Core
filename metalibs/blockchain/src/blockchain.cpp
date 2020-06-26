@@ -46,13 +46,12 @@ bool BlockChain::apply_block(Block* block)
     return false;
 }
 
-
 std::atomic<std::map<std::string, std::pair<uint, uint>>*>& BlockChain::get_wallet_statistics()
 {
     return wallet_statistics;
 }
 
-std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& BlockChain::get_wallet_request_addreses()
+std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& BlockChain::get_wallet_request_addresses()
 {
     return wallet_request_addreses;
 }

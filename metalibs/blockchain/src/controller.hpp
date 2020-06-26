@@ -73,7 +73,7 @@ public:
     std::string get_last_block_str();
 
     std::atomic<std::map<std::string, std::pair<uint, uint>>*>& get_wallet_statistics();
-    std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& get_wallet_request_addreses();
+    std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& get_wallet_request_addresses();
 
 private:
     void main_loop();

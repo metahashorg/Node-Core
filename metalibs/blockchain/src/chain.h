@@ -58,7 +58,7 @@ public:
     std::vector<RejectedTXInfo*>* make_rejected_tx_block(uint64_t timestamp);
 
     std::atomic<std::map<std::string, std::pair<uint, uint>>*>& get_wallet_statistics();
-    std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& get_wallet_request_addreses();
+    std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& get_wallet_request_addresses();
 
     std::set<std::string> check_addr(const std::string& addr);
     const std::unordered_map<std::string, std::set<std::string>, crypto::Hasher>& get_node_state();
