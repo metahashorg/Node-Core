@@ -5,15 +5,18 @@
 #include <open_ssl_decor.h>
 #include <statics.hpp>
 
-#include "block.h"
-#include "chain.h"
-
-#include <fstream>
-#include <future>
-#include <list>
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
+
+#include "block.h"
+#include "chain.h"
+
+#include <cmath>
+#include <fstream>
+#include <future>
+#include <list>
+#include <random>
 
 namespace metahash::metachain {
 
@@ -32,12 +35,13 @@ ControllerImplementation::ControllerImplementation(
     , min_approve(std::ceil(METAHASH_PRIMARY_CORES_COUNT * 51.0 / 100.0))
     , path(path)
     , signer(crypto::hex2bin(priv_key_line))
-    , cores(io_context, host_port.first, host_port.second, core_list, signer)
+    , cores(io_context, host_port.first, host_port.second, signer)
 {
-    //    if (signer.get_mh_addr() == "0x00fca67778165988703a302c1dfc34fd6036e209a20666969e") {
-    //        DEBUG_COUT("master");
-    //        master = true;
-    //    }
+    DEBUG_COUT("min_approve\t" + std::to_string(min_approve));
+
+    {
+        current_cores.insert(current_cores.end(), FOUNDER_WALLETS.begin(), FOUNDER_WALLETS.end());
+    }
 
     {
         std::vector<unsigned char> bin_proved_hash = crypto::hex2bin(proved_hash);
@@ -50,9 +54,12 @@ ControllerImplementation::ControllerImplementation(
         main_loop();
     });
 
-    listener = new net_io::meta_server(io_context, host_port.first, host_port.second, signer, [this](net_io::Request& request) -> std::vector<char> {
-        return add_pack_to_queue(request);
-    });
+    listener = new net_io::meta_server(
+        io_context, host_port.first, host_port.second, signer, [this](net_io::Request& request) -> std::vector<char> {
+            return add_pack_to_queue(request);
+        });
+
+    cores.init(core_list);
 }
 
 void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Block*, crypto::Hasher>& block_tree,
@@ -170,13 +177,41 @@ void ControllerImplementation::apply_block_chain(std::unordered_map<sha256_2, Bl
     DEBUG_COUT("STOP");
 }
 
+void ControllerImplementation::check_if_chain_actual()
+{
+    DEBUG_COUT("check_if_chain_actual");
+
+    std::map<std::string, std::vector<char>> last_block_on_cores = cores.send_with_return(RPC_LAST_BLOCK, std::vector<char>());
+
+    std::set<std::string> cores_with_missing_block;
+    std::set<sha256_2> missing_blocks;
+
+    serial_execution.post([this, last_block_on_cores] {
+        bool need_actualization = false;
+        for (auto&& [core_addr, block_info] : last_block_on_cores) {
+            if (block_info.size() >= 40) {
+                sha256_2 last_block_return;
+                std::copy_n(block_info.begin(), 32, last_block_return.begin());
+
+                uint64_t block_timestamp = 0;
+                std::copy_n(block_info.begin() + 32, 8, reinterpret_cast<char*>(&block_timestamp));
+
+                if (block_timestamp > prev_timestamp && !blocks.count(last_block_return)) {
+                    DEBUG_COUT("core\t" + core_addr + "have more recent block\t" + crypto::bin2hex(last_block_return));
+                    need_actualization = true;
+                }
+            }
+        }
+        if (need_actualization) {
+            DEBUG_COUT("need_actualization");
+            actualize_chain();
+        }
+    });
+}
+
 void ControllerImplementation::actualize_chain()
 {
     DEBUG_COUT("actualize_chain");
-
-    if (master()) {
-        return;
-    }
 
     std::map<std::string, std::vector<char>> last_block_on_cores = cores.send_with_return(RPC_LAST_BLOCK, std::vector<char>());
 
@@ -296,6 +331,7 @@ void ControllerImplementation::main_loop()
         last_sync_timestamp = timestamp;
     }
 
+    if (check_online_nodes()) {
         {
             if (prev_timestamp > last_actualization_timestamp) {
                 last_actualization_timestamp = prev_timestamp;
@@ -330,32 +366,7 @@ void ControllerImplementation::main_loop()
         if (master() && try_make_block()) {
             no_sleep = true;
         }
-
-        {
-            uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
-
-            if (timestamp - last_sync_timestamp > 60) {
-                DEBUG_COUT("sync_core_lists");
-                io_context.post([this] { cores.sync_core_lists(); });
-
-                last_sync_timestamp = timestamp;
-            }
-
-            if (prev_timestamp > last_actualization_timestamp) {
-                last_actualization_timestamp = prev_timestamp;
-            }
-
-            if (timestamp - last_actualization_timestamp > 1) {
-                need_actualize = true;
-            }
-
-            if (need_actualize) {
-                no_sleep = true;
-                actualize_chain();
-                need_actualize = false;
-                last_actualization_timestamp = timestamp;
-            }
-        }
+    }
 
     if (no_sleep) {
         serial_execution.post([this] {
@@ -404,15 +415,18 @@ void ControllerImplementation::apply_approve(ApproveRecord* p_ar)
             delete p_ar;
         }
 
-        auto approve_size = block_approve[block_hash].size();
-        auto m_approve = min_approve();
-        DEBUG_COUT(std::to_string(approve_size) + "\t" + std::to_string(m_approve));
-        if (approve_size >= m_approve) {
+        uint64_t approve_size = 0;
+        for (auto&& [addr, _] : block_approve[block_hash]) {
+            if (std::find(current_cores.begin(), current_cores.end(), addr) != std::end(current_cores)) {
+                approve_size++;
+            }
+        }
 
-            if (blocks.find(block_hash) != blocks.end()) {
+        if (approve_size >= min_approve) {
+            if (blocks.count(block_hash)) {
                 Block* block = blocks[block_hash];
                 if (block->get_prev_hash() == last_applied_block) {
-                    apply_block(block);
+                    try_apply_block(block);
                 } else {
                     DEBUG_COUT("block->get_prev_hash != last_applied_block");
                 }
@@ -427,23 +441,19 @@ void ControllerImplementation::apply_approve(ApproveRecord* p_ar)
     }
 }
 
-void ControllerImplementation::apply_block(Block* block)
+void ControllerImplementation::try_apply_block(Block* block)
 {
     if (BC->apply_block(block)) {
         write_block(block);
 
         if (block->get_block_type() == BLOCK_TYPE_STATE) {
-            std::unordered_set<std::string, crypto::Hasher> allowed_addreses;
-            auto nodes = BC->get_node_state();
-            for (auto&& [addr, roles] : nodes) {
-                if (roles.find(META_ROLE_CORE) != roles.end()
-                    || roles.find(META_ROLE_VERIF) != roles.end()
-                    || roles.find(META_ROLE_MASTER) != roles.end()) {
-
-                    allowed_addreses.insert(addr);
+            std::unordered_set<std::string, crypto::Hasher> allowed_addresses;
+            for (auto&& [addr, roles] : BC->get_node_state()) {
+                if (roles.count(META_ROLE_CORE) || roles.count(META_ROLE_VERIF)) {
+                    allowed_addresses.insert(addr);
                 }
             }
-            listener->update_allowed_addreses(allowed_addreses);
+            listener->update_allowed_addreses(allowed_addresses);
         }
     } else {
         DEBUG_COUT("!BC->can_apply_block(block)");
@@ -548,28 +558,145 @@ bool ControllerImplementation::try_make_block()
     } else if (timestamp - prev_timestamp > 30) {
         Block* block = blocks[last_created_block];
         if (block->get_prev_hash() == last_applied_block) {
-            apply_block(block);
+            try_apply_block(block);
         } else {
             DEBUG_COUT("block->get_prev_hash != last_applied_block");
         }
+    } else {
+        DEBUG_COUT("last_applied_block == last_created_block");
     }
+
     return false;
 }
 
 bool ControllerImplementation::master()
 {
-    uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
-    uint64_t current_day = timestamp / DAY_IN_SECONDS;
-    if (current_day != prev_day) {
-        return false;
-    }
-
-    auto roles = BC->check_addr(signer.get_mh_addr());
-    if (roles.find(META_ROLE_MASTER) != roles.end()) {
+    if (current_cores[0] == signer.get_mh_addr()) {
         return true;
     }
 
     return false;
+}
+
+bool ControllerImplementation::check_online_nodes()
+{
+    auto current_timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
+    auto current_generation = current_timestamp / CORE_LIST_RENEW_PERIOD;
+
+    auto online_cores = cores.get_online_cores();
+
+    if (online_cores.size() < METAHASH_PRIMARY_CORES_COUNT) {
+        return false;
+    }
+
+    if (core_list_generation < current_generation) {
+        uint64_t accept_count = 0;
+        if (current_generation - core_list_generation == 1) {
+            accept_count = min_approve;
+            if (std::find(current_cores.begin(), current_cores.end(), signer.get_mh_addr()) != std::end(current_cores)) {
+                auto list = make_pretend_core_list();
+                if (list.size()) {
+                    cores.send_no_return(RPC_CORE_LIST_APPROVE, list);
+                }
+
+                std::string string_list;
+                string_list.insert(string_list.end(), list.begin(), list.end());
+            }
+        } else {
+            auto list = make_pretend_core_list();
+            if (list.size()) {
+                cores.send_no_return(RPC_CORE_LIST_APPROVE, list);
+            }
+
+            std::string string_list;
+            string_list.insert(string_list.end(), list.begin(), list.end());
+
+            {
+                auto nodes = BC->get_node_state();
+                for (auto&& [addr, roles] : nodes) {
+                    if (roles.count(META_ROLE_CORE)) {
+                        accept_count++;
+                    }
+                }
+            }
+            accept_count = std::ceil(accept_count * 51.0 / 100.0);
+        }
+
+        for (auto&& [cores_list, approve_cores] : proposed_cores[current_generation]) {
+
+            if (approve_cores.size() >= accept_count) {
+                auto primary_cores = crypto::split(cores_list, '\n');
+                if (primary_cores.size() == METAHASH_PRIMARY_CORES_COUNT) {
+                    current_cores = primary_cores;
+                    core_list_generation = current_generation;
+
+                    for (const auto& addr : current_cores) {
+                        DEBUG_COUT(addr);
+                    }
+
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    return true;
+}
+
+std::vector<char> ControllerImplementation::make_pretend_core_list()
+{
+    std::deque<std::string> cores_list;
+    const auto nodes = BC->get_node_state();
+    const auto online_cores = cores.get_online_cores();
+
+//    for (auto&& [addr, roles] : nodes) {
+//        if (roles.count(META_ROLE_CORE)) {
+//            DEBUG_COUT("META_ROLE_CORE\t" + addr);
+//        }
+//    }
+//    for (auto& addr : online_cores) {
+//        if (online_cores.count(addr)) {
+//            DEBUG_COUT("online_cores\t" + addr);
+//        }
+//    }
+
+    for (auto&& [addr, roles] : nodes) {
+        if (online_cores.count(addr) && roles.count(META_ROLE_CORE)) {
+//            DEBUG_COUT("online_cores && META_ROLE_CORE\t" + addr);
+            cores_list.push_back(addr);
+        }
+    }
+
+    std::string master;
+    std::set<std::string> slaves;
+    if (cores_list.size() >= METAHASH_PRIMARY_CORES_COUNT) {
+        uint64_t last_block_hash_xx64 = crypto::get_xxhash64(blocks[last_applied_block]->get_data());
+        {
+            std::sort(cores_list.begin(), cores_list.end());
+//            DEBUG_COUT("last_block_hash_xx64\t" + std::to_string(last_block_hash_xx64));
+            std::mt19937_64 r;
+            r.seed(last_block_hash_xx64);
+            std::shuffle(cores_list.begin(), cores_list.end(), r);
+        }
+
+        master = cores_list[0];
+//        DEBUG_COUT("META_ROLE_MASTER\t" + master);
+        for (uint i = 1; i < METAHASH_PRIMARY_CORES_COUNT; i++) {
+            slaves.insert(cores_list[i]);
+//            DEBUG_COUT("META_ROLE_SLAVE\t" + cores_list[i]);
+        }
+    }
+
+    std::vector<char> return_list;
+    return_list.insert(return_list.end(), master.begin(), master.end());
+    for (const auto& addr : slaves) {
+        return_list.push_back('\n');
+        return_list.insert(return_list.end(), addr.begin(), addr.end());
+    }
+
+    return return_list;
 }
 
 }

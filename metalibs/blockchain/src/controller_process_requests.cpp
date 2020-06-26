@@ -12,25 +12,27 @@ std::vector<char> ControllerImplementation::add_pack_to_queue(net_io::Request& r
 {
     auto roles = BC->check_addr(request.sender_mh_addr);
     auto url = request.request_type;
-    std::string_view pack(request.message.data(), request.message.size());
+    auto pack = request.message;
 
-    if (roles.find(META_ROLE_VERIF) != roles.end()) {
-        if (url == RPC_PING) {
-            DEBUG_COUT("RPC_PING");
+    if (roles.count(META_ROLE_VERIF)) {
+        switch (url) {
+        case RPC_PING:
             parse_S_PING(pack);
-        } else if (url == RPC_TX && master()) {
-            DEBUG_COUT("RPC_TX");
+            return std::vector<char>();
+        case RPC_TX:
             parse_B_TX(pack);
+            return std::vector<char>();
+        case RPC_GET_CORE_LIST:
+            return parse_S_GET_CORE_LIST(pack);
         }
     }
 
-    if (roles.find(META_ROLE_CORE) != roles.end()) {
+    if (roles.count(META_ROLE_CORE)) {
         switch (url) {
         case RPC_APPROVE:
             parse_C_APPROVE(pack);
             return std::vector<char>();
         case RPC_DISAPPROVE:
-            DEBUG_COUT("RPC_DISAPPROVE");
             parse_C_DISAPPROVE(pack);
             return std::vector<char>();
         case RPC_LAST_BLOCK:
@@ -41,18 +43,27 @@ std::vector<char> ControllerImplementation::add_pack_to_queue(net_io::Request& r
             return parse_S_GET_CHAIN(pack);
         case RPC_GET_CORE_LIST:
             return parse_S_GET_CORE_LIST(pack);
-            break;
-        case RPC_GET_CORE_ADDR:
-            DEBUG_COUT("RPC_GET_CORE_ADDR");
-            return parse_S_GET_CORE_ADDR(pack);
-            break;
+        case RPC_CORE_LIST_APPROVE:
+            parse_S_CORE_LIST_APPROVE(request.sender_mh_addr, pack);
+            return std::vector<char>();
         }
     }
 
-    if (roles.find(META_ROLE_MASTER) != roles.end()) {
+    if (request.sender_mh_addr == current_cores[0]) {
         if (url == RPC_PRETEND_BLOCK) {
-            DEBUG_COUT("RPC_PRETEND_BLOCK");
             parse_C_PRETEND_BLOCK(pack);
+            return std::vector<char>();
+        }
+    }
+
+    {
+        DEBUG_COUT(request.request_id);
+        DEBUG_COUT(crypto::int2hex(request.request_type));
+        DEBUG_COUT(request.sender_mh_addr);
+        DEBUG_COUT(request.remote_ip_address);
+        DEBUG_COUT(request.message.size());
+        for (const auto& role : roles) {
+            DEBUG_COUT(role);
         }
     }
 
@@ -232,29 +243,22 @@ std::vector<char> ControllerImplementation::parse_S_GET_CHAIN(std::string_view p
     return chain;
 }
 
-std::vector<char> ControllerImplementation::parse_S_GET_CORE_LIST(std::string_view)
+std::vector<char> ControllerImplementation::parse_S_GET_CORE_LIST(std::string_view pack)
 {
+    cores.add_cores(pack);
+
     return cores.get_core_list();
 }
 
-std::vector<char> ControllerImplementation::parse_S_GET_CORE_ADDR(std::string_view pack)
+void ControllerImplementation::parse_S_CORE_LIST_APPROVE(std::string core, std::string_view pack)
 {
-    std::string addr_req_str(pack);
-    std::stringstream ss(addr_req_str);
-    std::string item;
-    std::vector<std::string> elems;
-    while (std::getline(ss, item, ':')) {
-        elems.push_back(std::move(item));
-    }
+    uint64_t current_timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
+    uint64_t current_generation = current_timestamp / CORE_LIST_RENEW_PERIOD;
+    std::string list(pack);
 
-    if (elems.size() == 3) {
-        cores.add_core(elems[0], elems[1], std::stoi(elems[2]));
-    }
-
-    auto mh_addr = signer.get_mh_addr();
-    std::vector<char> addr_as_vector;
-    addr_as_vector.insert(addr_as_vector.end(), mh_addr.begin(), mh_addr.end());
-    return addr_as_vector;
+    serial_execution.post([this, core, list, current_generation] {
+        proposed_cores[current_generation][list].insert(core);
+    });
 }
 
 }

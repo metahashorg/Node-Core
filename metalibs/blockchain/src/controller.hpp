@@ -54,9 +54,14 @@ private:
     uint64_t last_sync_timestamp = 0;
     uint64_t last_actualization_timestamp = 0;
 
-    net_io::meta_server *listener;
+    net_io::meta_server* listener;
+
+    std::vector<std::string> current_cores;
+    std::map<uint64_t, std::unordered_map<std::string, std::set<std::string>, crypto::Hasher>> proposed_cores;
+    uint64_t core_list_generation = 0;
 
     bool goon = true;
+
 public:
     ControllerImplementation(
         boost::asio::io_context& io_context,
@@ -83,12 +88,11 @@ private:
     void parse_C_PRETEND_BLOCK(std::string_view);
     void parse_C_APPROVE(std::string_view);
     void parse_C_DISAPPROVE(std::string_view);
-    void parse_C_APPROVE_BLOCK(std::string_view);
     std::vector<char> parse_S_LAST_BLOCK(std::string_view);
     std::vector<char> parse_S_GET_BLOCK(std::string_view);
     std::vector<char> parse_S_GET_CHAIN(std::string_view);
     std::vector<char> parse_S_GET_CORE_LIST(std::string_view);
-    std::vector<char> parse_S_GET_CORE_ADDR(std::string_view);
+    void parse_S_CORE_LIST_APPROVE(std::string core, std::string_view);
 
     void approve_block(Block*);
     void disapprove_block(Block*);
@@ -102,6 +106,7 @@ private:
 
     void read_and_apply_local_chain();
     void actualize_chain();
+    void check_if_chain_actual();
 
     void apply_block_chain(
         std::unordered_map<sha256_2, Block*, crypto::Hasher>& block_tree,
@@ -109,8 +114,10 @@ private:
         const std::string& source,
         bool need_write);
 
-    void apply_block(Block* block);
+    void try_apply_block(Block* block);
     bool master();
+    bool check_online_nodes();
+    std::vector<char> make_pretend_core_list();
 };
 
 }

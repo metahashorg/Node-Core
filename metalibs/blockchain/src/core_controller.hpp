@@ -24,11 +24,14 @@ private:
     crypto::Signer& signer;
 
 public:
-    CoreController(boost::asio::io_context& io_context, const std::string&, int, const std::map<std::string, std::pair<std::string, int>>&, crypto::Signer&);
+    CoreController(boost::asio::io_context& io_context, const std::string&, int, crypto::Signer&);
+
+    void init(const std::map<std::string, std::pair<std::string, int>>& core_list);
 
     void sync_core_lists();
+    void add_new_cores(const std::set<std::tuple<std::string, std::string, int>>& hosts);
 
-    void add_core(std::string& addr, std::string& host, int port);
+    void add_cores(std::string_view pack);
     std::vector<char> get_core_list();
 
     void send_no_return(uint64_t req_type, const std::vector<char>& req_data);

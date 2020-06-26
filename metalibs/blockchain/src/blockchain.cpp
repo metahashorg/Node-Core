@@ -605,22 +605,9 @@ void BlockChain::fill_node_state()
         }
     }
 
-    uint64_t max_money = 0;
-    std::string master_core_addr;
-    for (auto&& [addr, roles]: states) {
-        if (roles.find(META_ROLE_CORE) != roles.end()) {
-            auto* wallet = dynamic_cast<CommonWallet*>(wallet_map.get_wallet(addr));
-            auto&& [balance, state, data] = wallet->serialize();
-            if (balance > max_money) {
-                max_money = balance;
-                master_core_addr = addr;
-            }
-        }
-    }
-    states[master_core_addr].insert(META_ROLE_MASTER);
-
     node_state.swap(states);
 }
+
 const std::unordered_map<std::string, std::set<std::string>, crypto::Hasher>& BlockChain::get_node_state()
 {
     return node_state;

@@ -113,23 +113,23 @@ const uint64_t TX_REJECT_FOUNDER_LIMIT = 0xff06;
 const uint64_t TX_REJECT_INVALID_WALLET = 0x0404;
 
 const uint64_t DAY_IN_SECONDS = 24 * 60 * 60;
+const uint64_t CORE_LIST_RENEW_PERIOD = 10 * 60;
 
 /*                          RPC METHODS                           */
 const uint64_t RPC_PING = 0x10;
 const uint64_t RPC_TX = 0x20;
 const uint64_t RPC_PRETEND_BLOCK = 0x30;
-const uint64_t RPC_APPROVE_BLOCK = 0x31;
 const uint64_t RPC_APPROVE = 0x40;
 const uint64_t RPC_DISAPPROVE = 0x41;
 const uint64_t RPC_LAST_BLOCK = 0x50;
 const uint64_t RPC_GET_BLOCK = 0x60;
 const uint64_t RPC_GET_CHAIN = 0x61;
 const uint64_t RPC_GET_CORE_LIST = 0x71;
-const uint64_t RPC_GET_CORE_ADDR = 0x72;
+const uint64_t RPC_CORE_LIST_APPROVE = 0x81;
 
 /*                           NODE ROLE CONSTANTS                           */
+const uint64_t METAHASH_PRIMARY_CORES_COUNT = 4;
 
-static const std::string META_ROLE_MASTER = "Master";
 static const std::string META_ROLE_CORE = "Core";
 static const std::string META_ROLE_PROXY = "Proxy";
 static const std::string META_ROLE_VERIF = "Verifier";

@@ -174,6 +174,7 @@ void ControllerImplementation::write_block(Block* block)
 
         prev_timestamp = block->get_block_timestamp();
         last_applied_block = block->get_block_hash();
+        last_created_block = block->get_block_hash();
 
         prev_day = prev_timestamp / DAY_IN_SECONDS;
         prev_state = block->get_block_type();

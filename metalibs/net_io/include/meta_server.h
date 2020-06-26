@@ -91,11 +91,7 @@ public:
 
 class meta_server {
 public:
-    meta_server(boost::asio::io_context& io_context,
-        const std::string& address,
-        int port,
-        crypto::Signer& signer,
-        std::function<std::vector<char>(Request&)> request_handler);
+    meta_server(boost::asio::io_context& io_context, const std::string& address, const int port, crypto::Signer& signer, std::function<std::vector<char>(Request&)> request_handler);
 
     void start();
 
@@ -108,6 +104,9 @@ private:
     boost::asio::io_context& io_context;
     boost::asio::ip::tcp::endpoint endpoint;
     boost::asio::ip::tcp::acceptor acceptor;
+
+    const std::string my_address;
+    const int my_port;
 
     std::function<std::vector<char>(Request&)> request_handler;
     crypto::Signer& signer;

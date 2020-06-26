@@ -38,14 +38,15 @@ namespace statics {
         return write_buff;
     }
 
-    static const std::string unkown_sender = R"({"result":"error","error":"unkown sender"})";
+    static const std::string unknown_sender = R"({"result":"error","error":"unknown sender"})";
     static const std::string invalid_sign = R"({"result":"error","error":"invalid sign"})";
 }
 
 meta_server::meta_server(boost::asio::io_context& io_context, const std::string& address, const int port, crypto::Signer& signer, std::function<std::vector<char>(Request&)> request_handler)
     : io_context(io_context)
-    , endpoint(boost::asio::ip::tcp::v4(), static_cast<unsigned short>(port))
-    , acceptor(io_context, endpoint)
+    , acceptor(io_context)
+    , my_address(address)
+    , my_port(port)
     , request_handler(std::move(request_handler))
     , signer(signer)
     , new_connection()
@@ -55,9 +56,26 @@ meta_server::meta_server(boost::asio::io_context& io_context, const std::string&
 
 void meta_server::start()
 {
-    acceptor.listen();
+    bool success = false;
 
-    start_accept();
+    try {
+        endpoint = boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), static_cast<unsigned short>(my_port));
+        acceptor.open(endpoint.protocol());
+        acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
+        acceptor.set_option(boost::asio::ip::tcp::acceptor::enable_connection_aborted(true));
+        acceptor.bind(endpoint);
+        acceptor.listen();
+
+        success = true;
+    } catch (std::exception& e) {
+        DEBUG_COUT(e.what());
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        start();
+    }
+
+    if (success) {
+        start_accept();
+    }
 }
 
 void meta_server::start_accept()
@@ -121,7 +139,7 @@ void Connection::read(std::shared_ptr<Connection> pThis)
             } break;
             case statics::UNKNOWN_SENDER_METAHASH_ADDRESS: {
                 DEBUG_COUT("UNKNOWN_SENDER_METAHASH_ADDRESS");
-                pThis->reply.make(pThis->signer, pThis->request.request_id, statics::unkown_sender);
+                pThis->reply.make(pThis->signer, pThis->request.request_id, statics::unknown_sender);
                 pThis->write_and_close(pThis);
             } break;
             case statics::INVALID_SIGN: {

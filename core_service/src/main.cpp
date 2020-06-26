@@ -93,7 +93,7 @@ int main(int argc, char** argv)
 
     BlockChainController blockChainController(io_context, key, path, known_hash, core_list, { host, tx_port }, skip_last_forging_and_state);
 
-    std::thread(libevent, std::ref(blockChainController.get_wallet_statistics()), std::ref(blockChainController.get_wallet_request_addreses()), "wsstata.metahash.io", 80, "net-test").detach();
+    std::thread(libevent, std::ref(blockChainController.get_wallet_statistics()), std::ref(blockChainController.get_wallet_request_addresses()), "wsstata.metahash.io", 80, "net-test").detach();
 
     io_context.run();
 
