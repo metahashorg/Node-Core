@@ -9,7 +9,7 @@
 
 namespace metahash::metachain {
 
-DecentralizedApplication::DecentralizedApplication(std::unordered_set<Wallet*>& _changed_wallets)
+DecentralizedApplication::DecentralizedApplication(std::deque<Wallet*>& _changed_wallets)
     : Wallet(_changed_wallets)
 {
 }
@@ -22,7 +22,7 @@ bool DecentralizedApplication::initialize(uint64_t nonce)
 
     init_nonce = nonce;
 
-    changed_wallets.insert(this);
+    changed_wallets.push_back(this);
     return true;
 }
 
@@ -142,7 +142,7 @@ bool DecentralizedApplication::try_dapp_create(const TX* tx)
 
     mhc_per_day = value;
 
-    changed_wallets.insert(this);
+    changed_wallets.push_back(this);
     return true;
 }
 
@@ -173,7 +173,7 @@ bool DecentralizedApplication::try_dapp_modify(const TX* tx)
 
     mhc_per_day = value;
 
-    changed_wallets.insert(this);
+    changed_wallets.push_back(this);
     return true;
 }
 
@@ -181,13 +181,13 @@ bool DecentralizedApplication::try_dapp_add_host(const TX* tx)
 {
     uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
 
-    changed_wallets.insert(this);
+    changed_wallets.push_back(this);
     return host.insert({ tx->addr_from, timestamp }).second;
 }
 
 bool DecentralizedApplication::try_dapp_del_host(const TX* tx)
 {
-    changed_wallets.insert(this);
+    changed_wallets.push_back(this);
     return host.erase(tx->addr_from);
 }
 

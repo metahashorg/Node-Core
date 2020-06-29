@@ -7,7 +7,7 @@
 
 namespace metahash::metachain {
 
-Wallet::Wallet(std::unordered_set<Wallet*>& _changed_wallets)
+Wallet::Wallet(std::deque<Wallet*>& _changed_wallets)
     : changed_wallets(_changed_wallets)
 {
 }
@@ -23,14 +23,14 @@ bool Wallet::initialize(uint64_t value, uint64_t nonce, const std::string&)
     balance = value;
     transaction_id = nonce;
 
-    changed_wallets.insert(this);
+    changed_wallets.push_back(this);
     return true;
 }
 
 void Wallet::add(uint64_t value)
 {
     balance += value;
-    changed_wallets.insert(this);
+    changed_wallets.push_back(this);
 }
 
 uint64_t Wallet::sub(Wallet* other, const TX* tx, uint64_t real_fee)
@@ -55,7 +55,7 @@ uint64_t Wallet::sub(Wallet* other, const TX* tx, uint64_t real_fee)
 
     other->add(tx->value);
 
-    changed_wallets.insert(this);
+    changed_wallets.push_back(this);
     return 0;
 }
 

@@ -23,7 +23,7 @@ uint64_t CommonWallet::get_balance()
     return balance;
 }
 
-CommonWallet::CommonWallet(std::unordered_set<Wallet*>& _changed_wallets)
+CommonWallet::CommonWallet(std::deque<Wallet*>& _changed_wallets)
     : Wallet(_changed_wallets)
 {
 }
@@ -50,7 +50,7 @@ void CommonWallet::set_state(uint64_t new_state)
         addition = new WalletAdditions();
     }
     addition->state = new_state;
-    changed_wallets.insert(this);
+    changed_wallets.push_back(this);
 }
 
 uint64_t CommonWallet::get_trust()
@@ -72,7 +72,7 @@ void CommonWallet::add_trust()
     } else {
         addition->trust = 200;
     }
-    changed_wallets.insert(this);
+    changed_wallets.push_back(this);
 }
 
 void CommonWallet::sub_trust()
@@ -85,7 +85,7 @@ void CommonWallet::sub_trust()
     } else {
         addition->trust = 2;
     }
-    changed_wallets.insert(this);
+    changed_wallets.push_back(this);
 }
 
 void CommonWallet::set_founder_limit()
@@ -95,7 +95,7 @@ void CommonWallet::set_founder_limit()
     }
     addition->founder = true;
     addition->limit += FOUNDER_INITIAL_LIMIT;
-    changed_wallets.insert(this);
+    changed_wallets.push_back(this);
 }
 
 std::deque<std::pair<std::string, uint64_t>> CommonWallet::get_delegate_to_list()
@@ -203,8 +203,8 @@ bool CommonWallet::try_delegate(Wallet* other, TX const* tx)
     wallet_to->addition->delegated_from.emplace_back(addr_from, value);
     wallet_to->addition->delegated_from_sum += value;
 
-    changed_wallets.insert(this);
-    changed_wallets.insert(wallet_to);
+    changed_wallets.push_back(this);
+    changed_wallets.push_back(wallet_to);
     return true;
 }
 
@@ -266,8 +266,8 @@ bool CommonWallet::try_undelegate(Wallet* other, TX const* tx)
     wallet_to->addition->delegated_from_sum -= wallet_to->addition->delegated_from[i_from].second;
     wallet_to->addition->delegated_from.erase(wallet_to->addition->delegated_from.begin() + i_from);
 
-    changed_wallets.insert(this);
-    changed_wallets.insert(wallet_to);
+    changed_wallets.push_back(this);
+    changed_wallets.push_back(wallet_to);
     return true;
 }
 
@@ -324,7 +324,7 @@ bool CommonWallet::register_node(Wallet*, const TX* tx)
 void CommonWallet::apply_delegates()
 {
     if (addition) {
-        changed_wallets.insert(this);
+        changed_wallets.push_back(this);
 
         addition->delegated_from_daly_snapshot = addition->delegated_from;
         addition->delegate_to_daly_snapshot = addition->delegate_to;
@@ -562,7 +562,7 @@ bool CommonWallet::initialize(uint64_t value, uint64_t nonce, const std::string&
         addition->delegated_from_sum = delegated_from_sum;
     }
 
-    changed_wallets.insert(this);
+    changed_wallets.push_back(this);
     return true;
 }
 
@@ -686,7 +686,7 @@ void CommonWallet::set_trust(uint64_t new_trust)
     }
     addition->trust = new_trust;
 
-    changed_wallets.insert(this);
+    changed_wallets.push_back(this);
 }
 
 }

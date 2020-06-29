@@ -5,10 +5,9 @@
 #include <map>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 
 #include <transaction.h>
-#include <xxhash.h>
+#include <open_ssl_decor.h>
 
 namespace metahash::metachain {
 
@@ -16,16 +15,8 @@ class Wallet;
 
 class WalletMap {
 private:
-    struct string_hasher {
-        std::size_t operator()(const std::string& k) const
-        {
-            return XXH64(k.data(), k.size(), 0);
-        }
-    };
-
-    std::unordered_map<std::string, Wallet*, string_hasher> wallet_map;
-
-    std::unordered_set<Wallet*> changed_wallets;
+    std::unordered_map<std::string, Wallet*, crypto::Hasher> wallet_map;
+    std::deque<Wallet*> changed_wallets;
 
 public:
     Wallet* get_wallet(const std::string&);
@@ -44,7 +35,7 @@ private:
 
 class Wallet {
 protected:
-    std::unordered_set<Wallet*>& changed_wallets;
+    std::deque<Wallet*>& changed_wallets;
 
     uint64_t transaction_id = 1;
     uint64_t balance = 0;
@@ -53,7 +44,7 @@ protected:
     uint64_t real_balance = 0;
 
 public:
-    explicit Wallet(std::unordered_set<Wallet*>&);
+    explicit Wallet(std::deque<Wallet*>&);
     Wallet(const Wallet&) = delete;
     Wallet(Wallet&&) = delete;
     Wallet& operator=(const Wallet& other) = delete;
@@ -106,7 +97,7 @@ private:
     uint64_t get_balance();
 
 public:
-    explicit CommonWallet(std::unordered_set<Wallet*>&);
+    explicit CommonWallet(std::deque<Wallet*>&);
     CommonWallet(const CommonWallet&) = delete;
     CommonWallet(CommonWallet&&) = delete;
     CommonWallet& operator=(const CommonWallet& other) = delete;
@@ -153,7 +144,7 @@ private:
     std::map<std::string, uint64_t> real_host;
 
 public:
-    explicit DecentralizedApplication(std::unordered_set<Wallet*>&);
+    explicit DecentralizedApplication(std::deque<Wallet*>&);
     DecentralizedApplication(const DecentralizedApplication&) = delete;
     DecentralizedApplication(DecentralizedApplication&&) = delete;
     DecentralizedApplication& operator=(const DecentralizedApplication& other) = delete;
