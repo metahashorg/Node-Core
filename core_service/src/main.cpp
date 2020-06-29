@@ -259,105 +259,101 @@ void parse_settings(
     std::string& key,
     std::map<std::string, std::pair<std::string, int>>& core_list)
 {
-    std::ifstream file(file_name);
-    std::string line;
+    std::ifstream ifs(file_name);
+    std::string content((std::istreambuf_iterator<char>(ifs)), (std::istreambuf_iterator<char>()));
 
-    /********************NETWORK NAME********************/
-    if (std::getline(file, line)) {
-        if (line != "net-main"
-            && line != "net-dev"
-            && line != "net-test") {
+    rapidjson::Document config_json;
+    if (!config_json.Parse(content.c_str()).HasParseError()) {
 
-            DEBUG_COUT("Unknown network name:\t" + line);
+        if (config_json.HasMember("network") && config_json["network"].IsString()) {
+            network = config_json["network"].GetString();
+            if (network != "net-main" && network != "net-dev" && network != "net-test") {
+                DEBUG_COUT("Unknown network name:\t" + network);
+                print_config_file_params_and_exit();
+            }
+
+            DEBUG_COUT("Network name:\t" + network);
+        } else {
+            DEBUG_COUT("Missing network name");
             print_config_file_params_and_exit();
         }
 
-        network = line;
-        DEBUG_COUT("Network name:\t" + network);
-    } else {
-        DEBUG_COUT("Invalid Configuration File");
-        print_config_file_params_and_exit();
-    }
-
-    /********************LISTENING PORT********************/
-    if (std::getline(file, line)) {
-        std::stringstream linestream(line);
-        linestream >> tx_host >> tx_port;
-
-        if (tx_port <= 0) {
-            DEBUG_COUT("Invalid listening port:\t" + line);
+        if (config_json.HasMember("hostname") && config_json["hostname"].IsString() && config_json.HasMember("port") && config_json["port"].IsUint() && config_json["port"].GetInt() != 0) {
+            tx_host = config_json["hostname"].GetString();
+            tx_port = config_json["port"].GetInt();
+        } else {
+            DEBUG_COUT("Invalid or missing listening host or port");
             print_config_file_params_and_exit();
         }
 
-        DEBUG_COUT("Listening host port:\t" + tx_host + "\t" + std::to_string(tx_port));
-    } else {
-        DEBUG_COUT("Invalid Configuration File");
-        print_config_file_params_and_exit();
-    }
+        if (config_json.HasMember("path") && config_json["path"].IsString()) {
+            path = config_json["path"].GetString();
 
-    /********************METACHAIN PATH********************/
-    if (std::getline(file, line)) {
-        path = line;
+            if (std::filesystem::path dir(path); !std::filesystem::exists(dir) || !std::filesystem::is_directory(dir)) {
+                DEBUG_COUT("Invalid metachain path:\t" + path);
+                print_config_file_params_and_exit();
+            }
 
-        if (std::filesystem::path dir(path); !std::filesystem::exists(dir) || !std::filesystem::is_directory(dir)) {
-            DEBUG_COUT("Invalid metachain path");
+            DEBUG_COUT("Metachain path:\t" + path);
+        } else {
+            DEBUG_COUT("Missing metachain path");
             print_config_file_params_and_exit();
         }
+        if (config_json.HasMember("hash") && config_json["hash"].IsString()) {
+            hash = config_json["hash"].GetString();
+            auto hash_as_vec = metahash::crypto::hex2bin(hash);
+            if (hash_as_vec.size() != 32) {
+                DEBUG_COUT("Invalid trusted block hash");
+                print_config_file_params_and_exit();
+            }
 
-        DEBUG_COUT("Metachain path:\t" + path);
-    } else {
-        DEBUG_COUT("Invalid Configuration File");
-        print_config_file_params_and_exit();
-    }
-
-    /********************TRUSTED BLOCK HASH********************/
-    if (std::getline(file, line)) {
-        auto hash_as_vec = metahash::crypto::hex2bin(line);
-        if (hash_as_vec.size() != 32) {
-            DEBUG_COUT("Invalid trusted block hash");
+            DEBUG_COUT("Trusted block hash:\t" + hash);
+        } else {
+            DEBUG_COUT("Missing trusted hash");
             print_config_file_params_and_exit();
         }
+        if (config_json.HasMember("key") && config_json["key"].IsString()) {
+            key = config_json["key"].GetString();
 
-        hash = line;
-        DEBUG_COUT("Trusted block hash:\t" + hash);
-    } else {
-        DEBUG_COUT("Invalid Configuration File");
-        print_config_file_params_and_exit();
-    }
+            std::vector<unsigned char> priv_k = metahash::crypto::hex2bin(key);
+            std::vector<char> PubKey;
+            if (!metahash::crypto::generate_public_key(PubKey, priv_k)) {
+                DEBUG_COUT("Error while parsing Private key");
+                print_config_file_params_and_exit();
+            }
 
-    /********************PRIVATE KEY********************/
-    if (std::getline(file, line)) {
-        std::vector<unsigned char> priv_k = metahash::crypto::hex2bin(line);
-        std::vector<char> PubKey;
-        if (!metahash::crypto::generate_public_key(PubKey, priv_k)) {
-            DEBUG_COUT("Error while parsing Private key");
+            std::array<char, 25> addres = metahash::crypto::get_address(PubKey);
+            std::string Text_addres = "0x" + metahash::crypto::bin2hex(addres);
+            DEBUG_COUT("got key for address:\t" + Text_addres);
+
+        } else {
+            DEBUG_COUT("Missing Private key");
             print_config_file_params_and_exit();
         }
+        if (config_json.HasMember("cores") && config_json["cores"].IsArray()) {
+            auto& v_list = config_json["cores"];
 
-        std::array<char, 25> addres = metahash::crypto::get_address(PubKey);
-        std::string Text_addres = "0x" + metahash::crypto::bin2hex(addres);
-        DEBUG_COUT("got key for address:\t" + Text_addres);
+            for (uint i = 0; i < v_list.Size(); i++) {
+                auto& record = v_list[i];
 
-        key = line;
+                if (record.HasMember("address") && record["address"].IsString()
+                    && record.HasMember("host") && record["host"].IsString()
+                    && record.HasMember("port") && record["port"].IsUint()
+                    && record["port"].GetUint() != 0) {
+
+                    DEBUG_COUT("Core\t" + std::string(record["address"].GetString()) + "\t" + std::string(record["host"].GetString()) + "\t" + std::to_string(record["port"].GetUint()));
+                    core_list.insert({ record["address"].GetString(), { record["host"].GetString(), record["port"].GetUint() } });
+                }
+            }
+
+            if (core_list.empty()) {
+                DEBUG_COUT("WARNING: No cores present in configuration file");
+            }
+        } else {
+            DEBUG_COUT("WARNING: No cores present in configuration file");
+        }
     } else {
         DEBUG_COUT("Invalid Configuration File");
         print_config_file_params_and_exit();
-    }
-
-    /********************KNOWN CORES********************/
-    while (std::getline(file, line)) {
-        std::stringstream linestream(line);
-        std::string addr;
-        std::string host;
-        int port = 0;
-
-        linestream >> addr >> host >> port;
-        DEBUG_COUT("Core\t" + addr + "\t" + host + "\t" + std::to_string(port));
-
-        if (port == 0) {
-            break;
-        }
-
-        core_list.insert({ addr, { host, port } });
     }
 }
