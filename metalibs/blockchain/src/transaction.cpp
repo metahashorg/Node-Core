@@ -1,13 +1,8 @@
-#include "transaction.h"
-#include "open_ssl_decor.h"
-
-#include <rapidjson/document.h>
-#include <rapidjson/error/en.h>
-
-#include <iostream>
-
 #include <meta_log.hpp>
+#include <open_ssl_decor.h>
+#include <rapidjson/document.h>
 #include <statics.hpp>
+#include <transaction.h>
 
 namespace metahash::metachain {
 

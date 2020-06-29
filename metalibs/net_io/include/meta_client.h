@@ -3,7 +3,6 @@
 
 #include <boost/asio.hpp>
 #include <boost/bind/bind.hpp>
-#include <iostream>
 #include <istream>
 #include <ostream>
 #include <string>

@@ -1,7 +1,6 @@
 #include <boost/bind.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/shared_ptr.hpp>
-#include <utility>
 
 #include <meta_log.hpp>
 #include <meta_server.h>

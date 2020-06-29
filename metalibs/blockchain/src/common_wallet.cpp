@@ -1,5 +1,4 @@
 #include <meta_log.hpp>
-#include <open_ssl_decor.h>
 #include <statics.hpp>
 #include <wallet.h>
 

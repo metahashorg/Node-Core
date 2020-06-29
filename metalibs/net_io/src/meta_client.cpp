@@ -1,6 +1,5 @@
 #include <meta_client.h>
 #include <meta_log.hpp>
-#include <utility>
 
 namespace metahash::net_io {
 

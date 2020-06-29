@@ -1,31 +1,18 @@
-#include <csignal>
-
 #include <arpa/inet.h>
-#include <climits>
-#include <csignal>
 #include <deque>
 #include <filesystem>
 #include <fstream>
-#include <list>
-#include <netdb.h>
-#include <netinet/in.h>
 #include <set>
 #include <sstream>
-#include <sys/socket.h>
-#include <unistd.h>
-
-#include <version.h>
 
 #include <blockchain.h>
 #include <meta_log.hpp>
-#include <open_ssl_decor.h>
-#include <statics.hpp>
-
-#include <rapidjson/document.h>
-#include <rapidjson/stringbuffer.h>
-#include <rapidjson/writer.h>
-
 #include <mhcurl.hpp>
+#include <open_ssl_decor.h>
+#include <rapidjson/document.h>
+#include <rapidjson/writer.h>
+#include <statics.hpp>
+#include <version.h>
 
 [[noreturn]] void print_config_file_params_and_exit()
 {
@@ -150,7 +137,7 @@ __attribute__((__noreturn__)) void libevent(
 
             static const std::string path = "/";
             std::string response;
-            while (true) {
+            for (;;) {
                 if (CF.post("/", request_string, response)) {
                     break;
                 }
@@ -225,7 +212,7 @@ __attribute__((__noreturn__)) void libevent(
 
                         DEBUG_COUT("got info for \t" + std::to_string(got_statistics.size()) + "\taddresses");
 
-                        while (true) {
+                        for (;;) {
                             std::map<std::string, std::pair<uint, uint>>* got_statistics_prev = statistics.load();
                             if (statistics.compare_exchange_strong(got_statistics_prev, p_got_statistics)) {
 

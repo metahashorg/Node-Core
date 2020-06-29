@@ -3,8 +3,6 @@
 #include <open_ssl_decor.h>
 #include <statics.hpp>
 
-#include <set>
-
 namespace metahash::metachain {
 
 Wallet::Wallet(std::deque<Wallet*>& _changed_wallets)
