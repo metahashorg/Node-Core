@@ -1,4 +1,4 @@
-project(meta_log VERSION 0.1 LANGUAGES CXX)
+project(meta_log LANGUAGES CXX)
 
 add_library(${PROJECT_NAME}
         src/meta_log.cpp)

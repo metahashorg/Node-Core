@@ -6,15 +6,16 @@
 #ifdef DEBUG_OUTPUT
 
 #include <concurrentqueue.h>
+
 #include <sstream>
 #include <thread>
 
 #endif
 
-#define DEBUG_COUT(message) meta_log::debug_cout(true, std::string(__FILE__), std::string(&__func__[0]), __LINE__, message)
-#define DEBUG_COUT_COND(print, message) meta_log::debug_cout(print, std::string(__FILE__), std::string(&__func__[0]), __LINE__, message)
+#define DEBUG_COUT(message) metahash::log::debug_cout(true, std::string(__FILE__), std::string(&__func__[0]), __LINE__, message)
+#define DEBUG_COUT_COND(print, message) metahash::log::debug_cout(print, std::string(__FILE__), std::string(&__func__[0]), __LINE__, message)
 
-namespace meta_log {
+namespace metahash::log {
 extern moodycamel::ConcurrentQueue<std::stringstream*>* output_queue;
 extern std::thread* cout_printer;
 

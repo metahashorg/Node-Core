@@ -1,0 +1,152 @@
+#include "controller.hpp"
+
+#include <meta_block.h>
+#include <meta_constants.hpp>
+#include <meta_log.hpp>
+#include <rapidjson/document.h>
+
+#include <experimental/filesystem>
+#include <fstream>
+#include <list>
+
+namespace metahash::meta_core {
+
+std::set<std::string> get_files_in_dir(const std::string& path)
+{
+    std::set<std::string> files;
+    //                          y   m   d   t
+    const uint file_name_size = 4 + 2 + 2 + 4;
+
+    namespace fs = std::experimental::filesystem;
+    for (const auto& p : fs::directory_iterator(path)) {
+        const auto& file_path = p.path();
+        auto filename = file_path.filename().string();
+
+        if (filename.length() == file_name_size &&
+            // Year
+            std::isdigit(filename[0]) && std::isdigit(filename[1]) && std::isdigit(filename[2]) && std::isdigit(filename[3]) &&
+            // Month
+            std::isdigit(filename[4]) && std::isdigit(filename[5]) &&
+            // Day
+            std::isdigit(filename[6]) && std::isdigit(filename[7]) &&
+            // Extension
+            filename.compare(8, 4, std::string { ".blk" }) == 0) {
+            files.insert(file_path.string());
+        }
+    }
+
+    return files;
+}
+
+void parse_block_async(
+    boost::asio::io_context& io_context,
+    std::list<std::future<block::Block*>>& futures,
+    char* block_buff,
+    int64_t block_size,
+    bool delete_buff)
+{
+    auto promise = std::make_shared<std::promise<block::Block*>>();
+    futures.emplace_back(promise->get_future());
+
+    boost::asio::post(io_context, [block_buff, block_size, delete_buff, promise]() {
+        std::string_view block_as_string(block_buff, block_size);
+        auto* block = block::parse_block(block_as_string);
+
+        if (block) {
+            if (!dynamic_cast<block::CommonBlock*>(block)) {
+                delete block;
+                block = nullptr;
+            }
+        } else {
+            DEBUG_COUT("Block parse error");
+        }
+
+        if (delete_buff) {
+            delete[] block_buff;
+        }
+
+        promise->set_value(block);
+    });
+}
+
+
+void ControllerImplementation::read_and_apply_local_chain()
+{
+    std::string last_file;
+
+    std::ifstream last_known_state_file("last_state.json");
+    if (last_known_state_file.is_open()) {
+        std::string content((std::istreambuf_iterator<char>(last_known_state_file)), (std::istreambuf_iterator<char>()));
+
+        rapidjson::Document last_known_state_json;
+        if (!last_known_state_json.Parse(content.c_str()).HasParseError()) {
+
+            if (last_known_state_json.HasMember("hash") && last_known_state_json["hash"].IsString()
+                && last_known_state_json.HasMember("file") && last_known_state_json["file"].IsString()) {
+
+                last_file = std::string(last_known_state_json["file"].GetString(), last_known_state_json["file"].GetStringLength());
+                std::string last_block = std::string(last_known_state_json["hash"].GetString(), last_known_state_json["hash"].GetStringLength());
+                std::vector<unsigned char> bin_proved_hash = crypto::hex2bin(last_block);
+                std::copy_n(bin_proved_hash.begin(), 32, proved_block.begin());
+
+                DEBUG_COUT("got last state info. file:\t" + last_file + "\t and block:\t" + last_block);
+            }
+        }
+
+        last_known_state_file.close();
+    }
+
+    std::list<std::future<block::Block*>> pending_data;
+    std::unordered_map<sha256_2, block::Block*, crypto::Hasher> prev_tree;
+
+    char uint64_buff[8];
+    std::set<std::string> files = get_files_in_dir(path);
+
+    for (const std::string& file : files) {
+        std::ifstream ifile(file.c_str(), std::ios::in | std::ios::binary);
+
+        if (ifile.is_open()) {
+            while (ifile.read(uint64_buff, 8)) {
+                uint64_t block_size = *(reinterpret_cast<uint64_t*>(uint64_buff));
+                char* block_buff = new char[block_size];
+
+                if (ifile.read(block_buff, static_cast<int64_t>(block_size))) {
+                    parse_block_async(io_context, pending_data, block_buff, block_size, true);
+                } else {
+                    std::string msg = "read file error\t" + file;
+                    DEBUG_COUT(msg);
+                    std::this_thread::sleep_for(std::chrono::seconds(1));
+                    exit(1);
+                }
+            }
+        } else {
+            std::string msg = "!file.is_open()\t" + file;
+            DEBUG_COUT(msg);
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            exit(1);
+        }
+    }
+
+    for (auto&& fut : pending_data) {
+        auto block = fut.get();
+        if (block) {
+            if (!blocks.insert({ block->get_block_hash(), block }).second) {
+                DEBUG_COUT("Duplicate block in chain\t" + crypto::bin2hex(block->get_block_hash()));
+                delete block;
+            } else if (!prev_tree.insert({ block->get_prev_hash(), block }).second) {
+                DEBUG_COUT("Branches in block chain\t" + crypto::bin2hex(block->get_prev_hash()) + "\t->\t" + crypto::bin2hex(block->get_block_hash()));
+                blocks.erase(block->get_block_hash());
+                delete block;
+            }
+        }
+    }
+
+    DEBUG_COUT("PARSE BLOCKCHAIN COMPLETE");
+
+    apply_block_chain(blocks, prev_tree, "local storage", false);
+
+    DEBUG_COUT("READ BLOCK COMPLETE");
+}
+
+
+}
