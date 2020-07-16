@@ -33,7 +33,7 @@ void meta_client::send_message(uint64_t request_type, const std::vector<char>& m
     uint64_t magic = METAHASH_MAGIC_NUMBER;
 
     const std::vector<char> public_key = signer.get_pub_key();
-    const std::vector<char> sign = message.size() ? signer.sign(message) : std::vector<char>();
+    const std::vector<char> sign = signer.sign(message);
 
     write_buff.insert(write_buff.end(), reinterpret_cast<char*>(&magic), (reinterpret_cast<char*>(&magic) + sizeof(uint32_t)));
     crypto::append_varint(write_buff, request_id);

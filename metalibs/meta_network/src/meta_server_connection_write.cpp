@@ -37,7 +37,7 @@ void Connection::write_and_close(std::shared_ptr<Connection> pThis)
 void Connection::Reply::serialize(crypto::Signer& _signer, uint64_t reply_id, std::vector<char>& message)
 {
     const auto public_key = _signer.get_pub_key();
-    const auto sign = message.size() ? _signer.sign(message) : std::vector<char>();
+    const auto sign = _signer.sign(message);
     uint32_t magic = METAHASH_MAGIC_NUMBER;
 
     write_buff.insert(write_buff.end(), reinterpret_cast<char*>(&magic), (reinterpret_cast<char*>(&magic) + sizeof(uint32_t)));

@@ -76,7 +76,7 @@ int8_t Request::parse(char* buff_data, size_t buff_size, std::unordered_set<std:
 
     if (message_size && message.empty()) {
         if (fill_sw(message, message_size)) {
-            if (message_size && !crypto::check_sign(message, sign, public_key)) {
+            if (!crypto::check_sign(message, sign, public_key)) {
                 return statics::INVALID_SIGN;
             }
         } else {

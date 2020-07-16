@@ -54,7 +54,7 @@ int8_t ClientConnection::Response::parse(char* buff_data, size_t buff_size, cons
 
     if (message_size && message.empty()) {
         if (fill_sw(message, message_size)) {
-            if (message_size && !crypto::check_sign(message, sign, public_key)) {
+            if (!crypto::check_sign(message, sign, public_key)) {
                 DEBUG_COUT(crypto::bin2hex(sign));
                 DEBUG_COUT(crypto::bin2hex(public_key));
                 DEBUG_COUT("INVALID_SIGN");
