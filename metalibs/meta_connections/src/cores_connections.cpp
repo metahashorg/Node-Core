@@ -2,7 +2,7 @@
 
 namespace metahash::connection {
 
-MetaConnection::MetaConnection(boost::asio::io_context& io_context, const std::string& host, int port, crypto::Signer& signer, bool spectator = false)
+MetaConnection::MetaConnection(boost::asio::io_context& io_context, const std::string& host, int port, crypto::Signer& signer, bool spectator)
     : io_context(io_context)
     , my_host(host)
     , my_port(port)
