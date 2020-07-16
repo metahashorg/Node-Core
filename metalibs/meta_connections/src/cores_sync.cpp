@@ -24,7 +24,7 @@ void MetaConnection::sync_core_lists()
 {
     bool got_new = true;
     while (got_new) {
-        auto resp = send_with_return(RPC_GET_CORE_LIST, get_core_list());
+        auto resp = send_with_return(RPC_GET_CORE_LIST, spectator ? std::vector<char>() : get_core_list());
         got_new = false;
 
         for (auto&& [mh_addr, data] : resp) {

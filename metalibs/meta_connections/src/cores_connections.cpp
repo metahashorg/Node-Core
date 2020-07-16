@@ -2,11 +2,12 @@
 
 namespace metahash::connection {
 
-MetaConnection::MetaConnection(boost::asio::io_context& io_context, const std::string& host, int port, crypto::Signer& signer)
+MetaConnection::MetaConnection(boost::asio::io_context& io_context, const std::string& host, int port, crypto::Signer& signer, bool spectator = false)
     : io_context(io_context)
     , my_host(host)
     , my_port(port)
     , signer(signer)
+    , spectator(spectator)
 {
 }
 
@@ -28,7 +29,8 @@ bool MetaConnection::online(const std::string& addr)
     }
 }
 
-std::set<std::string> MetaConnection::get_online_cores() {
+std::set<std::string> MetaConnection::get_online_cores()
+{
     std::set<std::string> online_cores;
     std::lock_guard lock(core_lock);
     for (auto&& [mh_addr, core] : cores) {

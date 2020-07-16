@@ -22,8 +22,10 @@ private:
 
     crypto::Signer& signer;
 
+    const bool spectator = false;
+
 public:
-    MetaConnection(boost::asio::io_context& io_context, const std::string&, int, crypto::Signer&);
+    MetaConnection(boost::asio::io_context& io_context, const std::string&, int, crypto::Signer&, bool spectator = false);
 
     void init(const std::map<std::string, std::pair<std::string, int>>& core_list);
 
