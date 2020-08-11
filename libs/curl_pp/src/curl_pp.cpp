@@ -1,41 +1,104 @@
 #include <curl_pp.hpp>
 
-size_t curlwritefunc(void* ptr, size_t size, size_t nmemb, std::string* p_resp)
+#include <boost/beast/core.hpp>
+#include <boost/beast/http.hpp>
+#include <utility>
+#include <boost/beast/version.hpp>
+
+#include <memory>
+
+#include <iostream>
+
+namespace http::client {
+
+struct session {
+    boost::asio::ip::tcp::resolver resolver;
+    boost::beast::tcp_stream stream;
+    boost::beast::flat_buffer buffer;
+    boost::beast::http::request<boost::beast::http::string_body> req;
+    boost::beast::http::response<boost::beast::http::string_body> res;
+
+    std::function<void(bool, std::string)> func;
+
+    explicit session(boost::asio::io_context& ioc)
+        : resolver(boost::asio::make_strand(ioc))
+        , stream(boost::asio::make_strand(ioc))
+    {
+    }
+};
+
+void read(std::shared_ptr<session> session)
 {
-    std::string& resp = *p_resp;
-    resp.insert(resp.end(), reinterpret_cast<char*>(ptr), reinterpret_cast<char*>(ptr) + nmemb);
-    return size * nmemb;
+    boost::beast::http::async_read(session->stream, session->buffer, session->res, [session](boost::beast::error_code err, std::size_t) {
+        if (err) {
+            return session->func(false, "read");
+        }
+
+        session->func(true, session->res.body());
+
+        session->stream.socket().shutdown(boost::asio::ip::tcp::socket::shutdown_both, err);
+    });
 }
 
-bool CurlFetch::post(const std::string& url, const std::string& reques_string, std::string& response)
+void write(std::shared_ptr<session> session)
 {
-    if (!curl) {
-        curl = curl_easy_init();
-    }
+    session->stream.expires_after(std::chrono::seconds(300));
 
-    std::string path;
-    if (!url.empty() && url[0] == '/') {
-        path.insert(path.end(), url.begin() + 1, url.end());
-    } else {
-        path = url;
-    }
+    boost::beast::http::async_write(session->stream, session->req, [session](boost::beast::error_code err, std::size_t) {
+        if (err) {
+            std::cout << err.message() << std::endl;
+            return session->func(false, "write");
+        }
 
-    std::string full_url = "http://" + host + "/" + url;
-    curl_easy_setopt(curl, CURLOPT_URL, full_url.c_str());
-    curl_easy_setopt(curl, CURLOPT_PORT, port);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, reques_string.size());
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, reques_string.data());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curlwritefunc);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);
-    int ret = curl_easy_perform(curl);
+        read(session);
+    });
+}
 
-    if (!ret) {
-        return true;
-    }
+void connect(std::shared_ptr<session> session, const boost::asio::ip::tcp::resolver::results_type& results)
+{
+    session->stream.expires_after(std::chrono::seconds(300));
 
-    curl_easy_cleanup(curl);
-    curl = nullptr;
+    session->stream.async_connect(results, [session](boost::beast::error_code err, const boost::asio::ip::tcp::resolver::results_type::endpoint_type&) {
+        if (err) {
+            return session->func(false, "connect");
+        }
 
-    return false;
+        write(session);
+    });
+}
+
+void resolve(std::shared_ptr<session> session, const std::string& host, const std::string& port)
+{
+    session->resolver.async_resolve(host, port, [session](boost::beast::error_code err, const boost::asio::ip::tcp::resolver::results_type& results) {
+        if (err) {
+            return session->func(false, "resolve");
+        }
+
+        // Set a timeout on the operation
+
+        connect(session, results);
+    });
+}
+
+void run(std::shared_ptr<session> session, const std::string& host, const std::string& port, const std::string& url, const std::string& data, std::function<void(bool, std::string)> func)
+{
+    session->func = std::move(func);
+
+    session->req.method(boost::beast::http::verb::post);
+    session->req.set(boost::beast::http::field::content_type, "text/plain");
+    session->req.body() = data;
+    session->req.target(url);
+    session->req.set(boost::beast::http::field::host, host);
+    session->req.set(boost::beast::http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+    session->req.prepare_payload();
+
+    resolve(session, host, port);
+}
+
+void send_message_with_callback(boost::asio::io_context& io_context, const std::string& host, const std::string& port, const std::string& url, const std::string& data, std::function<void(bool , std::string)> func)
+{
+    auto sssn = std::make_shared<session>(io_context);
+    run(sssn, host, port, url, data, func);
+}
+
 }

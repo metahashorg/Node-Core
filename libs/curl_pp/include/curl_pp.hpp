@@ -1,25 +1,15 @@
 #ifndef MHCURL_HPP
 #define MHCURL_HPP
 
-#include <curl/curl.h>
-
 #include <string>
-#include <utility>
+#include <functional>
 
-class CurlFetch {
-private:
-    CURL* curl = nullptr;
-    std::string host;
-    int port;
+#include <boost/asio.hpp>
 
-public:
-    CurlFetch(std::string _host, int _port)
-        : host(std::move(_host))
-        , port(_port)
-    {
-    }
+namespace http::client {
 
-    bool post(const std::string& url, const std::string& reques_string, std::string& response);
-};
+void send_message_with_callback(boost::asio::io_context& ioc, const std::string& host, const std::string& port, const std::string& url, const std::string& data, std::function<void(bool, std::string)>);
+
+}
 
 #endif // MHCURL_HPP

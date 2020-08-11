@@ -20,13 +20,13 @@ int main(int argc, char** argv)
 
     parse_settings(std::string(argv[1]), network, host, tx_port, path, known_hash, key, core_list);
 
-    auto thread_count = std::thread::hardware_concurrency();
+    auto thread_count = std::thread::hardware_concurrency() - 1;
     boost::asio::io_context io_context(thread_count);
     auto&& [threads, work] = metahash::pool::thread_pool(io_context, thread_count);
 
     BlockChainController blockChainController(io_context, key, path, known_hash, core_list, { host, tx_port });
 
-    std::thread(libevent, std::ref(blockChainController.get_wallet_statistics()), std::ref(blockChainController.get_wallet_request_addresses()), "wsstata.metahash.io", 80, "net-test").detach();
+    libevent(io_context, blockChainController.get_wallet_statistics(), blockChainController.get_wallet_request_addresses(), "wsstata.metahash.io", 80, "net-test");
 
     io_context.run();
 
