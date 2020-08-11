@@ -18,7 +18,7 @@ void print_config_file_params_and_exit()
   "hash": "85e6c78616632e4fba97efb1dfb403834fe909bc34e3c7efa836ff2ea974ba9b",
   "cores": [
     {
-      "network": "0x00fca67778165988703a302c1dfc34fd6036e209a20666969e",
+      "address": "0x00fca67778165988703a302c1dfc34fd6036e209a20666969e",
       "host": "31.172.81.114",
       "port": 9999
     }
