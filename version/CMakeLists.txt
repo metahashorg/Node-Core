@@ -1,4 +1,4 @@
-project(version VERSION 0.1 LANGUAGES CXX)
+project(version VERSION 0.4 LANGUAGES CXX)
 
 # Get current working branch
 execute_process(
