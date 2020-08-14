@@ -9,8 +9,8 @@ void ControllerImplementation::main_loop()
     uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
     bool no_sleep = false;
 
-    if (timestamp != dbg_timestamp) {
-        DEBUG_COUT("P\tTX\tGCL\tA\tD\tLB\tGB\tGC\tCLA\tPB\tN");
+    if (timestamp > dbg_timestamp + 60) {
+        DEBUG_COUT("PING\tTX\tGetCL\tA+\tD-\tLastB\tGetB\tGetCh\tCLA+\tPRETEND\tNone");
         DEBUG_COUT(std::to_string(dbg_RPC_PING) +
             "\t" + std::to_string(dbg_RPC_TX) +
             "\t" + std::to_string(dbg_RPC_GET_CORE_LIST) +

@@ -27,10 +27,16 @@ std::map<std::string, std::vector<char>> MetaConnection::send_with_return(uint64
         }
     }
 
-    for (auto&& [mh_addr, future] : futures) {
-        auto data = future.get();
+    uint64_t timestamp_deadline = 10 + static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
 
-        resp_strings[mh_addr] = data;
+    for (auto&& [mh_addr, future] : futures) {
+        uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
+
+        auto duration = timestamp > timestamp_deadline ? 0 : timestamp_deadline - timestamp;
+        auto status = future.wait_for(std::chrono::seconds(duration));
+        if (status == std::future_status::ready) {
+            resp_strings[mh_addr] = future.get();
+        }
     }
 
     return resp_strings;
@@ -58,7 +64,12 @@ std::vector<char> MetaConnection::send_with_return_to_core(const std::string& ad
         }
     }
 
-    return future.get();
+    auto status = future.wait_for(std::chrono::seconds(10));
+    if (status == std::future_status::ready) {
+        return future.get();
+    }
+
+    return std::vector<char>();
 }
 
 }
