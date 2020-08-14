@@ -14,7 +14,6 @@
 
 namespace metahash::meta_core {
 
-
 struct ControllerImplementation {
 private:
     meta_chain::BlockChain* BC;
@@ -58,6 +57,19 @@ private:
 
     bool goon = true;
 
+    uint64_t dbg_timestamp = 0;
+    std::atomic<uint64_t> dbg_RPC_PING = 0;
+    std::atomic<uint64_t> dbg_RPC_TX = 0;
+    std::atomic<uint64_t> dbg_RPC_GET_CORE_LIST = 0;
+    std::atomic<uint64_t> dbg_RPC_APPROVE = 0;
+    std::atomic<uint64_t> dbg_RPC_DISAPPROVE = 0;
+    std::atomic<uint64_t> dbg_RPC_LAST_BLOCK = 0;
+    std::atomic<uint64_t> dbg_RPC_GET_BLOCK = 0;
+    std::atomic<uint64_t> dbg_RPC_GET_CHAIN = 0;
+    std::atomic<uint64_t> dbg_RPC_CORE_LIST_APPROVE = 0;
+    std::atomic<uint64_t> dbg_RPC_PRETEND_BLOCK = 0;
+    std::atomic<uint64_t> dbg_RPC_NONE = 0;
+
 public:
     ControllerImplementation(
         boost::asio::io_context& io_context,
@@ -66,7 +78,6 @@ public:
         const std::string& proved_hash,
         const std::map<std::string, std::pair<std::string, int>>& core_list,
         const std::pair<std::string, int>& host_port);
-
 
     std::atomic<std::map<std::string, std::pair<uint, uint>>*>& get_wallet_statistics();
     std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& get_wallet_request_addresses();
