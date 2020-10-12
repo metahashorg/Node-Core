@@ -1,7 +1,7 @@
 #include <meta_chain.h>
 
-#include <meta_log.hpp>
 #include <meta_constants.hpp>
+#include <meta_log.hpp>
 
 namespace metahash::meta_chain {
 
@@ -49,23 +49,6 @@ bool BlockChain::can_apply_forging_block(block::Block* block)
                     f_wallet->set_founder_limit();
                 }
             } break;
-//            case TX_STATE_FORGING_DAPP: {
-//                if (tx.data.size() != 25) {
-//                    DEBUG_COUT("wrong dapp addres");
-//                    return false;
-//                }
-//
-//                auto* wallet_from = dynamic_cast<meta_wallet::DecentralizedApplication*>(wallet_map.get_wallet(addr_to));
-//                if (!wallet_from) {
-//                    DEBUG_COUT("wrong wallet type");
-//                    return false;
-//                }
-//
-//                if (!wallet_from->sub(wallet_to, &tx, 0)) {
-//                    DEBUG_COUT("not enough money on dapp wallet");
-//                    return false;
-//                }
-//            } break;
             default:
                 DEBUG_COUT("wrong tx state\t" + std::to_string(tx.state));
                 return false;

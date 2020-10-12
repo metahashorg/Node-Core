@@ -1,7 +1,7 @@
 #include <meta_chain.h>
 
-#include <meta_log.hpp>
 #include <meta_constants.hpp>
+#include <meta_log.hpp>
 
 #include <random>
 

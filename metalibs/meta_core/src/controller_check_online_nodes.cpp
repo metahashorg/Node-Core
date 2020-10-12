@@ -1,6 +1,6 @@
-#include <meta_log.hpp>
-#include <meta_constants.hpp>
 #include "controller.hpp"
+#include <meta_constants.hpp>
+#include <meta_log.hpp>
 
 #include <cmath>
 #include <random>

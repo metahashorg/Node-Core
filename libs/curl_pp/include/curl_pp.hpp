@@ -1,8 +1,8 @@
 #ifndef MHCURL_HPP
 #define MHCURL_HPP
 
-#include <string>
 #include <functional>
+#include <string>
 
 #include <boost/asio.hpp>
 

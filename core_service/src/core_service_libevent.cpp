@@ -29,7 +29,7 @@ struct sync_stat {
         , host(host)
         , port(std::to_string(port))
         , key_type(network == "net-dev" ? "keys_tmh" : "keys_mth")
-        ,timer(ioc, boost::posix_time::minutes(15))
+        , timer(ioc, boost::posix_time::minutes(15))
     {
     }
 
@@ -65,7 +65,8 @@ struct sync_stat {
         return request_string;
     }
 
-    std::map<std::string, std::map<std::string, std::tuple<uint64_t, uint64_t, uint64_t>>> parse_response(const std::string& response) {
+    std::map<std::string, std::map<std::string, std::tuple<uint64_t, uint64_t, uint64_t>>> parse_response(const std::string& response)
+    {
         std::map<std::string, std::map<std::string, std::tuple<uint64_t, uint64_t, uint64_t>>> addr_stat_map;
 
         rapidjson::Document addr_stat;
@@ -75,7 +76,6 @@ struct sync_stat {
 
                 if (data.HasMember(key_type.c_str()) && data[key_type.c_str()].IsArray()) {
                     const auto& addrs = data[key_type.c_str()];
-
 
                     for (uint i = 0; i < addrs.Size(); i++) {
                         auto& record = addrs[i];
@@ -100,7 +100,8 @@ struct sync_stat {
         return addr_stat_map;
     }
 
-    void perform() {
+    void perform()
+    {
         if (auto* p_addresses = get_addresses(); p_addresses != nullptr) {
             std::deque<std::pair<std::string, uint64_t>> addresses(*p_addresses);
 
@@ -201,7 +202,8 @@ void libevent(
     std::atomic<std::map<std::string, std::pair<uint, uint>>*>& statistics,
     std::atomic<std::deque<std::pair<std::string, uint64_t>>*>& request_addreses,
     const std::string& host, int port,
-    const std::string& network) {
+    const std::string& network)
+{
 
     auto* sstat = new sync_stat(ioc, statistics, request_addreses, host, port, network);
     sstat->perform();

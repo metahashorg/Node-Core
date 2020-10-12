@@ -6,8 +6,8 @@
 #include <string>
 #include <unordered_map>
 
-#include <meta_transaction.h>
 #include <meta_crypto.h>
+#include <meta_transaction.h>
 
 namespace metahash::meta_wallet {
 

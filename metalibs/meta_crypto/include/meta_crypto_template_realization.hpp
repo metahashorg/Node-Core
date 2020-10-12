@@ -48,7 +48,7 @@ std::vector<char> Signer::sign(const Container& data)
     return sign_data(data, private_key);
 }
 
-std::string bin2hex(const unsigned char* data, uint64_t size) ;
+std::string bin2hex(const unsigned char* data, uint64_t size);
 
 template <typename Container>
 std::string bin2hex(const Container& bin_msg)
@@ -75,7 +75,7 @@ std::string int2bin(T i)
     return stream.str();
 }
 
-uint8_t read_varint(uint64_t& varint, const char * data, uint64_t size);
+uint8_t read_varint(uint64_t& varint, const char* data, uint64_t size);
 
 template <typename Message>
 uint8_t read_varint(uint64_t& varint, const Message& data)
@@ -176,7 +176,7 @@ bool check_sign(const DataContainer& data, const SignContainer& sign, const PubK
     }
 
     std::vector<char> data_as_vector;
-    data_as_vector.insert(data_as_vector.end(),data.begin(),data.end());
+    data_as_vector.insert(data_as_vector.end(), data.begin(), data.end());
 
     if (CheckBufferSignature(pubkey, data_as_vector, signature)) {
         EVP_PKEY_free(pubkey);

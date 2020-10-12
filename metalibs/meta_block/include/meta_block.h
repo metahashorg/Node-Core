@@ -34,7 +34,6 @@ public:
     const std::vector<transaction::TX> get_txs(boost::asio::io_context& io_context);
 
     bool parse(std::string_view block_sw) override;
-//    bool make(uint64_t timestamp, const sha256_2& new_prev_hash, const std::vector<transaction::TX*>&);
 };
 
 class ApproveBlock : public Block {

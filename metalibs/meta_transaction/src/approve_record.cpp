@@ -4,7 +4,7 @@ namespace metahash::transaction {
 
 bool ApproveRecord::make(
     const sha256_2& approving_block_hash,
-    crypto::Signer & signer)
+    crypto::Signer& signer)
 {
     std::vector<char> PubKey = signer.get_pub_key();
     std::vector<char> sign_buff = signer.sign(approving_block_hash);

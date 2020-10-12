@@ -1,6 +1,6 @@
 #include <meta_chain.h>
-#include <meta_log.hpp>
 #include <meta_constants.hpp>
+#include <meta_log.hpp>
 
 namespace metahash::meta_chain {
 
@@ -12,6 +12,7 @@ bool BlockChain::can_apply_block(block::Block* block)
 bool BlockChain::apply_block(block::Block* block)
 {
     if (try_apply_block(block, true)) {
+        clear = false;
         prev_hash = block->get_block_hash();
         if (block->get_block_type() == BLOCK_TYPE_STATE) {
             state_hash_xx64 = crypto::get_xxhash64(block->get_data());
@@ -30,7 +31,7 @@ bool BlockChain::apply_block(block::Block* block)
 
         return true;
     }
-    DEBUG_COUT("block is corrupt");
+
     wallet_map.clear_changes();
     return false;
 }
@@ -69,6 +70,5 @@ const std::unordered_map<std::string, std::set<std::string>, crypto::Hasher>& Bl
 {
     return node_state;
 }
-
 
 }

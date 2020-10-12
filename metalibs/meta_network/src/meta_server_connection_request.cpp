@@ -1,5 +1,5 @@
-#include <meta_server.h>
 #include <meta_common.h>
+#include <meta_server.h>
 
 namespace metahash::network {
 

@@ -2,9 +2,9 @@
 
 #include <meta_chain.h>
 
-#include <meta_log.hpp>
-#include <meta_crypto.h>
 #include <meta_constants.hpp>
+#include <meta_crypto.h>
+#include <meta_log.hpp>
 
 namespace metahash::meta_chain {
 

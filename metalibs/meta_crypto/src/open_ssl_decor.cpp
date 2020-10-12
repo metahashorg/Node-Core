@@ -2,7 +2,8 @@
 
 namespace metahash::crypto {
 
-std::string bin2hex(const unsigned char* data, uint64_t size) {
+std::string bin2hex(const unsigned char* data, uint64_t size)
+{
     static const char HexLookup[513] = {
         "000102030405060708090a0b0c0d0e0f"
         "101112131415161718191a1b1c1d1e1f"
@@ -33,7 +34,8 @@ std::string bin2hex(const unsigned char* data, uint64_t size) {
     return res;
 }
 
-uint8_t read_varint(uint64_t& varint, const char * data, uint64_t size) {
+uint8_t read_varint(uint64_t& varint, const char* data, uint64_t size)
+{
     if (size < 1)
         return 0;
 
@@ -174,7 +176,8 @@ bool CheckBufferSignature(EVP_PKEY* publicKey, const std::vector<char>& data, EC
     return false;
 }
 
-std::array<char, 25> make_address(std::vector<unsigned char>& bpubk) {
+std::array<char, 25> make_address(std::vector<unsigned char>& bpubk)
+{
     unsigned char* data = bpubk.data();
     int size = bpubk.size();
     if (data && size >= 65) {
@@ -214,7 +217,6 @@ std::array<char, 25> make_address(std::vector<unsigned char>& bpubk) {
     }
 
     return std::array<char, 25> { 0 };
-
 }
 
 std::pair<unsigned char*, uint64_t> make_public_key(EVP_PKEY* pkey)
@@ -268,7 +270,7 @@ std::vector<char> make_sign(const char* data, uint64_t size, EVP_PKEY* pkey)
 
     std::vector<char> signature_temp_buff(signature_size);
 
-    if (EVP_DigestSignFinal(md, reinterpret_cast<unsigned char *>(signature_temp_buff.data()), &signature_size) != 1) {
+    if (EVP_DigestSignFinal(md, reinterpret_cast<unsigned char*>(signature_temp_buff.data()), &signature_size) != 1) {
         EVP_PKEY_free(pkey);
         EVP_MD_CTX_destroy(md);
         return std::vector<char>();

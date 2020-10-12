@@ -1,5 +1,5 @@
-#include <meta_log.hpp>
 #include <date.h>
+#include <meta_log.hpp>
 
 #include <iomanip>
 #include <iostream>

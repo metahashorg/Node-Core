@@ -1,5 +1,5 @@
-#include <meta_wallet.h>
 #include <meta_log.hpp>
+#include <meta_wallet.h>
 
 #include <rapidjson/document.h>
 

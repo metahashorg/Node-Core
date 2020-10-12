@@ -1,5 +1,5 @@
-#include <meta_wallet.h>
 #include <meta_constants.hpp>
+#include <meta_wallet.h>
 
 namespace metahash::meta_wallet {
 
@@ -39,8 +39,6 @@ Wallet* WalletMap::wallet_factory(const std::string& addr)
     switch (int_family) {
     case 0x00:
         return new CommonWallet(changed_wallets);
-//    case 0x16:
-//        return new DecentralizedApplication(changed_wallets);
     default:
         return new CommonWallet(changed_wallets);
     }

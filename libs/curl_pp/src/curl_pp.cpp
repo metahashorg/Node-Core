@@ -2,8 +2,8 @@
 
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
-#include <utility>
 #include <boost/beast/version.hpp>
+#include <utility>
 
 #include <memory>
 
@@ -95,7 +95,7 @@ void run(std::shared_ptr<session> session, const std::string& host, const std::s
     resolve(session, host, port);
 }
 
-void send_message_with_callback(boost::asio::io_context& io_context, const std::string& host, const std::string& port, const std::string& url, const std::string& data, std::function<void(bool , std::string)> func)
+void send_message_with_callback(boost::asio::io_context& io_context, const std::string& host, const std::string& port, const std::string& url, const std::string& data, std::function<void(bool, std::string)> func)
 {
     auto sssn = std::make_shared<session>(io_context);
     run(sssn, host, port, url, data, func);

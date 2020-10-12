@@ -63,11 +63,12 @@ public:
 
     std::set<std::string> check_addr(const std::string& addr);
     const std::unordered_map<std::string, std::set<std::string>, crypto::Hasher>& get_node_state();
+
 private:
     static block::Block* make_block(uint64_t b_type, uint64_t b_time, sha256_2 prev_b_hash, std::vector<char>& tx_buff);
 
-    static uint64_t get_fee(uint64_t cnt) ;
-    static uint64_t FORGING_POOL(uint64_t ts) ;
+    static uint64_t get_fee(uint64_t cnt);
+    static uint64_t FORGING_POOL(uint64_t ts);
 
     bool try_apply_block(block::Block* block, bool apply);
     bool can_apply_common_block(block::Block* block);

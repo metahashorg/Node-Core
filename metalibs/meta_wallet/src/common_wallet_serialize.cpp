@@ -34,7 +34,7 @@ std::tuple<uint64_t, uint64_t, std::string> CommonWallet::serialize()
             writer.Uint64(get_trust() * 5);
         }
 
-        if (addition->delegate_to_daly_snapshot.size()) {
+        if (!addition->delegate_to_daly_snapshot.empty()) {
             has_json = true;
             writer.String("delegate_to");
             writer.StartArray();
@@ -49,7 +49,7 @@ std::tuple<uint64_t, uint64_t, std::string> CommonWallet::serialize()
             writer.EndArray();
         }
 
-        if (addition->delegated_from_daly_snapshot.size()) {
+        if (!addition->delegated_from_daly_snapshot.empty()) {
             has_json = true;
             writer.String("delegated_from");
             writer.StartArray();

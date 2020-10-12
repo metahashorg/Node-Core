@@ -111,7 +111,7 @@ struct ApproveRecord {
     bool approve;
 
     bool parse(std::string_view);
-    bool make(const sha256_2& approving_block_hash, crypto::Signer & signer);
+    bool make(const sha256_2& approving_block_hash, crypto::Signer& signer);
 };
 
 struct RejectedTXInfo {
