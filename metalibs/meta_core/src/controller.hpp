@@ -86,18 +86,20 @@ private:
     void main_loop();
 
     std::vector<char> add_pack_to_queue(network::Request& request);
-    void parse_S_PING(std::string_view);
-    void parse_B_TX(std::string_view);
-    void parse_C_PRETEND_BLOCK(std::string_view);
-    void parse_C_APPROVE(std::string_view);
-    void parse_C_DISAPPROVE(std::string_view);
-    std::vector<char> parse_S_LAST_BLOCK(std::string_view);
-    std::vector<char> parse_S_GET_BLOCK(std::string_view);
-    std::vector<char> parse_S_GET_CHAIN(std::string_view);
-    std::vector<char> parse_S_GET_CORE_LIST(std::string_view);
-    void parse_S_CORE_LIST_APPROVE(std::string core, std::string_view);
 
     void approve_block(block::Block*);
+    void log_network_statistics(uint64_t timestamp);
+    void parse_RPC_TX(std::string_view);
+    void parse_RPC_PRETEND_BLOCK(std::string_view);
+    void parse_RPC_APPROVE(std::string_view);
+    void parse_RPC_DISAPPROVE(std::string_view);
+    std::vector<char> parse_RPC_GET_APPROVE(std::string_view);
+    std::vector<char> parse_RPC_LAST_BLOCK(std::string_view);
+    std::vector<char> parse_RPC_GET_BLOCK(std::string_view);
+    std::vector<char> parse_RPC_GET_CHAIN(std::string_view);
+    std::vector<char> parse_RPC_GET_MISSING_BLOCK_LIST(std::string_view);
+    std::vector<char> parse_RPC_GET_CORE_LIST(std::string_view);
+    void parse_RPC_CORE_LIST_APPROVE(std::string core, std::string_view);
     void disapprove_block(block::Block*);
     void apply_approve(transaction::ApproveRecord*);
 

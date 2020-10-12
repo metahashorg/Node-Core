@@ -9,34 +9,7 @@ void ControllerImplementation::main_loop()
     uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
     bool no_sleep = false;
 
-    if (timestamp > dbg_timestamp + 60) {
-        DEBUG_COUT("PING\tTX\tGetCL\tA+\tD-\tLastB\tGetB\tGetCh\tCLA+\tPRETEND\tNone");
-        DEBUG_COUT(std::to_string(dbg_RPC_PING) +
-            "\t" + std::to_string(dbg_RPC_TX) +
-            "\t" + std::to_string(dbg_RPC_GET_CORE_LIST) +
-            "\t" + std::to_string(dbg_RPC_APPROVE) +
-            "\t" + std::to_string(dbg_RPC_DISAPPROVE) +
-            "\t" + std::to_string(dbg_RPC_LAST_BLOCK) +
-            "\t" + std::to_string(dbg_RPC_GET_BLOCK) +
-            "\t" + std::to_string(dbg_RPC_GET_CHAIN) +
-            "\t" + std::to_string(dbg_RPC_CORE_LIST_APPROVE) +
-            "\t" + std::to_string(dbg_RPC_PRETEND_BLOCK) +
-            "\t" + std::to_string(dbg_RPC_NONE));
-
-        dbg_RPC_PING = 0;
-        dbg_RPC_TX = 0;
-        dbg_RPC_GET_CORE_LIST = 0;
-        dbg_RPC_APPROVE = 0;
-        dbg_RPC_DISAPPROVE = 0;
-        dbg_RPC_LAST_BLOCK = 0;
-        dbg_RPC_GET_BLOCK = 0;
-        dbg_RPC_GET_CHAIN = 0;
-        dbg_RPC_CORE_LIST_APPROVE = 0;
-        dbg_RPC_PRETEND_BLOCK = 0;
-        dbg_RPC_NONE = 0;
-
-        dbg_timestamp = timestamp;
-    }
+    log_network_statistics(timestamp);
 
     if (timestamp - last_sync_timestamp > 60) {
         DEBUG_COUT("sync_core_lists");
