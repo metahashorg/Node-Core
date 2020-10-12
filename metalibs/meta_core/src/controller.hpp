@@ -105,7 +105,8 @@ private:
     void distribute(transaction::ApproveRecord*);
 
     void write_block(block::Block*);
-    bool try_make_block();
+
+    bool try_make_block(uint64_t timestamp);
 
     void read_and_apply_local_chain();
     void actualize_chain();
@@ -119,8 +120,8 @@ private:
 
     void try_apply_block(block::Block*);
     bool master();
-    bool check_online_nodes();
-    std::vector<char> make_pretend_core_list();
+    bool check_online_nodes(uint64_t timestamp);
+    std::vector<char> make_pretend_core_list(uint64_t current_generation);
 };
 
 }

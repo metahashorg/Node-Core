@@ -4,9 +4,8 @@
 
 namespace metahash::meta_core {
 
-bool ControllerImplementation::try_make_block()
+bool ControllerImplementation::try_make_block(uint64_t timestamp)
 {
-    uint64_t timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
     if (last_applied_block == last_created_block) {
         if (prev_timestamp >= timestamp) {
             return false;

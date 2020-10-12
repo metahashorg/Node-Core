@@ -7,10 +7,9 @@
 
 namespace metahash::meta_core {
 
-bool ControllerImplementation::check_online_nodes()
+bool ControllerImplementation::check_online_nodes(uint64_t timestamp)
 {
-    auto current_timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
-    auto current_generation = current_timestamp / CORE_LIST_RENEW_PERIOD;
+    auto current_generation = timestamp / CORE_LIST_RENEW_PERIOD;
 
     auto online_cores = cores.get_online_cores();
 
@@ -23,7 +22,7 @@ bool ControllerImplementation::check_online_nodes()
         if (current_generation - core_list_generation == 1) {
             accept_count = min_approve;
             if (std::find(current_cores.begin(), current_cores.end(), signer.get_mh_addr()) != std::end(current_cores)) {
-                auto list = make_pretend_core_list();
+                auto list = make_pretend_core_list(current_generation);
                 if (!list.empty()) {
                     cores.send_no_return(RPC_CORE_LIST_APPROVE, list);
                 }
@@ -32,7 +31,7 @@ bool ControllerImplementation::check_online_nodes()
                 string_list.insert(string_list.end(), list.begin(), list.end());
             }
         } else {
-            auto list = make_pretend_core_list();
+            auto list = make_pretend_core_list(current_generation);
             if (!list.empty()) {
                 cores.send_no_return(RPC_CORE_LIST_APPROVE, list);
             }
@@ -74,7 +73,7 @@ bool ControllerImplementation::check_online_nodes()
     return true;
 }
 
-std::vector<char> ControllerImplementation::make_pretend_core_list()
+std::vector<char> ControllerImplementation::make_pretend_core_list(uint64_t current_generation)
 {
     std::deque<std::string> cores_list;
     const auto nodes = BC->get_node_state();
@@ -89,7 +88,7 @@ std::vector<char> ControllerImplementation::make_pretend_core_list()
     std::string master;
     std::set<std::string> slaves;
     if (cores_list.size() >= METAHASH_PRIMARY_CORES_COUNT) {
-        uint64_t last_block_hash_xx64 = crypto::get_xxhash64(blocks[last_applied_block]->get_data());
+        uint64_t last_block_hash_xx64 = crypto::get_xxhash64(aplied_blocks[last_applied_block]->get_data()) + current_generation;
         {
             std::sort(cores_list.begin(), cores_list.end());
             std::mt19937_64 r;
