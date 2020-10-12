@@ -7,11 +7,7 @@
 
 namespace metahash::meta_core {
 
-void ControllerImplementation::parse_S_PING(std::string_view)
-{
-}
-
-void ControllerImplementation::parse_B_TX(std::string_view pack)
+void ControllerImplementation::parse_RPC_TX(std::string_view pack)
 {
     auto* tx_list = new std::list<transaction::TX*>();
 
@@ -60,7 +56,7 @@ void ControllerImplementation::parse_B_TX(std::string_view pack)
     }
 }
 
-void ControllerImplementation::parse_C_PRETEND_BLOCK(std::string_view pack)
+void ControllerImplementation::parse_RPC_PRETEND_BLOCK(std::string_view pack)
 {
     std::string_view block_sw(pack);
     auto* block = block::parse_block(block_sw);
@@ -88,7 +84,7 @@ void ControllerImplementation::parse_C_PRETEND_BLOCK(std::string_view pack)
     }
 }
 
-void ControllerImplementation::parse_C_APPROVE(std::string_view pack)
+void ControllerImplementation::parse_RPC_APPROVE(std::string_view pack)
 {
     std::string_view approve_sw(pack);
     auto* p_ar = new transaction::ApproveRecord;
@@ -103,7 +99,7 @@ void ControllerImplementation::parse_C_APPROVE(std::string_view pack)
     }
 }
 
-void ControllerImplementation::parse_C_DISAPPROVE(std::string_view pack)
+void ControllerImplementation::parse_RPC_DISAPPROVE(std::string_view pack)
 {
     std::string_view approve_sw(pack);
     auto* p_ar = new transaction::ApproveRecord;
@@ -118,7 +114,7 @@ void ControllerImplementation::parse_C_DISAPPROVE(std::string_view pack)
     }
 }
 
-std::vector<char> ControllerImplementation::parse_S_LAST_BLOCK(std::string_view)
+std::vector<char> ControllerImplementation::parse_RPC_GET_APPROVE(std::string_view pack)
 {
     std::vector<char> last_block;
     last_block.insert(last_block.end(), last_applied_block.begin(), last_applied_block.end());
@@ -128,7 +124,7 @@ std::vector<char> ControllerImplementation::parse_S_LAST_BLOCK(std::string_view)
     return last_block;
 }
 
-std::vector<char> ControllerImplementation::parse_S_GET_BLOCK(std::string_view pack)
+std::vector<char> ControllerImplementation::parse_RPC_GET_BLOCK(std::string_view pack)
 {
     if (pack.size() < 32) {
         DEBUG_COUT("pack.size() < 32");
@@ -149,7 +145,7 @@ std::vector<char> ControllerImplementation::parse_S_GET_BLOCK(std::string_view p
     return std::vector<char>();
 }
 
-std::vector<char> ControllerImplementation::parse_S_GET_CHAIN(std::string_view pack)
+std::vector<char> ControllerImplementation::parse_RPC_GET_CHAIN(std::string_view pack)
 {
     sha256_2 prev_block = { { 0 } };
     //    DEBUG_COUT(std::to_string(pack.size()));
@@ -179,14 +175,14 @@ std::vector<char> ControllerImplementation::parse_S_GET_CHAIN(std::string_view p
     return chain;
 }
 
-std::vector<char> ControllerImplementation::parse_S_GET_CORE_LIST(std::string_view pack)
+std::vector<char> ControllerImplementation::parse_RPC_GET_CORE_LIST(std::string_view pack)
 {
     cores.add_cores(pack);
 
     return cores.get_core_list();
 }
 
-void ControllerImplementation::parse_S_CORE_LIST_APPROVE(std::string core, std::string_view pack)
+void ControllerImplementation::parse_RPC_CORE_LIST_APPROVE(std::string core, std::string_view pack)
 {
     uint64_t current_timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
     uint64_t current_generation = current_timestamp / CORE_LIST_RENEW_PERIOD;
