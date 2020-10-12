@@ -2,8 +2,8 @@
 #define META_CONNECTIONS_HPP
 
 #include <map>
-#include <mutex>
 #include <set>
+#include <shared_mutex>
 
 #include <meta_client.h>
 
@@ -13,7 +13,7 @@ class MetaConnection {
 private:
     const uint64_t concurrent_connections_count = 2;
 
-    std::mutex core_lock;
+    std::shared_mutex core_lock;
     std::map<std::string, network::meta_client*> cores;
 
     boost::asio::io_context& io_context;

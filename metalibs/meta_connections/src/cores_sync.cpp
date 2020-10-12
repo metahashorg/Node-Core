@@ -46,7 +46,7 @@ void MetaConnection::add_cores(std::string_view pack)
 
 void MetaConnection::add_new_cores(const std::set<std::tuple<std::string, std::string, int>>& hosts)
 {
-    std::lock_guard lock(core_lock);
+    std::unique_lock lock(core_lock);
     for (auto&& [addr, host, port] : hosts) {
         if (addr != signer.get_mh_addr()) {
             if (cores.find(addr) == cores.end()) {
@@ -58,7 +58,7 @@ void MetaConnection::add_new_cores(const std::set<std::tuple<std::string, std::s
 
 std::vector<char> MetaConnection::get_core_list()
 {
-    std::lock_guard lock(core_lock);
+    std::shared_lock lock(core_lock);
 
     std::vector<char> core_list;
 

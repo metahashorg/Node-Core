@@ -21,7 +21,7 @@ void MetaConnection::init(const std::map<std::string, std::pair<std::string, int
 
 bool MetaConnection::online(const std::string& addr)
 {
-    std::lock_guard lock(core_lock);
+    std::shared_lock lock(core_lock);
     if (cores.find(addr) != cores.end()) {
         return cores[addr]->online();
     } else {
@@ -32,7 +32,7 @@ bool MetaConnection::online(const std::string& addr)
 std::set<std::string> MetaConnection::get_online_cores()
 {
     std::set<std::string> online_cores;
-    std::lock_guard lock(core_lock);
+    std::shared_lock lock(core_lock);
     for (auto&& [mh_addr, core] : cores) {
         if (core->online()) {
             online_cores.insert(mh_addr);
