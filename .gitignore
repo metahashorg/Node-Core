@@ -1,2 +1,5 @@
 /*build*
 /.vscode/
+/.vs
+/out/build/WSL-GCC-Debug
+/CMakeSettings.json
