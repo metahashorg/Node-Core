@@ -3,6 +3,7 @@
 
 #include <iomanip>
 #include <iostream>
+#include <vector>
 
 namespace metahash::log {
 moodycamel::ConcurrentQueue<std::stringstream*>* output_queue = new moodycamel::ConcurrentQueue<std::stringstream*>();
@@ -10,20 +11,25 @@ std::thread* cout_printer = new std::thread([]() {
     moodycamel::ConsumerToken ct(*output_queue);
 
     for (;;) {
-        std::stringstream* p_ssout;
-        if (output_queue->try_dequeue(ct, p_ssout)) {
+        std::vector<std::stringstream*> ssout_list(1000);
+        if (auto size = output_queue->try_dequeue_bulk(ct, ssout_list.begin(), 1000)) {
+            for (auto i = 0; i < size; i++) {
+                std::cout << ssout_list[i]->rdbuf();
+                delete ssout_list[i];
 
-            std::cout << p_ssout->rdbuf() << std::endl;
-
-            delete p_ssout;
+                if (i == size - 1) {
+                    std::cout << "\n";
+                } else {
+                    std::cout << std::endl;
+                }
+            }
         } else {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     }
 });
 
-void print_to_stream_date_and_place(std::stringstream* p_ss, const std::string& file, const std::string& function,
-    const int line)
+void print_to_stream_date_and_place(std::stringstream* p_ss, const std::string& file, const std::string& function, const int line)
 {
     const auto found = file.find_last_of("/\\");
     const auto filename = (found == std::string::npos) ? file : file.substr(found + 1);
