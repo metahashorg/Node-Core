@@ -8,7 +8,7 @@ namespace metahash::network {
 namespace statics {
     std::vector<char> version_info(const std::string& mh_addr)
     {
-        static const std::string version = std::string(VESION_MAJOR) + "." + std::string(VESION_MINOR) + "." + std::string(GIT_COUNT);
+        static const std::string version = std::string(VERSION_MAJOR) + "." + std::string(VERSION_MINOR) + "." + std::string(GIT_COUNT);
         std::string resp_data = "{\"result\":{\"version\":\"" + version + "\",\"mh_addr\": \"" + mh_addr + "\"}}";
         static const std::string http_head = "HTTP/1.1 200 OK\r\n"
                                              "Version: HTTP/1.1\r\n"
