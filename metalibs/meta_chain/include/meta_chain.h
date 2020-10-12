@@ -41,6 +41,8 @@ private:
 
     boost::asio::io_context& io_context;
 
+    bool clear = true;
+
 public:
     BlockChain(boost::asio::io_context& io_context);
 

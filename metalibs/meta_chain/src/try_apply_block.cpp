@@ -9,11 +9,9 @@ bool BlockChain::try_apply_block(block::Block* block, bool apply)
     static const sha256_2 zero_hash = { { 0 } };
     bool check_state = true;
 
-    if (wallet_map.empty() && (block->get_block_type() == BLOCK_TYPE_STATE || block->get_prev_hash() == zero_hash)) {
+    if (clear && (block->get_block_type() == BLOCK_TYPE_STATE || block->get_prev_hash() == zero_hash)) {
         check_state = false;
-        DEBUG_COUT("block is state or like\t" + crypto::bin2hex(block->get_block_hash()));
     } else if (block->get_prev_hash() != prev_hash) {
-        DEBUG_COUT("prev hash not equal in block and database");
         return false;
     }
 

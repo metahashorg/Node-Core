@@ -24,8 +24,6 @@ public:
     auto begin() { return wallet_map.begin(); }
     auto end() { return wallet_map.end(); }
 
-    bool empty() { return wallet_map.empty(); }
-
     void apply_changes();
     void clear_changes();
 

@@ -11,9 +11,6 @@ add_library(${PROJECT_NAME}
         src/common_wallet_try_apply_method.cpp
         src/common_wallet_state_trust.cpp
         src/common_wallet_get.cpp
-#        src/decentralized_application_wallet.cpp
-#        src/decentralized_application_wallet_initialize_serialize.cpp
-#        src/decentralized_application_wallet_create_modify.cpp
         src/wallet.cpp
         src/wallet_map.cpp)
 
