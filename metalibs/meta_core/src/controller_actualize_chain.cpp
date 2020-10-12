@@ -3,125 +3,95 @@
 
 #include "controller.hpp"
 
+#include <random>
+
 namespace metahash::meta_core {
 
 void ControllerImplementation::check_if_chain_actual()
 {
-    DEBUG_COUT("check_if_chain_actual");
+    cores.send_with_callback(RPC_LAST_BLOCK, std::vector<char>(), [this](const std::string& mh_addr, const std::vector<char>& resp) {
+        if (resp.size() >= 40) {
+            sha256_2 last_block_return;
+            std::copy_n(resp.begin(), 32, last_block_return.begin());
 
-    std::map<std::string, std::vector<char>> last_block_on_cores = cores.send_with_return(RPC_LAST_BLOCK, std::vector<char>());
+            uint64_t block_timestamp = 0;
+            std::copy_n(resp.begin() + 32, 8, reinterpret_cast<char*>(&block_timestamp));
 
-    std::set<std::string> cores_with_missing_block;
-    std::set<sha256_2> missing_blocks;
+            serial_execution.post([this, last_block_return, block_timestamp, mh_addr] {
+                if (block_timestamp >= prev_timestamp && !await_blocks.count(last_block_return) && !aplied_blocks.count(last_block_return)) {
+                    std::vector<char> last_block;
+                    last_block.insert(last_block.end(), last_applied_block.begin(), last_applied_block.end());
 
-    serial_execution.post([this, last_block_on_cores] {
-        bool need_actualization = false;
-        for (auto&& [core_addr, block_info] : last_block_on_cores) {
-            if (block_info.size() >= 40) {
-                sha256_2 last_block_return;
-                std::copy_n(block_info.begin(), 32, last_block_return.begin());
+                    cores.send_with_callback_to_one(mh_addr, RPC_GET_MISSING_BLOCK_LIST, last_block, [this, mh_addr](const std::vector<char>& resp) {
+                        auto block_list = new std::set<sha256_2>();
 
-                uint64_t block_timestamp = 0;
-                std::copy_n(block_info.begin() + 32, 8, reinterpret_cast<char*>(&block_timestamp));
+                        uint index = 0;
+                        while (index + 32 <= resp.size()) {
+                            sha256_2 block_in_list;
 
-                if (block_timestamp > prev_timestamp && !blocks.count(last_block_return)) {
-                    DEBUG_COUT("core\t" + core_addr + "have more recent block\t" + crypto::bin2hex(last_block_return));
-                    need_actualization = true;
+                            std::copy_n(resp.begin() + index, 32, block_in_list.begin());
+                            index += 32;
+
+                            block_list->insert(block_in_list);
+                        }
+
+                        serial_execution.post([this, block_list, mh_addr] {
+                            for (const auto& block_hash : *block_list) {
+                                if (!await_blocks.count(block_hash) && !aplied_blocks.count(block_hash)) {
+                                    missing_blocks[block_hash].insert(mh_addr);
+                                }
+                            }
+                            delete block_list;
+                        });
+                    });
                 }
-            }
-        }
-        if (need_actualization) {
-            DEBUG_COUT("need_actualization");
-            actualize_chain();
+            });
         }
     });
 }
 
 void ControllerImplementation::actualize_chain()
 {
-    DEBUG_COUT("actualize_chain");
+    std::random_device rd;
+    std::mt19937 mt(rd());
 
-    std::map<std::string, std::vector<char>> last_block_on_cores = cores.send_with_return(RPC_LAST_BLOCK, std::vector<char>());
+    auto empty_queue_cores = cores.get_empty_queue_cores();
 
-    std::set<std::string> cores_with_missing_block;
-    std::set<sha256_2> missing_blocks;
-    for (auto&& [core_addr, block_info] : last_block_on_cores) {
-        if (block_info.size() >= 40) {
-            sha256_2 last_block_return;
-            std::copy_n(block_info.begin(), 32, last_block_return.begin());
+    for (auto block_it = missing_blocks.begin(); block_it != missing_blocks.end(); block_it = missing_blocks.erase(block_it)) {
+        auto& block_hash = block_it->first;
+        auto& cores_with_it = block_it->second;
 
-            uint64_t block_timestamp = 0;
-            std::copy_n(block_info.begin() + 32, 8, reinterpret_cast<char*>(&block_timestamp));
+        std::vector<std::string> ready_cores;
+        set_intersection(cores_with_it.begin(), cores_with_it.end(), empty_queue_cores.begin(), empty_queue_cores.end(), std::back_inserter(ready_cores));
 
-            if (block_timestamp > prev_timestamp && !blocks.count(last_block_return)) {
-                DEBUG_COUT("core\t" + core_addr + "have more recent block\t" + crypto::bin2hex(last_block_return));
-                cores_with_missing_block.insert(core_addr);
-                missing_blocks.insert(last_block_return);
-            }
-        }
-    }
+        if (!await_blocks.count(block_hash) && !aplied_blocks.count(block_hash)) {
+            if (!ready_cores.empty()) {
+                std::uniform_int_distribution<int> dist(0, ready_cores.size() - 1);
+                auto rand_int = dist(mt);
 
-    if (!cores_with_missing_block.empty()) {
-        DEBUG_COUT("GET BLOCKCHAIN START");
+                std::vector<char> get_block;
+                get_block.insert(get_block.end(), block_hash.begin(), block_hash.end());
 
-        std::unordered_map<sha256_2, block::Block*, crypto::Hasher> block_tree;
-        std::unordered_map<sha256_2, block::Block*, crypto::Hasher> prev_tree;
+                cores.send_with_callback_to_one(ready_cores[rand_int], RPC_GET_BLOCK, get_block, [this](const std::vector<char>& resp) {
+                    std::string_view block_sw(resp.data(), resp.size());
 
-        uint64_t failed = 0;
+                    parse_RPC_PRETEND_BLOCK(block_sw);
+                });
 
-        for (;;) {
-            for (const auto& core : cores_with_missing_block) {
-                if (missing_blocks.empty() || failed > 100) {
-                    DEBUG_COUT("GET BLOCKCHAIN COMPLETE");
-                    apply_block_chain(block_tree, prev_tree, "metachain network", true);
-                    DEBUG_COUT("APPLY BLOCKCHAIN COMPLETE");
-                    return;
-                }
+                cores.send_with_callback(RPC_GET_APPROVE, get_block, [this](const std::string&, const std::vector<char>& resp) {
+                    uint index = 0;
+                    while (index + 8 <= resp.size()) {
+                        uint64_t approve_size = *(reinterpret_cast<const uint64_t*>(&resp[index]));
+                        index += 8;
 
-                sha256_2 requested_block = *missing_blocks.begin();
-
-                std::vector<char> block_as_vector;
-                block_as_vector.insert(block_as_vector.end(), requested_block.begin(), requested_block.end());
-
-                DEBUG_COUT(crypto::bin2hex(requested_block) + " <- " + core);
-                std::vector<char> return_data = cores.send_with_return_to_core(core, RPC_GET_BLOCK, block_as_vector);
-
-                if (return_data.empty()) {
-                    DEBUG_COUT("Block is empty");
-                } else {
-                    missing_blocks.erase(missing_blocks.begin());
-                }
-
-                std::string_view block_as_sw(return_data.data(), return_data.size());
-                auto* block = block::parse_block(block_as_sw);
-                if (block) {
-                    if (dynamic_cast<block::CommonBlock*>(block)) {
-                        failed = 0;
-                        if (!block_tree.insert({ block->get_block_hash(), block }).second) {
-                            DEBUG_COUT("Duplicate block in chain\t" + crypto::bin2hex(block->get_block_hash()));
-                            delete block;
-                            block = nullptr;
-                        } else if (!prev_tree.insert({ block->get_prev_hash(), block }).second) {
-                            DEBUG_COUT("Branches in block chain\t" + crypto::bin2hex(block->get_prev_hash()) + "\t->\t" + crypto::bin2hex(block->get_block_hash()));
-                            block_tree.erase(block->get_block_hash());
-                            delete block;
-                            block = nullptr;
-                        } else if (!blocks.count(block->get_prev_hash())) {
-                            if (block->get_prev_hash() == sha256_2 {}) {
-                                DEBUG_COUT("Got complete chain. Previous block is zero block");
-                            } else {
-                                missing_blocks.insert(block->get_prev_hash());
-                            }
+                        if (index + approve_size > resp.size()) {
+                            break;
                         }
-                    } else {
-                        failed++;
-                        delete block;
-                        block = nullptr;
+                        std::string_view approve_sw(&resp[index], approve_size);
+                        parse_RPC_APPROVE(approve_sw);
+                        index += approve_size;
                     }
-                } else {
-                    failed++;
-                    DEBUG_COUT("Parse block error");
-                }
+                });
             }
         }
     }

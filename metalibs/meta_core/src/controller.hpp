@@ -2,6 +2,7 @@
 #define CONTROLLER_HPP
 
 #include <set>
+#include <shared_mutex>
 #include <unordered_map>
 
 #include <meta_block.h>
@@ -16,14 +17,20 @@ namespace metahash::meta_core {
 
 struct ControllerImplementation {
 private:
-    meta_chain::BlockChain* BC;
+    meta_chain::BlockChain BC;
     boost::asio::io_context& io_context;
     boost::asio::io_context::strand serial_execution;
     boost::asio::deadline_timer main_loop_timer;
 
     std::vector<transaction::TX*> transactions;
-    std::unordered_map<sha256_2, block::Block*, crypto::Hasher> blocks;
 
+    std::shared_mutex blocks_lock;
+    std::unordered_map<sha256_2, block::Block*, crypto::Hasher> aplied_blocks;
+    std::unordered_map<sha256_2, block::Block*, crypto::Hasher> await_blocks;
+
+    std::map<sha256_2, std::set<std::string>> missing_blocks;
+
+    std::shared_mutex block_approve_lock;
     std::unordered_map<sha256_2, std::map<std::string, transaction::ApproveRecord*>, crypto::Hasher> block_approve;
     std::unordered_map<sha256_2, std::map<std::string, transaction::ApproveRecord*>, crypto::Hasher> block_disapprove;
 
@@ -47,13 +54,16 @@ private:
 
     connection::MetaConnection cores;
     uint64_t last_sync_timestamp = 0;
+
     uint64_t last_actualization_timestamp = 0;
+    uint64_t last_actualization_check_timestamp = 0;
 
     network::meta_server* listener;
 
     std::vector<std::string> current_cores;
     std::map<uint64_t, std::unordered_map<std::string, std::set<std::string>, crypto::Hasher>> proposed_cores;
     uint64_t core_list_generation = 0;
+    uint64_t generation_check_timestamp = 0;
 
     bool goon = true;
 
@@ -63,9 +73,11 @@ private:
     std::atomic<uint64_t> dbg_RPC_GET_CORE_LIST = 0;
     std::atomic<uint64_t> dbg_RPC_APPROVE = 0;
     std::atomic<uint64_t> dbg_RPC_DISAPPROVE = 0;
+    std::atomic<uint64_t> dbg_RPC_GET_APPROVE = 0;
     std::atomic<uint64_t> dbg_RPC_LAST_BLOCK = 0;
     std::atomic<uint64_t> dbg_RPC_GET_BLOCK = 0;
     std::atomic<uint64_t> dbg_RPC_GET_CHAIN = 0;
+    std::atomic<uint64_t> dbg_RPC_GET_MISSING_BLOCK_LIST = 0;
     std::atomic<uint64_t> dbg_RPC_CORE_LIST_APPROVE = 0;
     std::atomic<uint64_t> dbg_RPC_PRETEND_BLOCK = 0;
     std::atomic<uint64_t> dbg_RPC_NONE = 0;
@@ -86,9 +98,8 @@ private:
     void main_loop();
 
     std::vector<char> add_pack_to_queue(network::Request& request);
-
-    void approve_block(block::Block*);
     void log_network_statistics(uint64_t timestamp);
+
     void parse_RPC_TX(std::string_view);
     void parse_RPC_PRETEND_BLOCK(std::string_view);
     void parse_RPC_APPROVE(std::string_view);
@@ -100,28 +111,26 @@ private:
     std::vector<char> parse_RPC_GET_MISSING_BLOCK_LIST(std::string_view);
     std::vector<char> parse_RPC_GET_CORE_LIST(std::string_view);
     void parse_RPC_CORE_LIST_APPROVE(std::string core, std::string_view);
-    void disapprove_block(block::Block*);
-    void apply_approve(transaction::ApproveRecord*);
 
+    bool approve_block(block::Block*);
+    void disapprove_block(block::Block*);
+    bool apply_approve(transaction::ApproveRecord*);
+    bool count_approve_for_block(const sha256_2& block_hash);
+    bool try_apply_block(block::Block*, bool write = true);
     void distribute(block::Block*);
     void distribute(transaction::ApproveRecord*);
+    bool master();
+    bool check_block_for_appliance_and_break_on_corrupt_block(const sha256_2& hash, block::Block*& block);
 
     void write_block(block::Block*);
 
     bool try_make_block(uint64_t timestamp);
 
     void read_and_apply_local_chain();
-    void actualize_chain();
+
     void check_if_chain_actual();
+    void actualize_chain();
 
-    void apply_block_chain(
-        std::unordered_map<sha256_2, block::Block*, crypto::Hasher>& block_tree,
-        std::unordered_map<sha256_2, block::Block*, crypto::Hasher>& prev_tree,
-        const std::string& source,
-        bool need_write);
-
-    void try_apply_block(block::Block*);
-    bool master();
     bool check_online_nodes(uint64_t timestamp);
     std::vector<char> make_pretend_core_list(uint64_t current_generation);
 };

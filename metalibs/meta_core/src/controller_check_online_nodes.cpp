@@ -18,6 +18,11 @@ bool ControllerImplementation::check_online_nodes(uint64_t timestamp)
     }
 
     if (core_list_generation < current_generation) {
+        if (timestamp == generation_check_timestamp) {
+            return false;
+        }
+        generation_check_timestamp = timestamp;
+
         uint64_t accept_count = 0;
         if (current_generation - core_list_generation == 1) {
             accept_count = min_approve;
@@ -29,6 +34,7 @@ bool ControllerImplementation::check_online_nodes(uint64_t timestamp)
 
                 std::string string_list;
                 string_list.insert(string_list.end(), list.begin(), list.end());
+                proposed_cores[current_generation][string_list].insert(signer.get_mh_addr());
             }
         } else {
             auto list = make_pretend_core_list(current_generation);
@@ -38,9 +44,10 @@ bool ControllerImplementation::check_online_nodes(uint64_t timestamp)
 
             std::string string_list;
             string_list.insert(string_list.end(), list.begin(), list.end());
+            proposed_cores[current_generation][string_list].insert(signer.get_mh_addr());
 
             {
-                auto nodes = BC->get_node_state();
+                auto nodes = BC.get_node_state();
                 for (auto&& [addr, roles] : nodes) {
                     if (roles.count(META_ROLE_CORE)) {
                         accept_count++;
@@ -55,14 +62,23 @@ bool ControllerImplementation::check_online_nodes(uint64_t timestamp)
             if (approve_cores.size() >= accept_count) {
                 auto primary_cores = crypto::split(cores_list, '\n');
                 if (primary_cores.size() == METAHASH_PRIMARY_CORES_COUNT) {
-                    current_cores = primary_cores;
-                    core_list_generation = current_generation;
-
-                    for (const auto& addr : current_cores) {
-                        DEBUG_COUT(addr);
+                    bool all_here = true;
+                    for (auto& check_core : primary_cores) {
+                        if (!approve_cores.count(check_core)) {
+                            all_here = false;
+                        }
                     }
 
-                    return true;
+                    if (all_here) {
+                        current_cores = primary_cores;
+                        core_list_generation = current_generation;
+
+                        for (const auto& addr : current_cores) {
+                            DEBUG_COUT(addr);
+                        }
+
+                        return true;
+                    }
                 }
             }
         }
@@ -76,7 +92,7 @@ bool ControllerImplementation::check_online_nodes(uint64_t timestamp)
 std::vector<char> ControllerImplementation::make_pretend_core_list(uint64_t current_generation)
 {
     std::deque<std::string> cores_list;
-    const auto nodes = BC->get_node_state();
+    const auto nodes = BC.get_node_state();
     const auto online_cores = cores.get_online_cores();
 
     for (auto&& [addr, roles] : nodes) {

@@ -64,13 +64,10 @@ void ControllerImplementation::parse_RPC_PRETEND_BLOCK(std::string_view pack)
     if (block) {
         if (dynamic_cast<block::CommonBlock*>(block)) {
             serial_execution.post([this, block] {
-                if (blocks.find(block->get_prev_hash()) == blocks.end()) {
-                    serial_execution.post([this] {
-                        actualize_chain();
-                    });
-                }
+                missing_blocks.erase(block->get_block_hash());
 
-                if (!blocks.insert({ block->get_block_hash(), block }).second) {
+                std::unique_lock lock(blocks_lock);
+                if (!await_blocks.insert({ block->get_block_hash(), block }).second) {
                     delete block;
                 }
             });
@@ -116,9 +113,82 @@ void ControllerImplementation::parse_RPC_DISAPPROVE(std::string_view pack)
 
 std::vector<char> ControllerImplementation::parse_RPC_GET_APPROVE(std::string_view pack)
 {
+    if (pack.size() < 32) {
+        DEBUG_COUT("pack.size() < 32");
+        return std::vector<char>();
+    }
+
+    sha256_2 approve_wanted_block;
+    std::copy_n(pack.begin(), 32, approve_wanted_block.begin());
+
+    std::shared_lock a_lock(block_approve_lock);
+    auto approve_list_it = block_approve.find(approve_wanted_block);
+    a_lock.unlock();
+
+    if (approve_list_it == block_approve.end()) {
+        sha256_2 got_block = last_applied_block;
+
+        {
+            std::shared_lock b_lock(blocks_lock);
+            while (got_block != approve_wanted_block && aplied_blocks.count(got_block)) {
+                got_block = aplied_blocks[got_block]->get_prev_hash();
+            }
+        }
+
+        if (got_block == approve_wanted_block) {
+            auto* p_ar = new transaction::ApproveRecord;
+            p_ar->make(got_block, signer);
+            p_ar->approve = true;
+            std::unique_lock ulock(block_approve_lock);
+            auto insert_result = block_approve[got_block].insert({ signer.get_mh_addr(), p_ar });
+            if (!insert_result.second) {
+                DEBUG_COUT("APPROVE ALREADY PRESENT NOT CREATED");
+                delete p_ar;
+            }
+            approve_list_it = block_approve.find(approve_wanted_block);
+            if (approve_list_it == block_approve.end()) {
+                return std::vector<char>();
+            }
+        } else {
+            return std::vector<char>();
+        }
+    }
+
+    std::vector<char> approve_data_list;
+    for (auto&& [core_addr, record] : approve_list_it->second) {
+        uint64_t record_size = record->data.size();
+        approve_data_list.insert(approve_data_list.end(), reinterpret_cast<char*>(&record_size), reinterpret_cast<char*>(&record_size) + sizeof(uint64_t));
+        approve_data_list.insert(approve_data_list.end(), record->data.begin(), record->data.end());
+    }
+    return approve_data_list;
+}
+
+std::vector<char> ControllerImplementation::parse_RPC_LAST_BLOCK(std::string_view)
+{
     std::vector<char> last_block;
-    last_block.insert(last_block.end(), last_applied_block.begin(), last_applied_block.end());
-    char* p_timestamp = reinterpret_cast<char*>(&prev_timestamp);
+    sha256_2 got_block;
+    uint64_t got_timestamp;
+
+    if (master()) {
+        std::shared_lock s_lock(blocks_lock);
+
+        if (await_blocks.count(last_created_block)) {
+            got_block = last_created_block;
+            got_timestamp = await_blocks[last_created_block]->get_block_timestamp();
+        } else if (aplied_blocks.count(last_created_block)) {
+            got_block = last_created_block;
+            got_timestamp = aplied_blocks[last_created_block]->get_block_timestamp();
+        } else {
+            got_block = last_applied_block;
+            got_timestamp = prev_timestamp;
+        }
+    } else {
+        got_block = last_applied_block;
+        got_timestamp = prev_timestamp;
+    }
+
+    last_block.insert(last_block.end(), got_block.begin(), got_block.end());
+    char* p_timestamp = reinterpret_cast<char*>(&got_timestamp);
     last_block.insert(last_block.end(), p_timestamp, p_timestamp + 8);
 
     return last_block;
@@ -127,19 +197,18 @@ std::vector<char> ControllerImplementation::parse_RPC_GET_APPROVE(std::string_vi
 std::vector<char> ControllerImplementation::parse_RPC_GET_BLOCK(std::string_view pack)
 {
     if (pack.size() < 32) {
-        DEBUG_COUT("pack.size() < 32");
-        DEBUG_COUT(crypto::bin2hex(pack));
         return std::vector<char>();
     }
 
     sha256_2 block_hash;
     std::copy_n(pack.begin(), 32, block_hash.begin());
 
-    if (blocks.find(block_hash) != blocks.end()) {
-        return blocks[block_hash]->get_data();
-    } else {
-        DEBUG_COUT("blocks.find(block_hash) != blocks.end()");
-        DEBUG_COUT(crypto::bin2hex(block_hash));
+    std::shared_lock b_lock(blocks_lock);
+    if (aplied_blocks.count(block_hash)) {
+        return aplied_blocks[block_hash]->get_data();
+    }
+    if (await_blocks.count(block_hash)) {
+        return await_blocks[block_hash]->get_data();
     }
 
     return std::vector<char>();
@@ -147,29 +216,66 @@ std::vector<char> ControllerImplementation::parse_RPC_GET_BLOCK(std::string_view
 
 std::vector<char> ControllerImplementation::parse_RPC_GET_CHAIN(std::string_view pack)
 {
-    sha256_2 prev_block = { { 0 } };
-    //    DEBUG_COUT(std::to_string(pack.size()));
-
     if (pack.size() < 32) {
         return std::vector<char>();
     }
 
+    sha256_2 prev_block;
     std::copy_n(pack.begin(), 32, prev_block.begin());
 
     std::vector<char> chain;
-    sha256_2 got_block = master() ? last_created_block : last_applied_block;
+    sha256_2 got_block = last_applied_block;
 
-    //    DEBUG_COUT(bin2hex(prev_block));
-    //    DEBUG_COUT(bin2hex(got_block));
-
-    while (got_block != prev_block && blocks.find(got_block) != blocks.end()) {
-        auto& block_data = blocks[got_block]->get_data();
+    std::shared_lock b_lock(blocks_lock);
+    while (got_block != prev_block && aplied_blocks.count(got_block)) {
+        auto& block_data = aplied_blocks[got_block]->get_data();
+        b_lock.unlock();
 
         uint64_t block_size = block_data.size();
         chain.insert(chain.end(), reinterpret_cast<char*>(&block_size), reinterpret_cast<char*>(&block_size) + sizeof(uint64_t));
         chain.insert(chain.end(), block_data.begin(), block_data.end());
 
-        got_block = blocks[got_block]->get_prev_hash();
+        b_lock.lock();
+        got_block = aplied_blocks[got_block]->get_prev_hash();
+    }
+    b_lock.unlock();
+
+    if (master()) {
+        auto& block_data = await_blocks[last_created_block]->get_data();
+        uint64_t block_size = block_data.size();
+        chain.insert(chain.end(), reinterpret_cast<char*>(&block_size), reinterpret_cast<char*>(&block_size) + sizeof(uint64_t));
+        chain.insert(chain.end(), block_data.begin(), block_data.end());
+    }
+
+    return chain;
+}
+
+std::vector<char> ControllerImplementation::parse_RPC_GET_MISSING_BLOCK_LIST(std::string_view pack)
+{
+    std::vector<char> chain;
+
+    if (pack.size() < 32) {
+        return chain;
+    }
+
+    sha256_2 prev_block;
+    std::copy_n(pack.begin(), 32, prev_block.begin());
+
+    sha256_2 got_block = last_applied_block;
+
+    std::shared_lock b_lock(blocks_lock);
+    while (got_block != prev_block && aplied_blocks.count(got_block)) {
+        b_lock.unlock();
+
+        chain.insert(chain.end(), got_block.begin(), got_block.end());
+
+        b_lock.lock();
+        got_block = aplied_blocks[got_block]->get_prev_hash();
+    }
+    b_lock.unlock();
+
+    if (master()) {
+        chain.insert(chain.end(), last_created_block.begin(), last_created_block.end());
     }
 
     return chain;

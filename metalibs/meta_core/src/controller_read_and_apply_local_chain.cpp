@@ -53,7 +53,7 @@ void parse_block_async(
         auto* block = block::parse_block(block_as_string);
 
         if (block) {
-            if (!dynamic_cast<block::CommonBlock*>(block)) {
+            if (!dynamic_cast<block::CommonBlock*>(block) && !dynamic_cast<block::ApproveBlock*>(block)) {
                 delete block;
                 block = nullptr;
             }
@@ -68,7 +68,6 @@ void parse_block_async(
         promise->set_value(block);
     });
 }
-
 
 void ControllerImplementation::read_and_apply_local_chain()
 {
@@ -89,7 +88,7 @@ void ControllerImplementation::read_and_apply_local_chain()
                 std::vector<unsigned char> bin_proved_hash = crypto::hex2bin(last_block);
                 std::copy_n(bin_proved_hash.begin(), 32, proved_block.begin());
 
-                DEBUG_COUT("got last state info. file:\t" + last_file + "\t and block:\t" + last_block);
+                DEBUG_COUT("got last state info file:\t" + last_file + "\t and block:\t" + last_block);
             }
         }
 
@@ -97,7 +96,6 @@ void ControllerImplementation::read_and_apply_local_chain()
     }
 
     std::list<std::future<block::Block*>> pending_data;
-    std::unordered_map<sha256_2, block::Block*, crypto::Hasher> prev_tree;
 
     char uint64_buff[8];
     std::set<std::string> files = get_files_in_dir(path);
@@ -113,8 +111,7 @@ void ControllerImplementation::read_and_apply_local_chain()
                 if (ifile.read(block_buff, static_cast<int64_t>(block_size))) {
                     parse_block_async(io_context, pending_data, block_buff, block_size, true);
                 } else {
-                    std::string msg = "read file error\t" + file;
-                    DEBUG_COUT(msg);
+                    DEBUG_COUT("read file error\t" + file);
                     std::this_thread::sleep_for(std::chrono::seconds(1));
                     exit(1);
                 }
@@ -130,23 +127,73 @@ void ControllerImplementation::read_and_apply_local_chain()
     for (auto&& fut : pending_data) {
         auto block = fut.get();
         if (block) {
-            if (!blocks.insert({ block->get_block_hash(), block }).second) {
-                DEBUG_COUT("Duplicate block in chain\t" + crypto::bin2hex(block->get_block_hash()));
-                delete block;
-            } else if (!prev_tree.insert({ block->get_prev_hash(), block }).second) {
-                DEBUG_COUT("Branches in block chain\t" + crypto::bin2hex(block->get_prev_hash()) + "\t->\t" + crypto::bin2hex(block->get_block_hash()));
-                blocks.erase(block->get_block_hash());
-                delete block;
+            if (dynamic_cast<block::CommonBlock*>(block)) {
+                if (!try_apply_block(block, false)) {
+                    if (!await_blocks.insert({ block->get_block_hash(), block }).second) {
+                        DEBUG_COUT("Duplicate block in chain\t" + crypto::bin2hex(block->get_block_hash()));
+                        delete block;
+                    }
+                }
+            } else if (auto* a_block = dynamic_cast<block::ApproveBlock*>(block)) {
+                for (auto& tx : a_block->get_txs()) {
+                    block_approve[a_block->get_prev_hash()].insert({ "0x" + crypto::bin2hex(crypto::get_address(tx.pub_key)), new transaction::ApproveRecord(std::move(tx)) });
+                }
             }
         }
     }
 
-    DEBUG_COUT("PARSE BLOCKCHAIN COMPLETE");
+    bool got_changes = true;
+    while (got_changes) {
+        got_changes = false;
 
-    apply_block_chain(blocks, prev_tree, "local storage", false);
+        for (auto&& [hash, block] : await_blocks) {
+            static const sha256_2 zero_block = { { 0 } };
+            if (last_applied_block != zero_block) {
+                if (block->get_prev_hash() == last_applied_block) {
+                    got_changes = true;
+                    if (try_apply_block(block, false)) {
+                        break;
+                    }
+                }
+            } else {
+                if (proved_block != zero_block && block->get_block_hash() == proved_block) {
+                    got_changes = true;
+                    if (try_apply_block(block, false)) {
+                        break;
+                    }
+                } else if (proved_block == zero_block && block->get_prev_hash() == proved_block) {
+                    got_changes = true;
+                    if (try_apply_block(block, false)) {
+                        break;
+                    }
+                }
+            }
+        }
 
-    DEBUG_COUT("READ BLOCK COMPLETE");
+        for (auto&& [hash, block] : aplied_blocks) {
+            auto prev_hash = block->get_prev_hash();
+            if (await_blocks.count(prev_hash)) {
+                got_changes = true;
+                bool need_break = false;
+
+                auto move_block = await_blocks[prev_hash];
+                if (aplied_blocks.count(prev_hash)) {
+                    delete move_block;
+                } else {
+                    std::unique_lock lock(blocks_lock);
+                    aplied_blocks.insert({ prev_hash, move_block });
+                    need_break = true;
+                }
+
+                std::unique_lock lock(blocks_lock);
+                await_blocks.erase(prev_hash);
+
+                if (need_break) {
+                    break;
+                }
+            }
+        }
+    }
 }
-
 
 }

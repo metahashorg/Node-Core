@@ -6,6 +6,12 @@ namespace metahash::meta_core {
 
 bool ControllerImplementation::try_make_block(uint64_t timestamp)
 {
+    auto lower_bound = core_list_generation * CORE_LIST_RENEW_PERIOD + CORE_LIST_SILENCE_PERIOD;
+    auto upper_bound = (core_list_generation + 1) * CORE_LIST_RENEW_PERIOD - CORE_LIST_SILENCE_PERIOD;
+    if (timestamp < lower_bound || timestamp > upper_bound) {
+        return false;
+    }
+
     if (last_applied_block == last_created_block) {
         if (prev_timestamp >= timestamp) {
             return false;
@@ -32,28 +38,31 @@ bool ControllerImplementation::try_make_block(uint64_t timestamp)
             switch (block_state) {
             case BLOCK_TYPE_COMMON:
                 if (timestamp - statistics_timestamp > 600) {
-                    block = BC->make_statistics_block(timestamp);
+                    block = BC.make_statistics_block(timestamp);
                     statistics_timestamp = timestamp;
                 } else {
                     if (!transactions.empty()) {
-                        block = BC->make_common_block(timestamp, transactions);
+                        block = BC.make_common_block(timestamp, transactions);
                     }
                 }
                 break;
             case BLOCK_TYPE_FORGING:
                 DEBUG_COUT("BLOCK_TYPE_FORGING");
-                block = BC->make_forging_block(timestamp);
+                block = BC.make_forging_block(timestamp);
                 break;
             case BLOCK_TYPE_STATE:
                 DEBUG_COUT("BLOCK_TYPE_STATE");
-                block = BC->make_state_block(timestamp);
+                block = BC.make_state_block(timestamp);
                 break;
             }
 
             if (block) {
-                if (BC->can_apply_block(block)) {
+                if (BC.can_apply_block(block)) {
                     last_created_block = block->get_block_hash();
-                    blocks.insert({ block->get_block_hash(), block });
+                    {
+                        std::unique_lock lock(blocks_lock);
+                        await_blocks.insert({ block->get_block_hash(), block });
+                    }
                     distribute(block);
                     approve_block(block);
                     return true;
@@ -65,7 +74,7 @@ bool ControllerImplementation::try_make_block(uint64_t timestamp)
             }
         }
 
-        if (auto tx_list = BC->make_rejected_tx_block(timestamp)) {
+        if (auto tx_list = BC.make_rejected_tx_block(timestamp)) {
             rejected_tx_list.insert(rejected_tx_list.end(), tx_list->begin(), tx_list->end());
             delete tx_list;
 
@@ -81,15 +90,6 @@ bool ControllerImplementation::try_make_block(uint64_t timestamp)
             }
             delete reject_tx_block;
         }
-    } else if (timestamp - prev_timestamp > 30) {
-        auto* block = blocks[last_created_block];
-        if (block->get_prev_hash() == last_applied_block) {
-            try_apply_block(block);
-        } else {
-            DEBUG_COUT("block->get_prev_hash != last_applied_block");
-        }
-    } else {
-        DEBUG_COUT("last_applied_block == last_created_block");
     }
 
     return false;

@@ -42,4 +42,16 @@ std::set<std::string> MetaConnection::get_online_cores()
     return online_cores;
 }
 
+std::set<std::string> MetaConnection::get_empty_queue_cores()
+{
+    std::set<std::string> empty_queue_cores;
+    std::shared_lock lock(core_lock);
+    for (auto&& [mh_addr, core] : cores) {
+        if (core->get_queue_size() < 16) {
+            empty_queue_cores.insert(mh_addr);
+        }
+    }
+    return empty_queue_cores;
+}
+
 }

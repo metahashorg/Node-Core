@@ -44,6 +44,8 @@ private:
 
     const std::string mh_endpoint_addr;
 
+    boost::asio::io_context& io_context;
+
     boost::asio::io_context::strand serial_execution;
     const boost::asio::ip::tcp::resolver::results_type endpoints;
     std::shared_ptr<boost::asio::ip::tcp::socket> socket;
@@ -70,6 +72,7 @@ private:
     void check_tasks();
     void read();
     void reset();
+    void execute_callback(std::vector<char>&);
 };
 
 class meta_client {
@@ -81,6 +84,7 @@ public:
     std::tuple<std::string, std::string, int> get_definition();
 
     bool online();
+    uint64_t get_queue_size();
 
 private:
     std::atomic<int> request_count = 0;

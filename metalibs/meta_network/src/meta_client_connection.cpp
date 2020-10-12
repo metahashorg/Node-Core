@@ -6,6 +6,7 @@ namespace metahash::network {
 
 ClientConnection::ClientConnection(boost::asio::io_context& io_context, boost::asio::ip::basic_resolver<boost::asio::ip::tcp>::results_type& endpoints, moodycamel::ConcurrentQueue<Task*>& tasks, std::string mh_endpoint_addr)
     : mh_endpoint_addr(std::move(mh_endpoint_addr))
+    , io_context(io_context)
     , serial_execution(io_context)
     , endpoints(endpoints)
     , socket(new boost::asio::ip::tcp::socket(serial_execution))
@@ -97,9 +98,22 @@ void ClientConnection::reset()
     socket.reset(new boost::asio::ip::tcp::socket(serial_execution));
     try_connect();
 }
+
 bool ClientConnection::online()
 {
     return connected;
+}
+
+void ClientConnection::execute_callback(std::vector<char>& data)
+{
+    auto task = p_task;
+    io_context.post([task, data] {
+        task->callback(data);
+        delete task;
+    });
+
+    response = {};
+    p_task = nullptr;
 }
 
 }

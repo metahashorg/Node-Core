@@ -1,4 +1,5 @@
 #include <meta_connections.hpp>
+#include <utility>
 
 namespace metahash::connection {
 
@@ -42,6 +43,17 @@ std::map<std::string, std::vector<char>> MetaConnection::send_with_return(uint64
     return resp_strings;
 }
 
+void MetaConnection::send_with_callback(uint64_t req_type, const std::vector<char>& req_data, std::function<void(const std::string& mh_addr, const std::vector<char>&)> callback)
+{
+    std::shared_lock lock(core_lock);
+    for (auto&& [mh_addr, core] : cores) {
+
+        core->send_message(req_type, req_data, [mh_addr, callback](const std::vector<char>& resp) {
+            callback(mh_addr, resp);
+        });
+    }
+}
+
 void MetaConnection::send_no_return_to_core(const std::string& addr, uint64_t req_type, const std::vector<char>& req_data)
 {
     std::shared_lock lock(core_lock);
@@ -70,6 +82,14 @@ std::vector<char> MetaConnection::send_with_return_to_core(const std::string& ad
     }
 
     return std::vector<char>();
+}
+
+void MetaConnection::send_with_callback_to_one(const std::string& addr, uint64_t req_type, const std::vector<char>& req_data, std::function<void(const std::vector<char>&)> callback)
+{
+    std::shared_lock lock(core_lock);
+    if (cores.find(addr) != cores.end()) {
+        cores[addr]->send_message(req_type, req_data, callback);
+    }
 }
 
 }

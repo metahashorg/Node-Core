@@ -74,4 +74,9 @@ bool meta_client::online()
     return false;
 }
 
+uint64_t meta_client::get_queue_size()
+{
+    return tasks.size_approx();
+}
+
 }

@@ -37,6 +37,12 @@ const std::set<std::string> FOUNDER_WALLETS {
 
 const std::string TEAM_WALLET = "0x00e3aafe3399cdb92a6780cc8d2e4b38c4429ffc41c8c57d6b";
 
+//const std::set<std::string> FOUNDER_WALLETS {
+//    "0x007c5d7a487a3fea657b581b50b809bf878f418cdf346ee352",
+//    "0x009f684260a15920cb5200cadf766455305cc87f04b360a756",
+//    "0x00c6ab64013d614efdc90243fdef100da14ddee4c482ca9c7b"
+//};
+
 // DELEGATION LIMITS
 const uint64_t LIMIT_DELEGATE_TO = 256;
 const uint64_t LIMIT_DELEGATE_FROM = 4096;
@@ -112,18 +118,20 @@ const uint64_t TX_REJECT_INSUFFICIENT_FUNDS_EXT = 0xff05;
 const uint64_t TX_REJECT_FOUNDER_LIMIT = 0xff06;
 const uint64_t TX_REJECT_INVALID_WALLET = 0x0404;
 
-const uint64_t DAY_IN_SECONDS = 5 * 60;//24 * 60 * 60;
+const uint64_t DAY_IN_SECONDS = 5 * 60; //24 * 60 * 60;
 const uint64_t CORE_LIST_RENEW_PERIOD = 10 * 60;
+const uint64_t CORE_LIST_SILENCE_PERIOD = 15;
 
 /*                          RPC METHODS                           */
-const uint64_t RPC_PING = 0x10;
 const uint64_t RPC_TX = 0x20;
 const uint64_t RPC_PRETEND_BLOCK = 0x30;
 const uint64_t RPC_APPROVE = 0x40;
 const uint64_t RPC_DISAPPROVE = 0x41;
+const uint64_t RPC_GET_APPROVE = 0x42;
 const uint64_t RPC_LAST_BLOCK = 0x50;
 const uint64_t RPC_GET_BLOCK = 0x60;
 const uint64_t RPC_GET_CHAIN = 0x61;
+const uint64_t RPC_GET_MISSING_BLOCK_LIST = 0x62;
 const uint64_t RPC_GET_CORE_LIST = 0x71;
 const uint64_t RPC_CORE_LIST_APPROVE = 0x81;
 
@@ -191,7 +199,6 @@ const uint64_t NODE_STATE_FLAG_CORE_PRETEND = 0b0000'0001'0000'0000'0000'0000'00
 const uint64_t NODE_STATE_FLAG_CORE_SEED_CAP = 0b0000'0010'0000'0000'0000'0000'0000;
 const uint64_t NODE_STATE_FLAG_CORE_SOFT_CAP = 0b0000'0100'0000'0000'0000'0000'0000;
 const uint64_t NODE_STATE_FLAG_CORE_FORGING = NODE_STATE_FLAG_CORE_PRETEND | NODE_STATE_FLAG_CORE_SEED_CAP | NODE_STATE_FLAG_CORE_SOFT_CAP | NODE_STATE_FLAG_PRETEND_COMMON;
-
 
 static const std::map<std::string, uint64_t> NODE_SEED_CAP {
     { "Proxy", NODE_PROXY_SEED_CAP },

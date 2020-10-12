@@ -5,7 +5,6 @@ add_library(${PROJECT_NAME}
         src/controller.cpp
         src/controller_write_block.cpp
         src/controller_process_requests.cpp
-        src/controller_apply_block_chain.cpp
         src/controller_actualize_chain.cpp
         src/controller_main_loop.cpp
         src/controller_try_make_block.cpp

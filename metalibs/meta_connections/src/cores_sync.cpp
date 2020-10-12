@@ -44,16 +44,20 @@ void MetaConnection::add_cores(std::string_view pack)
     add_new_cores(hosts);
 }
 
-void MetaConnection::add_new_cores(const std::set<std::tuple<std::string, std::string, int>>& hosts)
+bool MetaConnection::add_new_cores(const std::set<std::tuple<std::string, std::string, int>>& hosts)
 {
+    bool got_new = false;
     std::unique_lock lock(core_lock);
     for (auto&& [addr, host, port] : hosts) {
         if (addr != signer.get_mh_addr()) {
             if (cores.find(addr) == cores.end()) {
                 cores.emplace(addr, new network::meta_client(io_context, addr, host, port, concurrent_connections_count, signer));
+                got_new = true;
             }
         }
     }
+
+    return got_new;
 }
 
 std::vector<char> MetaConnection::get_core_list()
