@@ -19,6 +19,7 @@ ControllerImplementation::ControllerImplementation(
     , path(path)
     , signer(crypto::hex2bin(priv_key_line))
     , cores(io_context, host_port.first, host_port.second, signer)
+    , listener(io_context, host_port.first, host_port.second, signer, std::bind(&ControllerImplementation::add_pack_to_queue, this, std::placeholders::_1))
 {
     DEBUG_COUT("min_approve\t" + std::to_string(min_approve));
 
@@ -37,7 +38,7 @@ ControllerImplementation::ControllerImplementation(
 
     serial_execution.post(std::bind(&ControllerImplementation::main_loop, this));
 
-    listener = new network::meta_server(io_context, host_port.first, host_port.second, signer, std::bind(&ControllerImplementation::add_pack_to_queue, this, std::placeholders::_1));
+    listener.start();
 
     cores.init(core_list);
 }

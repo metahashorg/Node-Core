@@ -14,7 +14,7 @@ meta_server::meta_server(boost::asio::io_context& io_context, const std::string&
     , signer(signer)
     , new_connection()
 {
-    start();
+    //start();
 }
 
 void meta_server::start()

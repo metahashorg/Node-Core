@@ -54,7 +54,7 @@ private:
     uint64_t last_actualization_timestamp = 0;
     uint64_t last_actualization_check_timestamp = 0;
 
-    network::meta_server* listener;
+    network::meta_server listener;
 
     std::vector<std::string> current_cores;
     std::map<uint64_t, std::unordered_map<std::string, std::set<std::string>, crypto::Hasher>> proposed_cores;
