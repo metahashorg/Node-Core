@@ -71,7 +71,7 @@ void parse_block_async(
     });
 }
 
-void ControllerImplementation::read_and_apply_local_chain()
+void read_last_known_state(sha256_2& proved_block)
 {
     std::string last_file;
 
@@ -96,8 +96,15 @@ void ControllerImplementation::read_and_apply_local_chain()
 
         last_known_state_file.close();
     }
+}
 
-    std::list<std::future<block::Block*>> pending_data;
+void read_stored_blocks(
+    boost::asio::io_context& io_context,
+    std::string path,
+    std::list<std::future<metahash::block::Block*>>& pending_data)
+{
+    uint files_read = 0;
+    uint blocks_read = 0;
 
     char uint64_buff[8];
     std::set<std::string> files = get_files_in_dir(path);
@@ -106,18 +113,25 @@ void ControllerImplementation::read_and_apply_local_chain()
         std::ifstream ifile(file.c_str(), std::ios::in | std::ios::binary);
 
         if (ifile.is_open()) {
+            files_read++;
             while (ifile.read(uint64_buff, 8)) {
                 uint64_t block_size = *(reinterpret_cast<uint64_t*>(uint64_buff));
                 char* block_buff = new char[block_size];
 
                 if (ifile.read(block_buff, static_cast<int64_t>(block_size))) {
+                    blocks_read++;
                     parse_block_async(io_context, pending_data, block_buff, block_size, true);
                 } else {
                     DEBUG_COUT("read file error\t" + file);
                     std::this_thread::sleep_for(std::chrono::seconds(1));
                     exit(1);
                 }
+
+                if (blocks_read % 250000 == 0) {
+                    DEBUG_COUT("Read blocks\t" + std::to_string(blocks_read) + "\tin files\t " + std::to_string(files_read));
+                }
             }
+
         } else {
             std::string msg = "!file.is_open()\t" + file;
             DEBUG_COUT(msg);
@@ -125,77 +139,48 @@ void ControllerImplementation::read_and_apply_local_chain()
             exit(1);
         }
     }
+}
 
+void ControllerImplementation::read_and_apply_local_chain()
+{
+    read_last_known_state(proved_block);
+
+    std::list<std::future<block::Block*>> pending_data;
+
+    read_stored_blocks(io_context, path, pending_data);
+    DEBUG_COUT("READ COMPLETE");
+
+    uint blocks_processed = 0;
     for (auto&& fut : pending_data) {
         auto block = fut.get();
         if (block) {
             if (dynamic_cast<block::CommonBlock*>(block)) {
-                if (!try_apply_block(block, false)) {
-                    if (!await_blocks.insert({ block->get_block_hash(), block }).second) {
-                        DEBUG_COUT("Duplicate block in chain\t" + crypto::bin2hex(block->get_block_hash()));
-                        delete block;
-                    }
-                }
+                blocks.insert(block);
             } else if (auto* a_block = dynamic_cast<block::ApproveBlock*>(block)) {
                 for (auto& tx : a_block->get_txs()) {
                     block_approve[a_block->get_prev_hash()].insert({ "0x" + crypto::bin2hex(crypto::get_address(tx.pub_key)), new transaction::ApproveRecord(std::move(tx)) });
                 }
+
+                check_blocks();
             }
+        }
+        
+        blocks_processed++;
+        if (blocks_processed % 250000 == 0) {
+            DEBUG_COUT("Processed blocks\t" + std::to_string(blocks_processed));
         }
     }
+    DEBUG_COUT("PROCESS COMPLETE");
 
-    bool got_changes = true;
-    while (got_changes) {
-        got_changes = false;
+    check_blocks();
 
-        for (auto&& [hash, block] : await_blocks) {
-            static const sha256_2 zero_block = { { 0 } };
-            if (last_applied_block != zero_block) {
-                if (block->get_prev_hash() == last_applied_block) {
-                    got_changes = true;
-                    if (try_apply_block(block, false)) {
-                        break;
-                    }
-                }
-            } else {
-                if (proved_block != zero_block && block->get_block_hash() == proved_block) {
-                    got_changes = true;
-                    if (try_apply_block(block, false)) {
-                        break;
-                    }
-                } else if (proved_block == zero_block && block->get_prev_hash() == proved_block) {
-                    got_changes = true;
-                    if (try_apply_block(block, false)) {
-                        break;
-                    }
-                }
-            }
-        }
+    DEBUG_COUT("LOCAL COMPLETE");
+}
 
-        for (auto&& [hash, block] : aplied_blocks) {
-            auto prev_hash = block->get_prev_hash();
-            if (await_blocks.count(prev_hash)) {
-                got_changes = true;
-                bool need_break = false;
-
-                auto move_block = await_blocks[prev_hash];
-                if (aplied_blocks.count(prev_hash)) {
-                    delete move_block;
-                } else {
-                    std::unique_lock lock(blocks_lock);
-                    aplied_blocks.insert({ prev_hash, move_block });
-                    need_break = true;
-                }
-
-                std::unique_lock lock(blocks_lock);
-                await_blocks.erase(prev_hash);
-
-                if (need_break) {
-                    break;
-                }
-            }
-        }
-    }
+void ControllerImplementation::check_blocks()
+{
+    while (check_awaited_blocks())
+        ;
 }
 
 }
