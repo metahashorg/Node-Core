@@ -26,30 +26,7 @@ void ControllerImplementation::main_loop()
         serial_execution.post(std::bind(&ControllerImplementation::actualize_chain, this));
     }
 
-    for (auto&& [hash, block] : await_blocks) {
-        static const sha256_2 zero_block = { { 0 } };
-
-        if (last_applied_block != zero_block) {
-            if (block->get_prev_hash() == last_applied_block) {
-                no_sleep = true;
-                if (check_block_for_appliance_and_break_on_corrupt_block(hash, block)) {
-                    break;
-                }
-            }
-        } else {
-            if (proved_block != zero_block && hash == proved_block) {
-                no_sleep = true;
-                if (check_block_for_appliance_and_break_on_corrupt_block(hash, block)) {
-                    break;
-                }
-            } else if (proved_block == zero_block && block->get_prev_hash() == proved_block) {
-                no_sleep = true;
-                if (check_block_for_appliance_and_break_on_corrupt_block(hash, block)) {
-                    break;
-                }
-            }
-        }
-    }
+    no_sleep = check_awaited_blocks();
 
     if (check_online_nodes(timestamp) && master() && try_make_block(timestamp)) {
         no_sleep = true;
@@ -63,6 +40,49 @@ void ControllerImplementation::main_loop()
             main_loop();
         });
     }
+}
+
+bool ControllerImplementation::check_awaited_blocks()
+{
+    static const sha256_2 zero_block = { { 0 } };
+
+    if (last_applied_block != zero_block) {
+        if (blocks.contains_next(last_applied_block)) {
+            auto* block = blocks.get_next(last_applied_block);
+            if (check_block_for_appliance_and_break_on_corrupt_block(block)) {
+                return true;
+            }
+        }
+    } else {
+        if (proved_block != zero_block) {
+            if (blocks.contains(proved_block)) {
+                auto* curr_block = blocks[proved_block];
+                auto prev_hash = curr_block->get_prev_hash();
+
+                while (curr_block->get_block_type() != BLOCK_TYPE_STATE && prev_hash != zero_block) {
+                    if (blocks.contains(prev_hash)) {
+                        curr_block = blocks[prev_hash];
+                        prev_hash = curr_block->get_prev_hash();
+                    } else {
+                        missing_blocks[prev_hash];
+                        serial_execution.post(std::bind(&ControllerImplementation::actualize_chain, this));
+                        return false;
+                    }
+                }
+
+                if (check_block_for_appliance_and_break_on_corrupt_block(curr_block)) {
+                    return true;
+                }
+            }
+        } else if (blocks.contains_next(proved_block)) {
+            auto* block = blocks.get_next(last_applied_block);
+            if (check_block_for_appliance_and_break_on_corrupt_block(block)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 }

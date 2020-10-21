@@ -18,9 +18,15 @@ void ControllerImplementation::check_if_chain_actual()
             std::copy_n(resp.begin() + 32, 8, reinterpret_cast<char*>(&block_timestamp));
 
             serial_execution.post([this, last_block_return, block_timestamp, mh_addr] {
-                if (block_timestamp >= prev_timestamp && !await_blocks.count(last_block_return) && !aplied_blocks.count(last_block_return)) {
+                if (block_timestamp >= prev_timestamp && !blocks.contains(last_block_return)) {
                     std::vector<char> last_block;
-                    last_block.insert(last_block.end(), last_applied_block.begin(), last_applied_block.end());
+
+                    static const sha256_2 zero_block = { { 0 } };
+                    if (last_applied_block != zero_block) {
+                        last_block.insert(last_block.end(), last_applied_block.begin(), last_applied_block.end());
+                    } else {
+                        last_block.insert(last_block.end(), proved_block.begin(), proved_block.end());
+                    }
 
                     cores.send_with_callback_to_one(mh_addr, RPC_GET_MISSING_BLOCK_LIST, last_block, [this, mh_addr](const std::vector<char>& resp) {
                         auto block_list = new std::set<sha256_2>();
@@ -37,7 +43,7 @@ void ControllerImplementation::check_if_chain_actual()
 
                         serial_execution.post([this, block_list, mh_addr] {
                             for (const auto& block_hash : *block_list) {
-                                if (!await_blocks.count(block_hash) && !aplied_blocks.count(block_hash)) {
+                                if (!blocks.contains(block_hash)) {
                                     missing_blocks[block_hash].insert(mh_addr);
                                 }
                             }
@@ -64,35 +70,41 @@ void ControllerImplementation::actualize_chain()
         std::vector<std::string> ready_cores;
         set_intersection(cores_with_it.begin(), cores_with_it.end(), empty_queue_cores.begin(), empty_queue_cores.end(), std::back_inserter(ready_cores));
 
-        if (!await_blocks.count(block_hash) && !aplied_blocks.count(block_hash)) {
-            if (!ready_cores.empty()) {
+        if (!blocks.contains(block_hash)) {
+            std::vector<char> get_block;
+            get_block.insert(get_block.end(), block_hash.begin(), block_hash.end());
+
+            if (ready_cores.empty()) {
+                cores.send_with_callback(RPC_GET_BLOCK, get_block, [this](const std::string&, const std::vector<char>& resp) {
+                    std::string_view block_sw(resp.data(), resp.size());
+
+                    parse_RPC_PRETEND_BLOCK(block_sw);
+                });
+            } else {
                 std::uniform_int_distribution<int> dist(0, ready_cores.size() - 1);
                 auto rand_int = dist(mt);
-
-                std::vector<char> get_block;
-                get_block.insert(get_block.end(), block_hash.begin(), block_hash.end());
 
                 cores.send_with_callback_to_one(ready_cores[rand_int], RPC_GET_BLOCK, get_block, [this](const std::vector<char>& resp) {
                     std::string_view block_sw(resp.data(), resp.size());
 
                     parse_RPC_PRETEND_BLOCK(block_sw);
                 });
-
-                cores.send_with_callback(RPC_GET_APPROVE, get_block, [this](const std::string&, const std::vector<char>& resp) {
-                    uint index = 0;
-                    while (index + 8 <= resp.size()) {
-                        uint64_t approve_size = *(reinterpret_cast<const uint64_t*>(&resp[index]));
-                        index += 8;
-
-                        if (index + approve_size > resp.size()) {
-                            break;
-                        }
-                        std::string_view approve_sw(&resp[index], approve_size);
-                        parse_RPC_APPROVE(approve_sw);
-                        index += approve_size;
-                    }
-                });
             }
+
+            cores.send_with_callback(RPC_GET_APPROVE, get_block, [this](const std::string&, const std::vector<char>& resp) {
+                uint index = 0;
+                while (index + 8 <= resp.size()) {
+                    uint64_t approve_size = *(reinterpret_cast<const uint64_t*>(&resp[index]));
+                    index += 8;
+
+                    if (index + approve_size > resp.size()) {
+                        break;
+                    }
+                    std::string_view approve_sw(&resp[index], approve_size);
+                    parse_RPC_APPROVE(approve_sw);
+                    index += approve_size;
+                }
+            });
         }
     }
 }

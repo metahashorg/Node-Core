@@ -59,10 +59,7 @@ bool ControllerImplementation::try_make_block(uint64_t timestamp)
             if (block) {
                 if (BC.can_apply_block(block)) {
                     last_created_block = block->get_block_hash();
-                    {
-                        std::unique_lock lock(blocks_lock);
-                        await_blocks.insert({ block->get_block_hash(), block });
-                    }
+                    blocks.insert(block);
                     distribute(block);
                     approve_block(block);
                     return true;

@@ -104,7 +104,7 @@ std::vector<char> ControllerImplementation::make_pretend_core_list(uint64_t curr
     std::string master;
     std::set<std::string> slaves;
     if (cores_list.size() >= METAHASH_PRIMARY_CORES_COUNT) {
-        uint64_t last_block_hash_xx64 = crypto::get_xxhash64(aplied_blocks[last_applied_block]->get_data()) + current_generation;
+        uint64_t last_block_hash_xx64 = crypto::get_xxhash64(blocks[last_applied_block]->get_data()) + current_generation;
         {
             std::sort(cores_list.begin(), cores_list.end());
             std::mt19937_64 r;

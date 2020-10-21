@@ -108,6 +108,8 @@ public:
 private:
     void main_loop();
 
+    bool check_awaited_blocks();
+
     std::vector<char> add_pack_to_queue(network::Request& request);
     void log_network_statistics(uint64_t timestamp);
 
@@ -123,21 +125,22 @@ private:
     std::vector<char> parse_RPC_GET_CORE_LIST(std::string_view);
     void parse_RPC_CORE_LIST_APPROVE(std::string core, std::string_view);
 
-    bool approve_block(block::Block*);
+    void approve_block(block::Block*);
     void disapprove_block(block::Block*);
-    bool apply_approve(transaction::ApproveRecord*);
-    bool count_approve_for_block(const sha256_2& block_hash);
+    void apply_approve(transaction::ApproveRecord*);
+    bool count_approve_for_block(block::Block*);
     bool try_apply_block(block::Block*, bool write = true);
     void distribute(block::Block*);
     void distribute(transaction::ApproveRecord*);
     bool master();
-    bool check_block_for_appliance_and_break_on_corrupt_block(const sha256_2& hash, block::Block*& block);
+    bool check_block_for_appliance_and_break_on_corrupt_block(block::Block*& block);
 
     void write_block(block::Block*);
 
     bool try_make_block(uint64_t timestamp);
 
     void read_and_apply_local_chain();
+    void check_blocks();
 
     void check_if_chain_actual();
     void actualize_chain();

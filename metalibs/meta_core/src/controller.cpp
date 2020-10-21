@@ -4,7 +4,7 @@
 
 namespace metahash::meta_core {
 
-bool ControllerImplementation::approve_block(block::Block* p_block)
+void ControllerImplementation::approve_block(block::Block* p_block)
 {
     auto* p_ar = new transaction::ApproveRecord;
     p_ar->make(p_block->get_block_hash(), signer);
@@ -24,62 +24,38 @@ void ControllerImplementation::disapprove_block(block::Block* p_block)
     apply_approve(p_ar);
 }
 
-bool ControllerImplementation::apply_approve(transaction::ApproveRecord* p_ar)
+void ControllerImplementation::apply_approve(transaction::ApproveRecord* p_ar)
 {
     sha256_2 block_hash;
     std::copy(p_ar->block_hash.begin(), p_ar->block_hash.end(), block_hash.begin());
 
     std::string addr = "0x" + crypto::bin2hex(crypto::get_address(p_ar->pub_key));
 
+    std::unique_lock lock(block_approve_lock);
     if (p_ar->approve) {
-        {
-            std::unique_lock lock(block_approve_lock);
-            if (!block_approve[block_hash].insert({ addr, p_ar }).second) {
-                delete p_ar;
-            }
+        if (!block_approve[block_hash].insert({ addr, p_ar }).second) {
+            delete p_ar;
         }
-
-        return count_approve_for_block(block_hash);
     } else {
         if (!block_disapprove[block_hash].insert({ addr, p_ar }).second) {
             delete p_ar;
         }
     }
-
-    return false;
 }
 
-bool ControllerImplementation::count_approve_for_block(const sha256_2& block_hash)
+bool ControllerImplementation::count_approve_for_block(block::Block* block)
 {
+    auto block_hash = block->get_block_hash();
+
     uint64_t approve_size = 0;
     for (auto&& [addr, _] : block_approve[block_hash]) {
-        //DEBUG_COUT(addr);
         if (std::find(current_cores.begin(), current_cores.end(), addr) != std::end(current_cores)) {
             approve_size++;
         }
     }
-    for (auto& addr : current_cores) {
-        //DEBUG_COUT(addr);
-    }
 
-    //DEBUG_COUT(std::to_string(approve_size) + "\t" + std::to_string(min_approve) + "\t" + std::to_string(current_cores.size()));
-    if (approve_size >= min_approve || approve_size == current_cores.size()) {
-        if (await_blocks.count(block_hash)) {
-            static const sha256_2 zero_block = { { 0 } };
-            auto* block = await_blocks[block_hash];
-
-            if (last_applied_block != zero_block) {
-                if (block->get_prev_hash() == last_applied_block) {
-                    return try_apply_block(block);
-                }
-            } else {
-                if (proved_block != zero_block && block_hash == proved_block) {
-                    return try_apply_block(block);
-                } else if (proved_block == zero_block && block->get_prev_hash() == proved_block) {
-                    return try_apply_block(block);
-                }
-            }
-        }
+    if (approve_size >= min_approve || approve_size == current_cores.size() || block->is_local()) {
+        return try_apply_block(block);
     }
 
     return false;
@@ -97,14 +73,6 @@ bool ControllerImplementation::try_apply_block(block::Block* block, bool write)
             prev_state = block->get_block_type();
         }
 
-        {
-            auto hash = block->get_block_hash();
-
-            std::unique_lock ulock(blocks_lock);
-            aplied_blocks.insert({ hash, block });
-            await_blocks.erase(hash);
-        }
-
         if (write) {
             write_block(block);
 
@@ -115,9 +83,11 @@ bool ControllerImplementation::try_apply_block(block::Block* block, bool write)
                         allowed_addresses.insert(addr);
                     }
                 }
-                listener->update_allowed_addreses(allowed_addresses);
+
+                listener.update_allowed_addreses(allowed_addresses);
             }
         }
+
         return true;
     }
 
@@ -150,27 +120,26 @@ bool ControllerImplementation::master()
     return false;
 }
 
-bool ControllerImplementation::check_block_for_appliance_and_break_on_corrupt_block(const sha256_2& hash, block::Block*& block)
+bool ControllerImplementation::check_block_for_appliance_and_break_on_corrupt_block(block::Block*& block)
 {
-    const bool return_break = true;
-
+    sha256_2 hash = block->get_block_hash();
     if (!block_approve[hash].count(signer.get_mh_addr()) && !block_disapprove[hash].count(signer.get_mh_addr())) {
         if (BC.can_apply_block(block)) {
-            return approve_block(block);
+            approve_block(block);
+
+            return count_approve_for_block(block);
         } else {
             disapprove_block(block);
 
-            std::unique_lock lock(blocks_lock);
-            await_blocks.erase(hash);
-            delete block;
+            blocks.erase(hash);
 
-            return return_break;
+            return true;
         }
     } else {
-        return count_approve_for_block(hash);
+        return count_approve_for_block(block);
     }
 
-    return !return_break;
+    return false;
 }
 
 }

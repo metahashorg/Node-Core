@@ -66,10 +66,7 @@ void ControllerImplementation::parse_RPC_PRETEND_BLOCK(std::string_view pack)
             serial_execution.post([this, block] {
                 missing_blocks.erase(block->get_block_hash());
 
-                std::unique_lock lock(blocks_lock);
-                if (!await_blocks.insert({ block->get_block_hash(), block }).second) {
-                    delete block;
-                }
+                blocks.insert(block);
             });
         } else if (dynamic_cast<block::RejectedTXBlock*>(block)) {
             serial_execution.post([this, block] {
@@ -128,11 +125,8 @@ std::vector<char> ControllerImplementation::parse_RPC_GET_APPROVE(std::string_vi
     if (approve_list_it == block_approve.end()) {
         sha256_2 got_block = last_applied_block;
 
-        {
-            std::shared_lock b_lock(blocks_lock);
-            while (got_block != approve_wanted_block && aplied_blocks.count(got_block)) {
-                got_block = aplied_blocks[got_block]->get_prev_hash();
-            }
+        while (got_block != approve_wanted_block && blocks.contains(got_block)) {
+            got_block = blocks[got_block]->get_prev_hash();
         }
 
         if (got_block == approve_wanted_block) {
@@ -170,14 +164,10 @@ std::vector<char> ControllerImplementation::parse_RPC_LAST_BLOCK(std::string_vie
     uint64_t got_timestamp;
 
     if (master()) {
-        std::shared_lock s_lock(blocks_lock);
 
-        if (await_blocks.count(last_created_block)) {
+        if (blocks.contains(last_created_block)) {
             got_block = last_created_block;
-            got_timestamp = await_blocks[last_created_block]->get_block_timestamp();
-        } else if (aplied_blocks.count(last_created_block)) {
-            got_block = last_created_block;
-            got_timestamp = aplied_blocks[last_created_block]->get_block_timestamp();
+            got_timestamp = blocks[last_created_block]->get_block_timestamp();
         } else {
             got_block = last_applied_block;
             got_timestamp = prev_timestamp;
@@ -203,12 +193,8 @@ std::vector<char> ControllerImplementation::parse_RPC_GET_BLOCK(std::string_view
     sha256_2 block_hash;
     std::copy_n(pack.begin(), 32, block_hash.begin());
 
-    std::shared_lock b_lock(blocks_lock);
-    if (aplied_blocks.count(block_hash)) {
-        return aplied_blocks[block_hash]->get_data();
-    }
-    if (await_blocks.count(block_hash)) {
-        return await_blocks[block_hash]->get_data();
+    if (blocks.contains(block_hash)) {
+        return blocks[block_hash]->get_data();
     }
 
     return std::vector<char>();
@@ -226,22 +212,18 @@ std::vector<char> ControllerImplementation::parse_RPC_GET_CHAIN(std::string_view
     std::vector<char> chain;
     sha256_2 got_block = last_applied_block;
 
-    std::shared_lock b_lock(blocks_lock);
-    while (got_block != prev_block && aplied_blocks.count(got_block)) {
-        auto& block_data = aplied_blocks[got_block]->get_data();
-        b_lock.unlock();
+    while (got_block != prev_block && blocks.contains(got_block)) {
+        auto& block_data = blocks[got_block]->get_data();
 
         uint64_t block_size = block_data.size();
         chain.insert(chain.end(), reinterpret_cast<char*>(&block_size), reinterpret_cast<char*>(&block_size) + sizeof(uint64_t));
         chain.insert(chain.end(), block_data.begin(), block_data.end());
 
-        b_lock.lock();
-        got_block = aplied_blocks[got_block]->get_prev_hash();
+        got_block = blocks[got_block]->get_prev_hash();
     }
-    b_lock.unlock();
 
     if (master()) {
-        auto& block_data = await_blocks[last_created_block]->get_data();
+        auto& block_data = blocks[last_created_block]->get_data();
         uint64_t block_size = block_data.size();
         chain.insert(chain.end(), reinterpret_cast<char*>(&block_size), reinterpret_cast<char*>(&block_size) + sizeof(uint64_t));
         chain.insert(chain.end(), block_data.begin(), block_data.end());
@@ -263,16 +245,15 @@ std::vector<char> ControllerImplementation::parse_RPC_GET_MISSING_BLOCK_LIST(std
 
     sha256_2 got_block = last_applied_block;
 
-    std::shared_lock b_lock(blocks_lock);
-    while (got_block != prev_block && aplied_blocks.count(got_block)) {
-        b_lock.unlock();
-
+    while (got_block != prev_block && blocks.contains(got_block)) {
         chain.insert(chain.end(), got_block.begin(), got_block.end());
 
-        b_lock.lock();
-        got_block = aplied_blocks[got_block]->get_prev_hash();
+        got_block = blocks[got_block]->get_prev_hash();
     }
-    b_lock.unlock();
+
+    if (blocks.contains(prev_block)) {
+        chain.insert(chain.end(), prev_block.begin(), prev_block.end());
+    }
 
     if (master()) {
         chain.insert(chain.end(), last_created_block.begin(), last_created_block.end());
