@@ -24,10 +24,6 @@ private:
 
     std::vector<transaction::TX*> transactions;
 
-    std::shared_mutex blocks_lock;
-    std::unordered_map<sha256_2, block::Block*, crypto::Hasher> aplied_blocks;
-    std::unordered_map<sha256_2, block::Block*, crypto::Hasher> await_blocks;
-
     std::map<sha256_2, std::set<std::string>> missing_blocks;
 
     std::shared_mutex block_approve_lock;
@@ -81,6 +77,19 @@ private:
     std::atomic<uint64_t> dbg_RPC_CORE_LIST_APPROVE = 0;
     std::atomic<uint64_t> dbg_RPC_PRETEND_BLOCK = 0;
     std::atomic<uint64_t> dbg_RPC_NONE = 0;
+    struct Blocks {
+        std::shared_mutex blocks_lock;
+        std::unordered_map<sha256_2, block::Block*, crypto::Hasher> blocks;
+        std::unordered_multimap<sha256_2, block::Block*, crypto::Hasher> previous;
+
+        bool contains(const sha256_2&);
+        bool contains_next(const sha256_2&);
+        void insert(block::Block*);
+        block::Block* operator[](const sha256_2&);
+        block::Block* get_next(const sha256_2&);
+        void erase(const sha256_2&);
+
+    } blocks;
 
 public:
     ControllerImplementation(

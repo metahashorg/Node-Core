@@ -11,7 +11,8 @@ add_library(${PROJECT_NAME}
         src/controller_check_online_nodes.cpp
         src/controller_read_and_apply_local_chain.cpp
         src/controller_add_pack_to_queue.cpp
-        src/controller_public_interface.cpp)
+        src/controller_public_interface.cpp 
+        src/controller_blocks.cpp)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
