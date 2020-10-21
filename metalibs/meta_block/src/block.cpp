@@ -79,4 +79,14 @@ sha256_2 Block::get_block_hash()
     return crypto::get_sha256(data);
 }
 
+bool Block::is_local()
+{
+    return from_local_storage;
+}
+
+void Block::set_local()
+{
+    from_local_storage = true;
+}
+
 }

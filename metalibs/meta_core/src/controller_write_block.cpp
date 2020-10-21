@@ -10,6 +10,10 @@ namespace metahash::meta_core {
 
 void ControllerImplementation::write_block(block::Block* block)
 {
+    if (block->is_local()) {
+        return;
+    }
+
     auto theTime = static_cast<time_t>(block->get_block_timestamp());
     struct tm* aTime = localtime(&theTime);
 

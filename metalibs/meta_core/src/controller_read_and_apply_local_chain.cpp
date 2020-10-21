@@ -56,6 +56,8 @@ void parse_block_async(
             if (!dynamic_cast<block::CommonBlock*>(block) && !dynamic_cast<block::ApproveBlock*>(block)) {
                 delete block;
                 block = nullptr;
+            } else {
+                block->set_local();
             }
         } else {
             DEBUG_COUT("Block parse error");
