@@ -63,20 +63,22 @@ private:
 
     bool goon = true;
 
-    uint64_t dbg_timestamp = 0;
-    std::atomic<uint64_t> dbg_RPC_PING = 0;
-    std::atomic<uint64_t> dbg_RPC_TX = 0;
-    std::atomic<uint64_t> dbg_RPC_GET_CORE_LIST = 0;
-    std::atomic<uint64_t> dbg_RPC_APPROVE = 0;
-    std::atomic<uint64_t> dbg_RPC_DISAPPROVE = 0;
-    std::atomic<uint64_t> dbg_RPC_GET_APPROVE = 0;
-    std::atomic<uint64_t> dbg_RPC_LAST_BLOCK = 0;
-    std::atomic<uint64_t> dbg_RPC_GET_BLOCK = 0;
-    std::atomic<uint64_t> dbg_RPC_GET_CHAIN = 0;
-    std::atomic<uint64_t> dbg_RPC_GET_MISSING_BLOCK_LIST = 0;
-    std::atomic<uint64_t> dbg_RPC_CORE_LIST_APPROVE = 0;
-    std::atomic<uint64_t> dbg_RPC_PRETEND_BLOCK = 0;
-    std::atomic<uint64_t> dbg_RPC_NONE = 0;
+    struct Statistics {
+        uint64_t dbg_timestamp = 0;
+        std::atomic<uint64_t> dbg_RPC_TX = 0;
+        std::atomic<uint64_t> dbg_RPC_GET_CORE_LIST = 0;
+        std::atomic<uint64_t> dbg_RPC_APPROVE = 0;
+        std::atomic<uint64_t> dbg_RPC_DISAPPROVE = 0;
+        std::atomic<uint64_t> dbg_RPC_GET_APPROVE = 0;
+        std::atomic<uint64_t> dbg_RPC_LAST_BLOCK = 0;
+        std::atomic<uint64_t> dbg_RPC_GET_BLOCK = 0;
+        std::atomic<uint64_t> dbg_RPC_GET_CHAIN = 0;
+        std::atomic<uint64_t> dbg_RPC_GET_MISSING_BLOCK_LIST = 0;
+        std::atomic<uint64_t> dbg_RPC_CORE_LIST_APPROVE = 0;
+        std::atomic<uint64_t> dbg_RPC_PRETEND_BLOCK = 0;
+        std::atomic<uint64_t> dbg_RPC_NONE = 0;
+    } stat;
+
     struct Blocks {
         std::shared_mutex blocks_lock;
         std::unordered_map<sha256_2, block::Block*, crypto::Hasher> blocks;
