@@ -9,7 +9,11 @@ namespace metahash::meta_core {
 
 void ControllerImplementation::check_if_chain_actual()
 {
-    cores.send_with_callback(RPC_LAST_BLOCK, std::vector<char>(), [this](const std::string& mh_addr, const std::vector<char>& resp) {
+    auto index = actualization_iteration % 2;
+    not_actualized[index] = 0;
+    actualization_iteration++;
+
+    cores.send_with_callback(RPC_LAST_BLOCK, std::vector<char>(), [this, index](const std::string& mh_addr, const std::vector<char>& resp) {
         if (resp.size() >= 40) {
             sha256_2 last_block_return;
             std::copy_n(resp.begin(), 32, last_block_return.begin());
@@ -17,8 +21,10 @@ void ControllerImplementation::check_if_chain_actual()
             uint64_t block_timestamp = 0;
             std::copy_n(resp.begin() + 32, 8, reinterpret_cast<char*>(&block_timestamp));
 
-            serial_execution.post([this, last_block_return, block_timestamp, mh_addr] {
+            serial_execution.post([this, last_block_return, block_timestamp, mh_addr, index] {
                 if (block_timestamp >= prev_timestamp && !blocks.contains(last_block_return)) {
+                    not_actualized[index]++;
+
                     std::vector<char> last_block;
 
                     static const sha256_2 zero_block = { { 0 } };

@@ -53,6 +53,8 @@ private:
 
     uint64_t last_actualization_timestamp = 0;
     uint64_t last_actualization_check_timestamp = 0;
+    uint64_t actualization_iteration = 0;
+    int not_actualized[2];
 
     network::meta_server listener;
 
@@ -107,6 +109,8 @@ public:
 
 private:
     void main_loop();
+
+    bool check_if_can_make_block(const uint64_t& timestamp);
 
     bool check_awaited_blocks();
 

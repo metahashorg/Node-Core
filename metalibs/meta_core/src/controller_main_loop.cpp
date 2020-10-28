@@ -28,8 +28,8 @@ void ControllerImplementation::main_loop()
 
     no_sleep = check_awaited_blocks();
 
-    if (check_online_nodes(timestamp) && master() && try_make_block(timestamp)) {
-        no_sleep = true;
+    if (check_if_can_make_block(timestamp)) {
+        no_sleep = try_make_block(timestamp);
     }
 
     if (no_sleep) {
@@ -40,6 +40,21 @@ void ControllerImplementation::main_loop()
             main_loop();
         });
     }
+}
+
+bool ControllerImplementation::check_if_can_make_block(const uint64_t& timestamp)
+{
+    if (not_actualized[0] || not_actualized[1]) {
+        return false;
+    }
+    if (!check_online_nodes(timestamp)) {
+        return false;
+
+    }
+    if (!master()) {
+        return false;
+    }
+    return true;
 }
 
 bool ControllerImplementation::check_awaited_blocks()
