@@ -82,7 +82,7 @@ private:
     struct Blocks {
         std::shared_mutex blocks_lock;
         std::unordered_map<sha256_2, block::Block*, crypto::Hasher> blocks;
-        std::unordered_multimap<sha256_2, block::Block*, crypto::Hasher> previous;
+        std::unordered_map<sha256_2, block::Block*, crypto::Hasher> previous;
 
         bool contains(const sha256_2&);
         bool contains_next(const sha256_2&);

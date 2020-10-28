@@ -20,11 +20,12 @@ void ControllerImplementation::Blocks::insert(block::Block* block)
     sha256_2 prev = block->get_prev_hash();
 
     std::unique_lock lock(blocks_lock);
-    if (!blocks.insert({ hash, block }).second) {
+    if (blocks.count(hash) || previous.count(prev)) {
         delete block;
         return;
     }
 
+    blocks.insert({ hash, block });
     previous.insert({ prev, block });
 }
 
