@@ -100,7 +100,7 @@ void read_last_known_state(sha256_2& proved_block)
 
 void read_stored_blocks(
     boost::asio::io_context& io_context,
-    std::string path,
+    const std::string& path,
     std::list<std::future<metahash::block::Block*>>& pending_data)
 {
     uint files_read = 0;

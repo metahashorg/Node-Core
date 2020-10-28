@@ -82,18 +82,20 @@ void ControllerImplementation::actualize_chain()
 
             if (ready_cores.empty()) {
                 cores.send_with_callback(RPC_GET_BLOCK, get_block, [this](const std::string&, const std::vector<char>& resp) {
-                    std::string_view block_sw(resp.data(), resp.size());
-
-                    parse_RPC_PRETEND_BLOCK(block_sw);
+                    if (resp.size()) {
+                        std::string_view block_sw(resp.data(), resp.size());
+                        parse_RPC_PRETEND_BLOCK(block_sw);
+                    }
                 });
             } else {
                 std::uniform_int_distribution<int> dist(0, ready_cores.size() - 1);
                 auto rand_int = dist(mt);
 
                 cores.send_with_callback_to_one(ready_cores[rand_int], RPC_GET_BLOCK, get_block, [this](const std::vector<char>& resp) {
-                    std::string_view block_sw(resp.data(), resp.size());
-
-                    parse_RPC_PRETEND_BLOCK(block_sw);
+                    if (resp.size()) {
+                        std::string_view block_sw(resp.data(), resp.size());
+                        parse_RPC_PRETEND_BLOCK(block_sw);
+                    }
                 });
             }
 
