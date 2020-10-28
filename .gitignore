@@ -1,5 +1,5 @@
 /*build*
 /.vscode/
 /.vs
-/out/build/WSL-GCC-Debug
+/out/
 /CMakeSettings.json
