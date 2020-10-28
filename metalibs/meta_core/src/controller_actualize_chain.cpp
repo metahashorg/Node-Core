@@ -91,22 +91,34 @@ void ControllerImplementation::actualize_chain()
                 });
             }
 
-            cores.send_with_callback(RPC_GET_APPROVE, get_block, [this](const std::string&, const std::vector<char>& resp) {
-                uint index = 0;
-                while (index + 8 <= resp.size()) {
-                    uint64_t approve_size = *(reinterpret_cast<const uint64_t*>(&resp[index]));
-                    index += 8;
-
-                    if (index + approve_size > resp.size()) {
-                        break;
-                    }
-                    std::string_view approve_sw(&resp[index], approve_size);
-                    parse_RPC_APPROVE(approve_sw);
-                    index += approve_size;
-                }
-            });
+            get_approve_for_block(get_block);
         }
     }
+}
+
+void ControllerImplementation::get_approve_for_block(sha256_2& block_hash)
+{
+    std::vector<char> get_block;
+    get_block.insert(get_block.end(), block_hash.begin(), block_hash.end());
+    get_approve_for_block(get_block);
+}
+
+void ControllerImplementation::get_approve_for_block(std::vector<char>& get_block)
+{
+    cores.send_with_callback(RPC_GET_APPROVE, get_block, [this](const std::string&, const std::vector<char>& resp) {
+        uint index = 0;
+        while (index + 8 <= resp.size()) {
+            uint64_t approve_size = *(reinterpret_cast<const uint64_t*>(&resp[index]));
+            index += 8;
+
+            if (index + approve_size > resp.size()) {
+                break;
+            }
+            std::string_view approve_sw(&resp[index], approve_size);
+            parse_RPC_APPROVE(approve_sw);
+            index += approve_size;
+        }
+    });
 }
 
 }

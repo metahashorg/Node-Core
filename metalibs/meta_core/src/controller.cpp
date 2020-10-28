@@ -58,6 +58,7 @@ bool ControllerImplementation::count_approve_for_block(block::Block* block)
         return try_apply_block(block);
     }
 
+    get_approve_for_block(block_hash);
     return false;
 }
 

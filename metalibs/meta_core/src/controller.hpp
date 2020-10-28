@@ -145,6 +145,9 @@ private:
     void check_if_chain_actual();
     void actualize_chain();
 
+    void get_approve_for_block(sha256_2& block_hash);
+    void get_approve_for_block(std::vector<char>& get_block);
+
     bool check_online_nodes(uint64_t timestamp);
     std::vector<char> make_pretend_core_list(uint64_t current_generation);
 };

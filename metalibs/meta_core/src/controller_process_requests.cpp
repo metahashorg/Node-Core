@@ -134,9 +134,8 @@ std::vector<char> ControllerImplementation::parse_RPC_GET_APPROVE(std::string_vi
             p_ar->make(got_block, signer);
             p_ar->approve = true;
             std::unique_lock ulock(block_approve_lock);
-            auto insert_result = block_approve[got_block].insert({ signer.get_mh_addr(), p_ar });
-            if (!insert_result.second) {
-                DEBUG_COUT("APPROVE ALREADY PRESENT NOT CREATED");
+            if (!block_approve[got_block].insert({ signer.get_mh_addr(), p_ar }).second) {
+                //DEBUG_COUT("APPROVE ALREADY PRESENT NOT CREATED");
                 delete p_ar;
             }
             approve_list_it = block_approve.find(approve_wanted_block);
