@@ -18,9 +18,9 @@ std::thread* cout_printer = new std::thread([]() {
                 delete ssout_list[i];
 
                 if (i == size - 1) {
-                    std::cout << "\n";
-                } else {
                     std::cout << std::endl;
+                } else {
+                    std::cout << "\n";
                 }
             }
         } else {
