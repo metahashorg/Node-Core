@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <set>
+#include <unordered_set>
 
 #include <meta_block.h>
 #include <meta_pool.hpp>
@@ -32,6 +33,9 @@ private:
 
     std::unordered_map<std::string, std::set<std::string>, crypto::Hasher> node_state;
     std::unordered_map<std::string, std::map<std::string, ProxyStat>, crypto::Hasher> node_statistics;
+
+    std::unordered_set<sha256_2, crypto::Hasher> applied_transactions;
+    std::unordered_set<sha256_2, crypto::Hasher> temp_apply_tx;
 
     std::vector<transaction::TX*> statistics_tx_list;
     std::vector<transaction::RejectedTXInfo*> rejected_tx_list;

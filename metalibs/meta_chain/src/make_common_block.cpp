@@ -43,6 +43,12 @@ block::Block* BlockChain::make_common_block(uint64_t timestamp, std::vector<tran
 
         //check temp balances
         for (auto* tx : transactions) {
+            if (applied_transactions.find(tx->hash) != applied_transactions.end()) {
+                delete tx;
+                continue;
+            }
+            
+
             const std::string& addr_from = tx->addr_from;
             const std::string& addr_to = tx->addr_to;
 
