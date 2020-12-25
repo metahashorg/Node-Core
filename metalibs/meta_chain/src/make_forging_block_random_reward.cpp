@@ -7,10 +7,8 @@
 
 namespace metahash::meta_chain {
 
-void BlockChain::make_forging_block_random_reward(uint64_t timestamp, std::deque<std::string>& active_forging, std::vector<char>& txs_buff)
+void BlockChain::make_forging_block_random_reward(const uint64_t pool, std::deque<std::string>& active_forging, std::vector<char>& txs_buff)
 {
-    auto state_fee = wallet_map.get_wallet(STATE_FEE_WALLET);
-
     if (!active_forging.empty()) {
         {
             DEBUG_COUT("state_hash_xx64\t" + std::to_string(state_hash_xx64));
@@ -32,7 +30,7 @@ void BlockChain::make_forging_block_random_reward(uint64_t timestamp, std::deque
             }
         }
 
-        const uint64_t forging_count_total = ((FORGING_POOL(timestamp) + state_fee->get_value()) * 1) / 10;
+        const uint64_t forging_count_total = (pool * 10) / 100;
 
         const uint64_t FORGING_RANDOM_REWARD_1 = forging_count_total * 4 / 10;
         const uint64_t FORGING_RANDOM_REWARD_2 = forging_count_total * 1 / 10;

@@ -69,10 +69,10 @@ private:
     std::pair<std::map<std::string, std::map<std::string, std::map<std::string, uint64_t>>>, std::map<std::string, uint64_t>> make_forging_block_get_node_stats();
     std::pair<std::deque<std::string>, std::map<std::string, uint64_t>> make_forging_block_get_wallet_stats();
 
-    void make_forging_block_node_reward(uint64_t timestamp, std::map<std::string, std::map<std::string, std::map<std::string, uint64_t>>>& type_geo_node_delegates, std::vector<char>& txs_buff);
-    void make_forging_block_coin_reward(uint64_t timestamp, std::map<std::string, uint64_t>& delegates, std::vector<char>& txs_buff);
-    void make_forging_block_random_reward(uint64_t timestamp, std::deque<std::string>& active_forging, std::vector<char>& txs_buff);
-    void make_forging_block_wallet_reward(uint64_t timestamp, std::map<std::string, uint64_t>& pasive_forging, std::vector<char>& txs_buff);
+    void make_forging_block_node_reward(const uint64_t pool, std::map<std::string, std::map<std::string, std::map<std::string, uint64_t>>>& type_geo_node_delegates, std::vector<char>& txs_buff);
+    void make_forging_block_coin_reward(const uint64_t pool, std::map<std::string, uint64_t>& delegates, std::vector<char>& txs_buff);
+    void make_forging_block_random_reward(const uint64_t pool, std::deque<std::string>& active_forging, std::vector<char>& txs_buff);
+    void make_forging_block_wallet_reward(const uint64_t pool, std::map<std::string, uint64_t>& pasive_forging, std::vector<char>& txs_buff);
 
     static uint64_t get_fee(uint64_t cnt);
     static uint64_t FORGING_POOL(uint64_t ts);

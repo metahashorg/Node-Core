@@ -5,11 +5,9 @@
 
 namespace metahash::meta_chain {
 
-void BlockChain::make_forging_block_node_reward(uint64_t timestamp, std::map<std::string, std::map<std::string, std::map<std::string, uint64_t>>>& type_geo_node_delegates, std::vector<char>& txs_buff)
+void BlockChain::make_forging_block_node_reward(const uint64_t pool, std::map<std::string, std::map<std::string, std::map<std::string, uint64_t>>>& type_geo_node_delegates, std::vector<char>& txs_buff)
 {
     if (!type_geo_node_delegates.empty()) {
-        auto state_fee = wallet_map.get_wallet(STATE_FEE_WALLET);
-
         std::set<std::string> reward_nodes;
         static const std::vector<std::string> types_by_value {
             "Proxy",
@@ -52,7 +50,6 @@ void BlockChain::make_forging_block_node_reward(uint64_t timestamp, std::map<std
             }
         }
 
-        const uint64_t pool = (FORGING_POOL(timestamp) + state_fee->get_value());
         uint64_t forging_node_total = (pool * 10) / 100;
 
         std::map<std::string, std::map<std::string, uint64_t>> geo_total = {

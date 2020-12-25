@@ -5,17 +5,15 @@
 
 namespace metahash::meta_chain {
 
-void BlockChain::make_forging_block_coin_reward(uint64_t timestamp, std::map<std::string, uint64_t>& delegates, std::vector<char>& txs_buff)
+void BlockChain::make_forging_block_coin_reward(const uint64_t pool, std::map<std::string, uint64_t>& delegates, std::vector<char>& txs_buff)
 {
-    auto state_fee = wallet_map.get_wallet(STATE_FEE_WALLET);
-
     uint64_t forging_coin_units = 0;
     for (auto& delegate_pair : delegates) {
         forging_coin_units += delegate_pair.second;
     }
 
     if (forging_coin_units) {
-        uint64_t forging_coin_total = ((FORGING_POOL(timestamp) + state_fee->get_value()) * 5) / 10;
+        uint64_t forging_coin_total = (pool * 50) / 100;
         double forging_coin_per_one = double(forging_coin_total) / double(forging_coin_units);
 
         for (auto& delegate_pair : delegates) {
