@@ -8,6 +8,12 @@ add_library(${PROJECT_NAME}
         src/interface_functions.cpp
         src/make_common_block.cpp
         src/make_forging_block.cpp
+        src/make_forging_block_coin_reward.cpp
+        src/make_forging_block_get_wallet_stats.cpp
+        src/make_forging_block_get_node_stats.cpp
+        src/make_forging_block_node_reward.cpp
+        src/make_forging_block_random_reward.cpp
+        src/make_forging_block_wallet_reward.cpp
         src/make_state_block.cpp
         src/make_statistics_block.cpp
         src/try_apply_block.cpp)

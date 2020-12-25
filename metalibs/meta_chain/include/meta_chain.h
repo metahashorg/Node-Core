@@ -47,15 +47,11 @@ public:
     BlockChain(boost::asio::io_context& io_context);
 
     bool can_apply_block(block::Block* block);
-
     bool apply_block(block::Block* block);
 
     block::Block* make_forging_block(uint64_t timestamp);
-
     block::Block* make_state_block(uint64_t timestamp);
-
     block::Block* make_common_block(uint64_t timestamp, std::vector<transaction::TX*>& transactions);
-
     block::Block* make_statistics_block(uint64_t timestamp);
 
     std::vector<transaction::RejectedTXInfo*>* make_rejected_tx_block(uint64_t timestamp);
@@ -67,7 +63,16 @@ public:
     const std::unordered_map<std::string, std::set<std::string>, crypto::Hasher>& get_node_state();
 
 private:
-    static block::Block* make_block(uint64_t b_type, uint64_t b_time, sha256_2 prev_b_hash, std::vector<char>& tx_buff);
+    block::Block* make_block(uint64_t b_type, uint64_t b_time, sha256_2 prev_b_hash, std::vector<char>& tx_buff);
+
+    std::vector<char> make_forging_tx(const std::string& address, uint64_t reward, const std::vector<unsigned char>& data, uint64_t tx_type);
+    std::pair<std::map<std::string, std::map<std::string, std::map<std::string, uint64_t>>>, std::map<std::string, uint64_t>> make_forging_block_get_node_stats();
+    std::pair<std::deque<std::string>, std::map<std::string, uint64_t>> make_forging_block_get_wallet_stats();
+
+    void make_forging_block_node_reward(uint64_t timestamp, std::map<std::string, std::map<std::string, std::map<std::string, uint64_t>>>& type_geo_node_delegates, std::vector<char>& txs_buff);
+    void make_forging_block_coin_reward(uint64_t timestamp, std::map<std::string, uint64_t>& delegates, std::vector<char>& txs_buff);
+    void make_forging_block_random_reward(uint64_t timestamp, std::deque<std::string>& active_forging, std::vector<char>& txs_buff);
+    void make_forging_block_wallet_reward(uint64_t timestamp, std::map<std::string, uint64_t>& pasive_forging, std::vector<char>& txs_buff);
 
     static uint64_t get_fee(uint64_t cnt);
     static uint64_t FORGING_POOL(uint64_t ts);
