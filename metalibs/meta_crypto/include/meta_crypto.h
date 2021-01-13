@@ -6,7 +6,7 @@
 // Containers
 #include <array>
 #include <vector>
-
+#include <string>
 // OpenSSL
 #include <openssl/ecdsa.h>
 #include <openssl/evp.h>
