@@ -64,17 +64,17 @@ void Connection::read(std::shared_ptr<Connection> pThis)
                 pThis->read(pThis);
             } break;
             case statics::WRONG_MAGIC_NUMBER: {
-                DEBUG_COUT("WRONG_MAGIC_NUMBER");
+                // DEBUG_COUT("WRONG_MAGIC_NUMBER");
                 pThis->reply.make_http(statics::version_info(pThis->signer.get_mh_addr()));
                 pThis->write_and_close(pThis);
             } break;
             case statics::UNKNOWN_SENDER_METAHASH_ADDRESS: {
-                DEBUG_COUT("UNKNOWN_SENDER_METAHASH_ADDRESS");
+                // DEBUG_COUT("UNKNOWN_SENDER_METAHASH_ADDRESS");
                 pThis->reply.make(pThis->signer, pThis->request.request_id, statics::unknown_sender);
                 pThis->write_and_close(pThis);
             } break;
             case statics::INVALID_SIGN: {
-                DEBUG_COUT("INVALID_SIGN");
+                // DEBUG_COUT("INVALID_SIGN");
                 pThis->reply.make(pThis->signer, pThis->request.request_id, statics::invalid_sign);
                 pThis->write_and_close(pThis);
             } break;
