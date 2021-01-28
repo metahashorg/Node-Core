@@ -11,7 +11,7 @@ namespace metahash::connection {
 
 class MetaConnection {
 private:
-    const uint64_t concurrent_connections_count = 4;
+    const uint64_t concurrent_connections_count = 16;
 
     std::shared_mutex core_lock;
     std::map<std::string, network::meta_client*> cores;
