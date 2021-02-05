@@ -21,6 +21,7 @@ bool ControllerImplementation::check_online_nodes(uint64_t timestamp)
         if (timestamp == generation_check_timestamp) {
             return false;
         }
+        DEBUG_COUT("online_cores.size()\t=\t" + std::to_string(online_cores.size()));
         generation_check_timestamp = timestamp;
 
         uint64_t accept_count = 0;
@@ -58,6 +59,7 @@ bool ControllerImplementation::check_online_nodes(uint64_t timestamp)
         }
 
         for (auto&& [cores_list, approve_cores] : proposed_cores[current_generation]) {
+            DEBUG_COUT("approve_cores.size()\t=\t" + std::to_string(approve_cores.size()) + "\taccept_count\t=\t" + std::to_string(accept_count));
 
             if (approve_cores.size() >= accept_count) {
                 auto primary_cores = crypto::split(cores_list, '\n');
