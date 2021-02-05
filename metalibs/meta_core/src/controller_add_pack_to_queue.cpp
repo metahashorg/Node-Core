@@ -12,19 +12,25 @@ std::vector<char> ControllerImplementation::add_pack_to_queue(network::Request& 
     const auto url = request.request_type;
     const auto pack = request.message;
 
-    {
+    auto get_stat_iter = [this, sender_addr] {
         bool need_insertion = false;
         {
-            std::shared_lock lock(income_nodes_lock);
-            if (income_nodes.find(sender_addr) == income_nodes.end()) {
+            std::shared_lock lock(income_nodes_stat_lock);
+            auto stat_iter = income_nodes_stat.find(sender_addr);
+            if (stat_iter == income_nodes_stat.end()) {
                 need_insertion = true;
+            } else {
+                return stat_iter;
             }
         }
         if (need_insertion) {
-            std::unique_lock lock(income_nodes_lock);
-            income_nodes.insert(sender_addr);
+            std::unique_lock lock(income_nodes_stat_lock);
+            income_nodes_stat[sender_addr];
+            return income_nodes_stat.find(sender_addr);            
         }
-    }
+    };
+
+    auto&& stat = get_stat_iter()->second;
 
     switch (url) {
     case RPC_TX:
@@ -85,58 +91,52 @@ std::vector<char> ControllerImplementation::add_pack_to_queue(network::Request& 
 void ControllerImplementation::log_network_statistics(uint64_t timestamp)
 {
     /// DEBUG INFO BEGIN
-    if (timestamp > stat.dbg_timestamp + 60) {
-        DEBUG_COUT("TX\tGetCL\tAPPROVE\tDisAprv\tGetAprv\tLastBlo\tGetBlok\tGetChai\tGetBLst\tCoreLst\tPRETEND\tNone");
-        DEBUG_COUT(std::to_string(stat.dbg_RPC_TX) + "\t"
-            + std::to_string(stat.dbg_RPC_GET_CORE_LIST) + "\t"
-            + std::to_string(stat.dbg_RPC_APPROVE) + "\t"
-            + std::to_string(stat.dbg_RPC_DISAPPROVE) + "\t"
-            + std::to_string(stat.dbg_RPC_GET_APPROVE) + "\t"
-            + std::to_string(stat.dbg_RPC_LAST_BLOCK) + "\t"
-            + std::to_string(stat.dbg_RPC_GET_BLOCK) + "\t"
-            + std::to_string(stat.dbg_RPC_GET_CHAIN) + "\t"
-            + std::to_string(stat.dbg_RPC_GET_MISSING_BLOCK_LIST) + "\t"
-            + std::to_string(stat.dbg_RPC_CORE_LIST_APPROVE) + "\t"
-            + std::to_string(stat.dbg_RPC_PRETEND_BLOCK) + "\t"
-            + std::to_string(stat.dbg_RPC_NONE));
+    if (timestamp > dbg_timestamp + 60) {
+        DEBUG_COUT("\t0x00112233445566778899aabbccddeeffgghhffjjiikkllmmnn\tTX\tGetCL\tApprove\tDisAprv\tGetAprv\tLastBlo\tGetBlok\tGetChai\tGetBLst\tCoreLst\tPretend\tNone\tRoles");
 
-        stat.dbg_RPC_TX = 0;
-        stat.dbg_RPC_GET_CORE_LIST = 0;
-        stat.dbg_RPC_APPROVE = 0;
-        stat.dbg_RPC_DISAPPROVE = 0;
-        stat.dbg_RPC_GET_APPROVE = 0;
-        stat.dbg_RPC_LAST_BLOCK = 0;
-        stat.dbg_RPC_GET_BLOCK = 0;
-        stat.dbg_RPC_GET_CHAIN = 0;
-        stat.dbg_RPC_GET_MISSING_BLOCK_LIST = 0;
-        stat.dbg_RPC_CORE_LIST_APPROVE = 0;
-        stat.dbg_RPC_PRETEND_BLOCK = 0;
-        stat.dbg_RPC_NONE = 0;
+        std::shared_lock lock(income_nodes_stat_lock);
+        for (auto&& node_stat : income_nodes_stat) {
+            auto&& stat = node_stat.second;
+            auto&& addr = node_stat.first;
 
-        stat.dbg_timestamp = timestamp;
-
-        {
-            std::unordered_set<std::string, crypto::Hasher> nodes;
-
+            std::string role_list;
             {
-                std::shared_lock lock(income_nodes_lock);
-                nodes = income_nodes;
-            }
-
-            for (const auto& node : nodes) {
-                auto roles = BC.check_addr(node);
-                std::string role_list;
+                auto roles = BC.check_addr(addr);
                 for (const auto& role : roles) {
                     role_list += role + "\t";
                 }
-                DEBUG_COUT(node + "\t" + role_list);
             }
 
-            {
-                std::unique_lock lock(income_nodes_lock);
-                income_nodes.clear();
-            }
+            DEBUG_COUT("\t" + addr + "\t"
+                + std::to_string(stat.dbg_RPC_TX) + "\t"
+                + std::to_string(stat.dbg_RPC_GET_CORE_LIST) + "\t"
+                + std::to_string(stat.dbg_RPC_APPROVE) + "\t"
+                + std::to_string(stat.dbg_RPC_DISAPPROVE) + "\t"
+                + std::to_string(stat.dbg_RPC_GET_APPROVE) + "\t"
+                + std::to_string(stat.dbg_RPC_LAST_BLOCK) + "\t"
+                + std::to_string(stat.dbg_RPC_GET_BLOCK) + "\t"
+                + std::to_string(stat.dbg_RPC_GET_CHAIN) + "\t"
+                + std::to_string(stat.dbg_RPC_GET_MISSING_BLOCK_LIST) + "\t"
+                + std::to_string(stat.dbg_RPC_CORE_LIST_APPROVE) + "\t"
+                + std::to_string(stat.dbg_RPC_PRETEND_BLOCK) + "\t"
+                + std::to_string(stat.dbg_RPC_NONE) + "\t"
+                + role_list);
+
+            stat.dbg_RPC_TX = 0;
+            stat.dbg_RPC_GET_CORE_LIST = 0;
+            stat.dbg_RPC_APPROVE = 0;
+            stat.dbg_RPC_DISAPPROVE = 0;
+            stat.dbg_RPC_GET_APPROVE = 0;
+            stat.dbg_RPC_LAST_BLOCK = 0;
+            stat.dbg_RPC_GET_BLOCK = 0;
+            stat.dbg_RPC_GET_CHAIN = 0;
+            stat.dbg_RPC_GET_MISSING_BLOCK_LIST = 0;
+            stat.dbg_RPC_CORE_LIST_APPROVE = 0;
+            stat.dbg_RPC_PRETEND_BLOCK = 0;
+            stat.dbg_RPC_NONE = 0;
         }
+
+        dbg_timestamp = timestamp;
     }
     /// DEBUG INFO END
 }

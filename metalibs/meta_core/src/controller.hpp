@@ -66,7 +66,6 @@ private:
     bool goon = true;
 
     struct Statistics {
-        uint64_t dbg_timestamp = 0;
         std::atomic<uint64_t> dbg_RPC_TX = 0;
         std::atomic<uint64_t> dbg_RPC_GET_CORE_LIST = 0;
         std::atomic<uint64_t> dbg_RPC_APPROVE = 0;
@@ -79,10 +78,11 @@ private:
         std::atomic<uint64_t> dbg_RPC_CORE_LIST_APPROVE = 0;
         std::atomic<uint64_t> dbg_RPC_PRETEND_BLOCK = 0;
         std::atomic<uint64_t> dbg_RPC_NONE = 0;
-    } stat;
+    };
         
-    std::shared_mutex income_nodes_lock;
-    std::unordered_set<std::string, crypto::Hasher> income_nodes;
+    std::shared_mutex income_nodes_stat_lock;
+    std::unordered_map<std::string, Statistics, crypto::Hasher> income_nodes_stat;
+    uint64_t dbg_timestamp = 0;
 
     struct Blocks {
         std::shared_mutex blocks_lock;
