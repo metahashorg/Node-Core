@@ -13,6 +13,13 @@ std::vector<char> ControllerImplementation::add_pack_to_queue(network::Request& 
     const auto pack = request.message;
 
     switch (url) {
+    case RPC_TX:
+        if (roles.count(META_ROLE_VERIF)) {
+            stat.dbg_RPC_TX++;
+            parse_RPC_TX(pack);
+            return std::vector<char>();
+        }
+        break;
     case RPC_APPROVE:
         stat.dbg_RPC_APPROVE++;
         parse_RPC_APPROVE(pack);
@@ -39,33 +46,25 @@ std::vector<char> ControllerImplementation::add_pack_to_queue(network::Request& 
     case RPC_GET_CORE_LIST:
         stat.dbg_RPC_GET_CORE_LIST++;
         return parse_RPC_GET_CORE_LIST(pack);
-    }
-
-    if (roles.count(META_ROLE_VERIF)) {
-        if (url == RPC_TX) {
-            stat.dbg_RPC_TX++;
-            parse_RPC_TX(pack);
-            return std::vector<char>();
-        }
-    }
-
-    if (roles.count(META_ROLE_CORE)) {
-        if (url == RPC_CORE_LIST_APPROVE) {
+    case RPC_CORE_LIST_APPROVE:
+        if (roles.count(META_ROLE_CORE)) {
             stat.dbg_RPC_CORE_LIST_APPROVE++;
             parse_RPC_CORE_LIST_APPROVE(request.sender_mh_addr, pack);
             return std::vector<char>();
         }
-    }
-
-    if (!current_cores.empty() && request.sender_mh_addr == current_cores[0]) {
-        if (url == RPC_PRETEND_BLOCK) {
+        break;
+    case RPC_PRETEND_BLOCK:
+        if (!current_cores.empty() && request.sender_mh_addr == current_cores[0]) {
             stat.dbg_RPC_PRETEND_BLOCK++;
             parse_RPC_PRETEND_BLOCK(pack);
             return std::vector<char>();
         }
+        break;
+    default:
+        stat.dbg_RPC_NONE++;
+        break;
     }
 
-    stat.dbg_RPC_NONE++;
 
     return std::vector<char>();
 }

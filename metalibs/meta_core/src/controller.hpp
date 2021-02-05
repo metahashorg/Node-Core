@@ -34,7 +34,7 @@ private:
     sha256_2 last_created_block = { { 0 } };
     sha256_2 proved_block = { { 0 } };
 
-    uint64_t min_approve = 0;
+    const uint64_t min_approve = 0;
 
     uint64_t statistics_timestamp = 0;
     uint64_t prev_timestamp = 0;
