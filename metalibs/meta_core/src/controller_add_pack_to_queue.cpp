@@ -107,7 +107,7 @@ void ControllerImplementation::log_network_statistics(uint64_t timestamp)
                 }
             }
 
-            DEBUG_COUT("\t" + addr + "\t"
+            DEBUG_COUT(addr + "\t"
                 + std::to_string(stat.dbg_RPC_TX) + "\t"
                 + std::to_string(stat.dbg_RPC_GET_CORE_LIST) + "\t"
                 + std::to_string(stat.dbg_RPC_APPROVE) + "\t"
