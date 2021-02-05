@@ -12,6 +12,20 @@ std::vector<char> ControllerImplementation::add_pack_to_queue(network::Request& 
     const auto url = request.request_type;
     const auto pack = request.message;
 
+    {
+        bool need_insertion = false;
+        {
+            std::shared_lock lock(income_nodes_lock);
+            if (income_nodes.find(sender_addr) == income_nodes.end()) {
+                need_insertion = true;
+            }
+        }
+        if (need_insertion) {
+            std::unique_lock lock(income_nodes_lock);
+            income_nodes.insert(sender_addr);
+        }
+    }
+
     switch (url) {
     case RPC_TX:
         if (roles.count(META_ROLE_VERIF)) {
@@ -65,7 +79,6 @@ std::vector<char> ControllerImplementation::add_pack_to_queue(network::Request& 
         break;
     }
 
-
     return std::vector<char>();
 }
 
@@ -101,6 +114,29 @@ void ControllerImplementation::log_network_statistics(uint64_t timestamp)
         stat.dbg_RPC_NONE = 0;
 
         stat.dbg_timestamp = timestamp;
+
+        {
+            std::unordered_set<std::string, crypto::Hasher> nodes;
+
+            {
+                std::shared_lock lock(income_nodes_lock);
+                nodes = income_nodes;
+            }
+
+            for (const auto& node : nodes) {
+                auto roles = BC.check_addr(node);
+                std::string role_list;
+                for (const auto& role : roles) {
+                    role_list += role + "\t";
+                }
+                DEBUG_COUT(node + "\t" + role_list);
+            }
+
+            {
+                std::unique_lock lock(income_nodes_lock);
+                income_nodes.clear();
+            }
+        }
     }
     /// DEBUG INFO END
 }

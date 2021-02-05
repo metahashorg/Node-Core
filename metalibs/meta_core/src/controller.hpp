@@ -80,6 +80,9 @@ private:
         std::atomic<uint64_t> dbg_RPC_PRETEND_BLOCK = 0;
         std::atomic<uint64_t> dbg_RPC_NONE = 0;
     } stat;
+        
+    std::shared_mutex income_nodes_lock;
+    std::unordered_set<std::string, crypto::Hasher> income_nodes;
 
     struct Blocks {
         std::shared_mutex blocks_lock;
