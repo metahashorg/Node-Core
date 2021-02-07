@@ -32,6 +32,22 @@ std::vector<char> ControllerImplementation::add_pack_to_queue(network::Request& 
 
     auto&& stat = get_stat_iter()->second;
 
+    {
+        bool need_insertion = false;
+        auto& sender_ip = request.remote_ip_address;
+        {
+            std::shared_lock lock(stat.ip_lock);
+            auto ip_iter = stat.ip.find(sender_ip);
+            if (ip_iter == stat.ip.end()) {
+                need_insertion = true;
+            }
+        }
+        if (need_insertion) {
+            std::unique_lock lock(stat.ip_lock);
+            stat.ip.insert(sender_ip);
+        }
+    }
+
     switch (url) {
     case RPC_TX:
         if (roles.count(META_ROLE_VERIF)) {
@@ -92,7 +108,7 @@ void ControllerImplementation::log_network_statistics(uint64_t timestamp)
 {
     /// DEBUG INFO BEGIN
     if (timestamp > dbg_timestamp + 60) {
-        DEBUG_COUT("\t0x00112233445566778899aabbccddeeffgghhffjjiikkllmmnn\tTX\tGetCL\tApprove\tDisAprv\tGetAprv\tLastBlo\tGetBlok\tGetChai\tGetBLst\tCoreLst\tPretend\tNone\tRoles");
+        DEBUG_COUT("0x00112233445566778899aabbccddeeffgghhffjjiikkllmmnn\tTX\tGetCL\tApprove\tDisAprv\tGetAprv\tLastBlo\tGetBlok\tGetChai\tGetBLst\tCoreLst\tPretend\tNone\tRoles\tIP");
 
         std::shared_lock lock(income_nodes_stat_lock);
         for (auto&& node_stat : income_nodes_stat) {
@@ -104,6 +120,14 @@ void ControllerImplementation::log_network_statistics(uint64_t timestamp)
                 auto roles = BC.check_addr(addr);
                 for (const auto& role : roles) {
                     role_list += role + "\t";
+                }
+            }
+
+            std::string ip_list;
+            {
+                std::shared_lock lock(stat.ip_lock);
+                for (const auto& ip : stat.ip) {
+                    ip_list += ip + "\t";
                 }
             }
 
@@ -120,7 +144,8 @@ void ControllerImplementation::log_network_statistics(uint64_t timestamp)
                 + std::to_string(stat.dbg_RPC_CORE_LIST_APPROVE) + "\t"
                 + std::to_string(stat.dbg_RPC_PRETEND_BLOCK) + "\t"
                 + std::to_string(stat.dbg_RPC_NONE) + "\t"
-                + role_list);
+                + role_list
+                + ip_list);
 
             stat.dbg_RPC_TX = 0;
             stat.dbg_RPC_GET_CORE_LIST = 0;
@@ -134,6 +159,11 @@ void ControllerImplementation::log_network_statistics(uint64_t timestamp)
             stat.dbg_RPC_CORE_LIST_APPROVE = 0;
             stat.dbg_RPC_PRETEND_BLOCK = 0;
             stat.dbg_RPC_NONE = 0;
+            
+            {
+                std::unique_lock lock(stat.ip_lock);
+                stat.ip.clear();
+            }
         }
 
         dbg_timestamp = timestamp;

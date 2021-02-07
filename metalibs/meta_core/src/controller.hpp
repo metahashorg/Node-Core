@@ -80,6 +80,9 @@ private:
         std::atomic<uint64_t> dbg_RPC_CORE_LIST_APPROVE = 0;
         std::atomic<uint64_t> dbg_RPC_PRETEND_BLOCK = 0;
         std::atomic<uint64_t> dbg_RPC_NONE = 0;
+
+        std::shared_mutex ip_lock;
+        std::set<std::string> ip;
     };
         
     std::shared_mutex income_nodes_stat_lock;
