@@ -1,6 +1,6 @@
 #include "controller.hpp"
 #include <meta_constants.hpp>
-#include <meta_log.hpp>
+//#include <meta_log.hpp>
 
 namespace metahash::meta_core {
 

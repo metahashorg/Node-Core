@@ -1,5 +1,5 @@
 #include <meta_common.h>
-#include <meta_log.hpp>
+//#include <meta_log.hpp>
 #include <meta_server.h>
 #include <version.h>
 

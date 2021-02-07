@@ -1,4 +1,4 @@
-#include <meta_log.hpp>
+//#include <meta_log.hpp>
 #include <meta_server.h>
 
 #include <boost/bind/bind.hpp>
@@ -32,7 +32,7 @@ void meta_server::start()
 
         success = true;
     } catch (std::exception& e) {
-        DEBUG_COUT(e.what());
+        //DEBUG_COUT(e.what());
         std::this_thread::sleep_for(std::chrono::seconds(1));
         start();
     }
@@ -53,8 +53,8 @@ void meta_server::handle_accept(const boost::system::error_code& e)
     if (!e) {
         new_connection->start(new_connection);
     } else {
-        DEBUG_COUT("fail");
-        DEBUG_COUT(e.message());
+        //DEBUG_COUT("fail");
+        //DEBUG_COUT(e.message());
     }
 
     start_accept();

@@ -1,6 +1,6 @@
 #include <meta_client.h>
 #include <meta_common.h>
-#include <meta_log.hpp>
+//#include <meta_log.hpp>
 
 namespace metahash::network {
 
