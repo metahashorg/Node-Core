@@ -58,6 +58,8 @@ private:
 
     network::meta_server listener;
 
+    std::unordered_map<std::string, uint64_t, crypto::Hasher> core_last_block;
+
     std::vector<std::string> current_cores;
     std::map<uint64_t, std::unordered_map<std::string, std::set<std::string>, crypto::Hasher>> proposed_cores;
     uint64_t core_list_generation = 0;

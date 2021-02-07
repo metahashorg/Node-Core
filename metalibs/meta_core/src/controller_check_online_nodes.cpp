@@ -95,7 +95,9 @@ std::vector<char> ControllerImplementation::make_pretend_core_list(uint64_t curr
     const auto online_cores = cores.get_online_cores();
 
     for (auto&& [addr, roles] : nodes) {
-        if (online_cores.count(addr) && roles.count(META_ROLE_CORE)) {
+        if (online_cores.count(addr) 
+            && roles.count(META_ROLE_CORE)    
+            && (long(prev_timestamp) - long(core_last_block[addr])) < 3600) {
             cores_list.push_back(addr);
         }
     }

@@ -22,6 +22,8 @@ void ControllerImplementation::check_if_chain_actual()
             std::copy_n(resp.begin() + 32, 8, reinterpret_cast<char*>(&block_timestamp));
 
             serial_execution.post([this, last_block_return, block_timestamp, mh_addr, index] {
+                core_last_block[mh_addr] = block_timestamp;
+
                 if (block_timestamp >= prev_timestamp && !blocks.contains(last_block_return)) {
                     not_actualized[index]++;
 
