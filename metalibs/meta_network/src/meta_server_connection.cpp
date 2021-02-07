@@ -80,8 +80,8 @@ void Connection::read(std::shared_ptr<Connection> pThis)
             } break;
             }
         } else {
-            DEBUG_COUT("error");
-            DEBUG_COUT(e.message());
+            //DEBUG_COUT("error");
+            //DEBUG_COUT(e.message());
         }
     });
 }

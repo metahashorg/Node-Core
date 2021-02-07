@@ -1,6 +1,6 @@
 #include <meta_client.h>
 #include <meta_common.h>
-#include <meta_log.hpp>
+//#include <meta_log.hpp>
 
 namespace metahash::network {
 
@@ -37,8 +37,8 @@ void ClientConnection::check_tasks()
             if (!err) {
                 read();
             } else {
-                DEBUG_COUT("error");
-                DEBUG_COUT(err.message());
+                //DEBUG_COUT("error");
+                //DEBUG_COUT(err.message());
 
                 reset();
             }
@@ -76,15 +76,15 @@ void ClientConnection::read()
             case statics::WRONG_MAGIC_NUMBER:
             case statics::UNKNOWN_SENDER_METAHASH_ADDRESS:
             case statics::INVALID_SIGN: {
-                DEBUG_COUT("ERROR");
+                //DEBUG_COUT("ERROR");
                 p_task->callback(std::vector<char>());
                 reset();
             } break;
             }
 
         } else {
-            DEBUG_COUT("error");
-            DEBUG_COUT(err.message());
+            //DEBUG_COUT("error");
+            //DEBUG_COUT(err.message());
 
             p_task->callback(std::vector<char>());
             reset();

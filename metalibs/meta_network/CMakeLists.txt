@@ -16,6 +16,6 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 
 target_link_libraries(${PROJECT_NAME} moodycamel)
 target_link_libraries(${PROJECT_NAME} meta_pool)
-target_link_libraries(${PROJECT_NAME} meta_log)
+#target_link_libraries(${PROJECT_NAME} meta_log)
 target_link_libraries(${PROJECT_NAME} meta_crypto)
 target_link_libraries(${PROJECT_NAME} version)
