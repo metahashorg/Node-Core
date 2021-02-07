@@ -85,6 +85,8 @@ bool ControllerImplementation::try_apply_block(block::Block* block, bool write)
                     }
                 }
 
+                allowed_addresses.erase(signer.get_mh_addr());
+
                 listener.update_allowed_addreses(allowed_addresses);
             }
         }
