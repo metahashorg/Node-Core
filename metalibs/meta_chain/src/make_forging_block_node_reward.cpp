@@ -101,7 +101,7 @@ void BlockChain::make_forging_block_node_reward(uint64_t timestamp, std::map<std
             { "Core",
                 { { "us", double(geo_total["Core"]["us"]) / double(geo_total_units["Core"]["us"]) },
                     { "eu", double(geo_total["Core"]["eu"]) / double(geo_total_units["Core"]["eu"]) },
-                    { "cn", double(geo_total["Core"]["cn"]) / double(geo_total_units["Core"]["cn"]) } } },
+                    { "cn", double(geo_total["Core"]["cn"]) / double(geo_total_units["Core"]["cn"]) } } }
         };
 
         for (auto&& [node_role, role_stat] : type_geo_node_delegates) {
