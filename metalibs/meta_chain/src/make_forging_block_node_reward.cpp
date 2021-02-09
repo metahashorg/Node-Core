@@ -15,9 +15,8 @@ void BlockChain::make_forging_block_node_reward(uint64_t timestamp, std::map<std
             "Proxy",
             "InfrastructureTorrent",
             "Torrent",
-            "Verifier"
-            //TODO Core
-            // ,"Core"
+            "Verifier", 
+            "Core"
         };
 
         uint64_t forging_node_units = 0;
@@ -37,10 +36,11 @@ void BlockChain::make_forging_block_node_reward(uint64_t timestamp, std::map<std
             { "Verifier",
                 { { "us", 0 },
                     { "eu", 0 },
+                    { "cn", 0 } } },
+            { "Core",
+                { { "us", 0 },
+                    { "eu", 0 },
                     { "cn", 0 } } }
-            //TODO Core
-            // ,{ "Core",
-            //     { { "us", 0 }}}
         };
 
         for (const auto& type : types_by_value) {
@@ -73,10 +73,11 @@ void BlockChain::make_forging_block_node_reward(uint64_t timestamp, std::map<std
             { "Verifier",
                 { { "us", (pool * 2) / 100 },
                     { "eu", (pool * 2) / 100 },
+                    { "cn", (pool * 2) / 100 } } },
+            { "Core",
+                { { "us", (pool * 2) / 100 },
+                    { "eu", (pool * 2) / 100 },
                     { "cn", (pool * 2) / 100 } } }
-            //TODO Core
-            // ,{ "Core",
-            //     { { "us", (pool * 6) / 100 } } }
         };
 
         const double forging_node_per_unit = double(forging_node_total) / double(forging_node_units);
@@ -96,7 +97,11 @@ void BlockChain::make_forging_block_node_reward(uint64_t timestamp, std::map<std
             { "Verifier",
                 { { "us", double(geo_total["Verifier"]["us"]) / double(geo_total_units["Verifier"]["us"]) },
                     { "eu", double(geo_total["Verifier"]["eu"]) / double(geo_total_units["Verifier"]["eu"]) },
-                    { "cn", double(geo_total["Verifier"]["cn"]) / double(geo_total_units["Verifier"]["cn"]) } } }
+                    { "cn", double(geo_total["Verifier"]["cn"]) / double(geo_total_units["Verifier"]["cn"]) } } },
+            { "Core",
+                { { "us", double(geo_total["Core"]["us"]) / double(geo_total_units["Core"]["us"]) },
+                    { "eu", double(geo_total["Core"]["eu"]) / double(geo_total_units["Core"]["eu"]) },
+                    { "cn", double(geo_total["Core"]["cn"]) / double(geo_total_units["Core"]["cn"]) } } },
         };
 
         for (auto&& [node_role, role_stat] : type_geo_node_delegates) {
