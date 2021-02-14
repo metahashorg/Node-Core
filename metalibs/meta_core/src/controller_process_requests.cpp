@@ -9,7 +9,7 @@ namespace metahash::meta_core {
 
 void ControllerImplementation::parse_RPC_TX(std::string_view pack)
 {
-    auto* tx_list = new std::list<transaction::TX*>();
+    std::vector<transaction::TX*> tx_list(pack.size()/128);
 
     uint64_t index = 0;
     uint64_t tx_size;
@@ -31,7 +31,7 @@ void ControllerImplementation::parse_RPC_TX(std::string_view pack)
 
         auto p_tx = new transaction::TX;
         if (p_tx->parse(tx_sw)) {
-            tx_queue.enqueue(p_tx);
+            tx_list.push_back(p_tx);
         } else {
             delete p_tx;
             DEBUG_COUT("corrupt tx");
@@ -46,13 +46,8 @@ void ControllerImplementation::parse_RPC_TX(std::string_view pack)
         index += varint_size;
     }
 
-    if (tx_list->empty()) {
-        delete tx_list;
-    } else {
-        serial_execution.post([this, tx_list] {
-            transactions.insert(transactions.end(), tx_list->begin(), tx_list->end());
-            delete tx_list;
-        });
+    if (tx_list.size()) {
+        tx_queue.enqueue_bulk(tx_list.begin(), tx_list.size());
     }
 }
 
@@ -62,9 +57,7 @@ void ControllerImplementation::parse_RPC_PRETEND_BLOCK(std::string_view pack)
     auto* block = block::parse_block(block_sw);
 
     if (block) {
-        if (dynamic_cast<block::CommonBlock*>(block)) {
-            block_queue.enqueue(block);
-        } else if (dynamic_cast<block::RejectedTXBlock*>(block)) {
+        if (dynamic_cast<block::CommonBlock*>(block) || dynamic_cast<block::RejectedTXBlock*>(block)) {
             block_queue.enqueue(block);
         } else {
             delete block;
@@ -127,9 +120,9 @@ std::vector<char> ControllerImplementation::parse_RPC_GET_APPROVE(std::string_vi
             auto* p_ar = new transaction::ApproveRecord;
             p_ar->make(got_block, signer);
             p_ar->approve = true;
+
             std::unique_lock ulock(block_approve_lock);
             if (!block_approve[got_block].insert({ signer.get_mh_addr(), p_ar }).second) {
-                //DEBUG_COUT("APPROVE ALREADY PRESENT NOT CREATED");
                 delete p_ar;
             }
             approve_list_it = block_approve.find(approve_wanted_block);
@@ -157,7 +150,6 @@ std::vector<char> ControllerImplementation::parse_RPC_LAST_BLOCK(std::string_vie
     uint64_t got_timestamp;
 
     if (master()) {
-
         if (blocks.contains(last_created_block)) {
             got_block = last_created_block;
             got_timestamp = blocks[last_created_block]->get_block_timestamp();

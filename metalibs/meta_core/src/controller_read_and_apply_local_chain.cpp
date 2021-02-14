@@ -170,7 +170,7 @@ void ControllerImplementation::read_and_apply_local_chain()
                 blocks.insert(block);
             } else if (auto* a_block = dynamic_cast<block::ApproveBlock*>(block)) {
                 for (auto& tx : a_block->get_txs()) {
-                    block_approve[a_block->get_prev_hash()].insert({ "0x" + crypto::bin2hex(crypto::get_address(tx.pub_key)), new transaction::ApproveRecord(std::move(tx)) });
+                    block_approve[tx.get_block_hash()].insert({ "0x" + crypto::bin2hex(crypto::get_address(tx.pub_key)), new transaction::ApproveRecord(std::move(tx)) });
                 }
 
                 check_blocks();
@@ -187,6 +187,23 @@ void ControllerImplementation::read_and_apply_local_chain()
     check_blocks();
 
     DEBUG_COUT("LOCAL COMPLETE");
+    {
+        sha256_2 got_block = last_applied_block;
+        while (blocks.contains(got_block)) {
+            auto approve_list_it = block_approve.find(got_block);
+            if (approve_list_it == block_approve.end() || !approve_list_it->second.count(signer.get_mh_addr())) {
+                auto* p_ar = new transaction::ApproveRecord;
+                p_ar->make(got_block, signer);
+                p_ar->approve = true;
+
+                if (!block_approve[got_block].insert({ signer.get_mh_addr(), p_ar }).second) {
+                    delete p_ar;
+                }
+            }
+
+            got_block = blocks[got_block]->get_prev_hash();
+        }
+    }
 }
 
 void ControllerImplementation::check_blocks()
@@ -194,5 +211,4 @@ void ControllerImplementation::check_blocks()
     while (check_awaited_blocks())
         ;
 }
-
 }

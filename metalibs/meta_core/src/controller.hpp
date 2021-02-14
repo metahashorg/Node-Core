@@ -30,7 +30,6 @@ private:
     std::unordered_map<sha256_2, std::map<std::string, transaction::ApproveRecord*>, crypto::Hasher> block_approve;
     std::unordered_map<sha256_2, std::map<std::string, transaction::ApproveRecord*>, crypto::Hasher> block_disapprove;
 
-    
     moodycamel::ConcurrentQueue<transaction::TX*> tx_queue;
     moodycamel::ConcurrentQueue<block::Block*> block_queue;
 
@@ -88,7 +87,7 @@ private:
         std::shared_mutex ip_lock;
         std::set<std::string> ip;
     };
-        
+
     std::shared_mutex income_nodes_stat_lock;
     std::unordered_map<std::string, Statistics, crypto::Hasher> income_nodes_stat;
     uint64_t dbg_timestamp = 0;
