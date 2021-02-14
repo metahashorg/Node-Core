@@ -11,6 +11,33 @@ void ControllerImplementation::main_loop()
 
     log_network_statistics(timestamp);
 
+    {
+        const uint64_t LIST_SIZE = 8000;
+        {
+            static std::vector<transaction::TX*> tx_list(LIST_SIZE, nullptr);
+            if (auto size = tx_queue.try_dequeue_bulk(tx_list.begin(), LIST_SIZE)) {
+                transactions.insert(transactions.end(), tx_list.begin(), tx_list.begin() + size);
+            }
+        }
+        {
+            static std::vector<block::Block*> block_list(LIST_SIZE, nullptr);
+            if (auto size = block_queue.try_dequeue_bulk(block_list.begin(), LIST_SIZE)) {
+                for (int i = 0; i < size; i++) {
+                    auto block = block_list[i];
+
+                    if (dynamic_cast<block::CommonBlock*>(block)) {
+                        missing_blocks.erase(block->get_block_hash());
+                        blocks.insert(block);
+                    } else if (dynamic_cast<block::RejectedTXBlock*>(block)) {
+                        write_block(block);
+                    } else {
+                        delete block;
+                    }
+                }
+            }
+        }
+    }
+
     if (timestamp - last_sync_timestamp > 60) {
         io_context.post(std::bind(&connection::MetaConnection::sync_core_lists, &cores));
         last_sync_timestamp = timestamp;

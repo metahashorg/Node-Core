@@ -26,7 +26,7 @@ std::vector<char> ControllerImplementation::add_pack_to_queue(network::Request& 
         if (need_insertion) {
             std::unique_lock lock(income_nodes_stat_lock);
             income_nodes_stat[sender_addr];
-            return income_nodes_stat.find(sender_addr);            
+            return income_nodes_stat.find(sender_addr);
         }
     };
 
@@ -57,28 +57,49 @@ std::vector<char> ControllerImplementation::add_pack_to_queue(network::Request& 
         }
         break;
     case RPC_APPROVE:
-        stat.dbg_RPC_APPROVE++;
-        parse_RPC_APPROVE(pack);
-        return std::vector<char>();
+        if (roles.count(META_ROLE_CORE)) {
+            stat.dbg_RPC_APPROVE++;
+            parse_RPC_APPROVE(pack);
+            return std::vector<char>();
+        }
+        break;
     case RPC_DISAPPROVE:
-        stat.dbg_RPC_DISAPPROVE++;
-        parse_RPC_DISAPPROVE(pack);
-        return std::vector<char>();
+        if (roles.count(META_ROLE_CORE)) {
+            stat.dbg_RPC_DISAPPROVE++;
+            parse_RPC_DISAPPROVE(pack);
+            return std::vector<char>();
+        }
+        break;
     case RPC_GET_APPROVE:
-        stat.dbg_RPC_GET_APPROVE++;
-        return parse_RPC_GET_APPROVE(pack);
+        if (roles.count(META_ROLE_CORE)) {
+            stat.dbg_RPC_GET_APPROVE++;
+            return parse_RPC_GET_APPROVE(pack);
+        }
+        break;
     case RPC_LAST_BLOCK:
-        stat.dbg_RPC_LAST_BLOCK++;
-        return parse_RPC_LAST_BLOCK(pack);
+        if (roles.count(META_ROLE_CORE)) {
+            stat.dbg_RPC_LAST_BLOCK++;
+            return parse_RPC_LAST_BLOCK(pack);
+        }
+        break;
     case RPC_GET_BLOCK:
-        stat.dbg_RPC_GET_BLOCK++;
-        return parse_RPC_GET_BLOCK(pack);
+        if (roles.count(META_ROLE_CORE)) {
+            stat.dbg_RPC_GET_BLOCK++;
+            return parse_RPC_GET_BLOCK(pack);
+        }
+        break;
     case RPC_GET_CHAIN:
-        stat.dbg_RPC_GET_CHAIN++;
-        return parse_RPC_GET_CHAIN(pack);
+        if (roles.count(META_ROLE_CORE)) {
+            stat.dbg_RPC_GET_CHAIN++;
+            return parse_RPC_GET_CHAIN(pack);
+        }
+        break;
     case RPC_GET_MISSING_BLOCK_LIST:
-        stat.dbg_RPC_GET_MISSING_BLOCK_LIST++;
-        return parse_RPC_GET_MISSING_BLOCK_LIST(pack);
+        if (roles.count(META_ROLE_CORE)) {
+            stat.dbg_RPC_GET_MISSING_BLOCK_LIST++;
+            return parse_RPC_GET_MISSING_BLOCK_LIST(pack);
+        }
+        break;
     case RPC_GET_CORE_LIST:
         stat.dbg_RPC_GET_CORE_LIST++;
         return parse_RPC_GET_CORE_LIST(pack);
@@ -97,9 +118,10 @@ std::vector<char> ControllerImplementation::add_pack_to_queue(network::Request& 
         }
         break;
     default:
-        stat.dbg_RPC_NONE++;
         break;
     }
+
+    stat.dbg_RPC_NONE++;
 
     return std::vector<char>();
 }
@@ -159,7 +181,7 @@ void ControllerImplementation::log_network_statistics(uint64_t timestamp)
             stat.dbg_RPC_CORE_LIST_APPROVE = 0;
             stat.dbg_RPC_PRETEND_BLOCK = 0;
             stat.dbg_RPC_NONE = 0;
-            
+
             {
                 std::unique_lock lock(stat.ip_lock);
                 stat.ip.clear();

@@ -31,7 +31,7 @@ void ControllerImplementation::parse_RPC_TX(std::string_view pack)
 
         auto p_tx = new transaction::TX;
         if (p_tx->parse(tx_sw)) {
-            tx_list->push_back(p_tx);
+            tx_queue.enqueue(p_tx);
         } else {
             delete p_tx;
             DEBUG_COUT("corrupt tx");
@@ -63,15 +63,9 @@ void ControllerImplementation::parse_RPC_PRETEND_BLOCK(std::string_view pack)
 
     if (block) {
         if (dynamic_cast<block::CommonBlock*>(block)) {
-            serial_execution.post([this, block] {
-                missing_blocks.erase(block->get_block_hash());
-
-                blocks.insert(block);
-            });
+            block_queue.enqueue(block);
         } else if (dynamic_cast<block::RejectedTXBlock*>(block)) {
-            serial_execution.post([this, block] {
-                write_block(block);
-            });
+            block_queue.enqueue(block);
         } else {
             delete block;
         }

@@ -30,6 +30,10 @@ private:
     std::unordered_map<sha256_2, std::map<std::string, transaction::ApproveRecord*>, crypto::Hasher> block_approve;
     std::unordered_map<sha256_2, std::map<std::string, transaction::ApproveRecord*>, crypto::Hasher> block_disapprove;
 
+    
+    moodycamel::ConcurrentQueue<transaction::TX*> tx_queue;
+    moodycamel::ConcurrentQueue<block::Block*> block_queue;
+
     sha256_2 last_applied_block = { { 0 } };
     sha256_2 last_created_block = { { 0 } };
     sha256_2 proved_block = { { 0 } };
