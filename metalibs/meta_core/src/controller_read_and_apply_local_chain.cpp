@@ -156,7 +156,8 @@ void read_stored_blocks(
 void ControllerImplementation::read_and_apply_local_chain()
 {
     auto last_file = "";
-    proved_block = { { 0 } };
+    auto proved_block_vec = crypto::hex2bin("85e6c78616632e4fba97efb1dfb403834fe909bc34e3c7efa836ff2ea974ba9b");
+    std::copy_n(proved_block_vec.begin(), 32, proved_block.begin());
     //auto last_file = read_last_known_state(proved_block);
 
     std::list<std::future<block::Block*>> pending_data;
