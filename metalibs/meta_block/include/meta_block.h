@@ -15,14 +15,14 @@ public:
     virtual ~Block() = default;
 
     virtual const std::vector<char>& get_data();
-    virtual uint64_t get_block_type();
-    virtual uint64_t get_block_timestamp();
-    virtual sha256_2 get_prev_hash();
-    virtual sha256_2 get_block_hash();
+    virtual uint64_t get_block_type() const;
+    virtual uint64_t get_block_timestamp() const;
+    virtual sha256_2 get_prev_hash() const;
+    virtual sha256_2 get_block_hash() const;
 
     virtual bool parse(std::string_view block_sw) = 0;
 
-    virtual bool is_local();
+    virtual bool is_local() const;
     virtual void set_local();
 };
 
@@ -33,9 +33,9 @@ private:
 public:
     virtual ~CommonBlock() override = default;
 
-    uint64_t get_block_type() override;
+    uint64_t get_block_type() const override;
 
-    const std::vector<transaction::TX> get_txs(boost::asio::io_context& io_context);
+    const std::vector<transaction::TX> get_txs(boost::asio::io_context& io_context) const;
 
     bool parse(std::string_view block_sw) override;
 };
@@ -47,7 +47,7 @@ private:
 public:
     virtual ~ApproveBlock() override = default;
 
-    const std::vector<transaction::ApproveRecord> get_txs();
+    const std::vector<transaction::ApproveRecord> get_txs() const;
 
     bool parse(std::string_view block_sw) override;
     bool make(uint64_t, const sha256_2&, const std::vector<transaction::ApproveRecord*>&);
@@ -63,11 +63,11 @@ private:
 public:
     virtual ~RejectedTXBlock() override = default;
 
-    std::string get_sign();
-    std::string get_pub_key();
-    std::string get_data_for_sign();
+    std::string get_sign() const;
+    std::string get_pub_key() const;
+    std::string get_data_for_sign() const;
 
-    const std::vector<transaction::RejectedTXInfo> get_txs();
+    const std::vector<transaction::RejectedTXInfo> get_txs() const;
 
     bool parse(std::string_view block_sw) override;
     bool make(uint64_t timestamp, const sha256_2& new_prev_hash, const std::vector<transaction::RejectedTXInfo*>& new_txs, crypto::Signer& signer);

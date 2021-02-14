@@ -3,7 +3,7 @@
 
 namespace metahash::block {
 
-const std::vector<transaction::ApproveRecord> ApproveBlock::get_txs()
+const std::vector<transaction::ApproveRecord> ApproveBlock::get_txs() const
 {
     std::vector<transaction::ApproveRecord> txs;
     if (data.empty()) {

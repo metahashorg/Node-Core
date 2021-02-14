@@ -1,4 +1,5 @@
 #include <meta_transaction.h>
+#include <algorithm>
 
 namespace metahash::transaction {
 
@@ -21,6 +22,13 @@ bool ApproveRecord::make(
 
     std::string_view record_raw_sw(record_raw.data(), record_raw.size());
     return parse(record_raw_sw);
+}
+
+sha256_2 ApproveRecord::get_block_hash() const
+{
+    sha256_2 hash;
+    std::copy_n(block_hash.begin(), 32, hash.begin());
+    return hash;
 }
 
 }

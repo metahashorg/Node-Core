@@ -7,7 +7,7 @@
 
 namespace metahash::block {
 
-const std::vector<transaction::TX> CommonBlock::get_txs(boost::asio::io_context& io_context)
+const std::vector<transaction::TX> CommonBlock::get_txs(boost::asio::io_context& io_context) const
 {
     if (data.empty()) {
         return std::vector<transaction::TX>();
@@ -59,7 +59,7 @@ const std::vector<transaction::TX> CommonBlock::get_txs(boost::asio::io_context&
     return txs;
 }
 
-uint64_t CommonBlock::get_block_type()
+uint64_t CommonBlock::get_block_type() const
 {
     uint64_t block_type = Block::get_block_type();
     if (block_type == BLOCK_TYPE) {
