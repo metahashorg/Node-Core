@@ -155,7 +155,9 @@ void read_stored_blocks(
 
 void ControllerImplementation::read_and_apply_local_chain()
 {
-    auto last_file = read_last_known_state(proved_block);
+    auto last_file = "";
+    proved_block = { { 0 } };
+    //auto last_file = read_last_known_state(proved_block);
 
     std::list<std::future<block::Block*>> pending_data;
 
