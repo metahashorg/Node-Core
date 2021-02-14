@@ -153,6 +153,23 @@ void ControllerImplementation::log_network_statistics(uint64_t timestamp)
                 }
             }
 
+            auto total_stat = stat.dbg_RPC_TX
+                + stat.dbg_RPC_GET_CORE_LIST
+                + stat.dbg_RPC_APPROVE
+                + stat.dbg_RPC_DISAPPROVE
+                + stat.dbg_RPC_GET_APPROVE
+                + stat.dbg_RPC_LAST_BLOCK
+                + stat.dbg_RPC_GET_BLOCK
+                + stat.dbg_RPC_GET_CHAIN
+                + stat.dbg_RPC_GET_MISSING_BLOCK_LIST
+                + stat.dbg_RPC_CORE_LIST_APPROVE
+                + stat.dbg_RPC_PRETEND_BLOCK
+                + stat.dbg_RPC_NONE;
+
+            if (total_stat == 0 && ip_list.empty()) {
+                continue;
+            }
+
             DEBUG_COUT(addr + "\t"
                 + std::to_string(stat.dbg_RPC_TX) + "\t"
                 + std::to_string(stat.dbg_RPC_GET_CORE_LIST) + "\t"
