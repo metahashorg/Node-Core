@@ -31,7 +31,6 @@ void ControllerImplementation::apply_approve(transaction::ApproveRecord* p_ar)
 
     std::string addr = "0x" + crypto::bin2hex(crypto::get_address(p_ar->pub_key));
 
-    std::unique_lock lock(block_approve_lock);
     if (p_ar->approve) {
         if (!block_approve[block_hash].insert({ addr, p_ar }).second) {
             delete p_ar;

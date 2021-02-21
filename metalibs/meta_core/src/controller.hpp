@@ -26,12 +26,13 @@ private:
 
     std::map<sha256_2, std::set<std::string>> missing_blocks;
 
-    std::shared_mutex block_approve_lock;
     std::unordered_map<sha256_2, std::map<std::string, transaction::ApproveRecord*>, crypto::Hasher> block_approve;
     std::unordered_map<sha256_2, std::map<std::string, transaction::ApproveRecord*>, crypto::Hasher> block_disapprove;
 
     moodycamel::ConcurrentQueue<transaction::TX*> tx_queue;
+    moodycamel::ConcurrentQueue<transaction::ApproveRecord*> approve_queue;
     moodycamel::ConcurrentQueue<block::Block*> block_queue;
+    moodycamel::ConcurrentQueue<std::pair<std::string, sha256_2>> approve_request_queue;
 
     sha256_2 last_applied_block = { { 0 } };
     sha256_2 last_created_block = { { 0 } };
@@ -76,6 +77,7 @@ private:
         std::atomic<uint64_t> dbg_RPC_APPROVE = 0;
         std::atomic<uint64_t> dbg_RPC_DISAPPROVE = 0;
         std::atomic<uint64_t> dbg_RPC_GET_APPROVE = 0;
+        std::atomic<uint64_t> dbg_RPC_APPROVE_LIST = 0;
         std::atomic<uint64_t> dbg_RPC_LAST_BLOCK = 0;
         std::atomic<uint64_t> dbg_RPC_GET_BLOCK = 0;
         std::atomic<uint64_t> dbg_RPC_GET_CHAIN = 0;
@@ -120,9 +122,8 @@ public:
 
 private:
     void main_loop();
-
+    void process_queues();
     bool check_if_can_make_block(const uint64_t& timestamp);
-
     bool check_awaited_blocks();
 
     std::vector<char> add_pack_to_queue(network::Request& request);
@@ -132,13 +133,13 @@ private:
     void parse_RPC_PRETEND_BLOCK(std::string_view);
     void parse_RPC_APPROVE(std::string_view);
     void parse_RPC_DISAPPROVE(std::string_view);
-    std::vector<char> parse_RPC_GET_APPROVE(std::string_view);
+    void parse_RPC_APPROVE_LIST(std::string_view);
+    void parse_RPC_GET_APPROVE(const std::string& core, std::string_view);
     std::vector<char> parse_RPC_LAST_BLOCK(std::string_view);
     std::vector<char> parse_RPC_GET_BLOCK(std::string_view);
-    std::vector<char> parse_RPC_GET_CHAIN(std::string_view);
     std::vector<char> parse_RPC_GET_MISSING_BLOCK_LIST(std::string_view);
     std::vector<char> parse_RPC_GET_CORE_LIST(std::string_view);
-    void parse_RPC_CORE_LIST_APPROVE(std::string core, std::string_view);
+    void parse_RPC_CORE_LIST_APPROVE(const std::string& core, std::string_view);
 
     void approve_block(block::Block*);
     void disapprove_block(block::Block*);

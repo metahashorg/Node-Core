@@ -128,6 +128,7 @@ const uint64_t RPC_PRETEND_BLOCK = 0x30;
 const uint64_t RPC_APPROVE = 0x40;
 const uint64_t RPC_DISAPPROVE = 0x41;
 const uint64_t RPC_GET_APPROVE = 0x42;
+const uint64_t RPC_APPROVE_LIST = 0x43;
 const uint64_t RPC_LAST_BLOCK = 0x50;
 const uint64_t RPC_GET_BLOCK = 0x60;
 const uint64_t RPC_GET_CHAIN = 0x61;

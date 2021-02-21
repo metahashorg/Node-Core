@@ -11,32 +11,7 @@ void ControllerImplementation::main_loop()
 
     log_network_statistics(timestamp);
 
-    {
-        const uint64_t LIST_SIZE = 8000;
-        {
-            static std::vector<transaction::TX*> tx_list(LIST_SIZE, nullptr);
-            if (auto size = tx_queue.try_dequeue_bulk(tx_list.begin(), LIST_SIZE)) {
-                transactions.insert(transactions.end(), tx_list.begin(), tx_list.begin() + size);
-            }
-        }
-        {
-            static std::vector<block::Block*> block_list(LIST_SIZE, nullptr);
-            if (auto size = block_queue.try_dequeue_bulk(block_list.begin(), LIST_SIZE)) {
-                for (int i = 0; i < size; i++) {
-                    auto block = block_list[i];
-
-                    if (dynamic_cast<block::CommonBlock*>(block)) {
-                        missing_blocks.erase(block->get_block_hash());
-                        blocks.insert(block);
-                    } else if (dynamic_cast<block::RejectedTXBlock*>(block)) {
-                        write_block(block);
-                    } else {
-                        delete block;
-                    }
-                }
-            }
-        }
-    }
+    process_queues();
 
     if (timestamp - last_sync_timestamp > 60) {
         io_context.post(std::bind(&connection::MetaConnection::sync_core_lists, &cores));
@@ -69,6 +44,88 @@ void ControllerImplementation::main_loop()
     }
 }
 
+void ControllerImplementation::process_queues()
+{
+    //moodycamel::ConcurrentQueue<transaction::TX*> tx_queue;
+    moodycamel::ConcurrentQueue<transaction::ApproveRecord*> approve_queue;
+    //moodycamel::ConcurrentQueue<block::Block*> block_queue;
+    moodycamel::ConcurrentQueue<std::pair<std::string, sha256_2>> approve_request_queue;
+    {
+        const uint64_t LIST_SIZE = 8000;
+        {
+            static std::vector<transaction::TX*> tx_list(LIST_SIZE, nullptr);
+            if (auto size = tx_queue.try_dequeue_bulk(tx_list.begin(), LIST_SIZE)) {
+                transactions.insert(transactions.end(), tx_list.begin(), tx_list.begin() + size);
+            }
+        }
+        {
+            static std::vector<block::Block*> block_list(LIST_SIZE, nullptr);
+            if (auto size = block_queue.try_dequeue_bulk(block_list.begin(), LIST_SIZE)) {
+                for (uint i = 0; i < size; i++) {
+                    auto block = block_list[i];
+
+                    if (dynamic_cast<block::CommonBlock*>(block)) {
+                        missing_blocks.erase(block->get_block_hash());
+                        blocks.insert(block);
+                    } else if (dynamic_cast<block::RejectedTXBlock*>(block)) {
+                        write_block(block);
+                    } else {
+                        delete block;
+                    }
+                }
+            }
+        }
+        {
+            static std::vector<transaction::ApproveRecord*> approve_list(LIST_SIZE, nullptr);
+            if (auto size = approve_queue.try_dequeue_bulk(approve_list.begin(), LIST_SIZE)) {
+                for (uint i = 0; i < size; i++) {
+                    apply_approve(approve_list[i]);
+                }
+            }
+        }
+        {
+            static std::vector<std::pair<std::string, sha256_2>> approve_request_list(LIST_SIZE);
+            if (auto size = approve_request_queue.try_dequeue_bulk(approve_request_list.begin(), LIST_SIZE)) {
+                for (uint i = 0; i < size; i++) {
+                    auto&& [core_name, block_hash] = approve_request_list[i];
+
+                    auto approve_list_it = block_approve.find(block_hash);
+                    if (approve_list_it == block_approve.end()) {
+                        sha256_2 got_block = last_applied_block;
+                        while (got_block != block_hash && blocks.contains(got_block)) {
+                            got_block = blocks[got_block]->get_prev_hash();
+                        }
+                        if (got_block == block_hash) {
+                            auto* p_ar = new transaction::ApproveRecord;
+                            p_ar->make(got_block, signer);
+                            p_ar->approve = true;
+                            if (!block_approve[got_block].insert({ signer.get_mh_addr(), p_ar }).second) {
+                                delete p_ar;
+                            }
+                            approve_list_it = block_approve.find(block_hash);
+                            if (approve_list_it == block_approve.end()) {
+                                continue;
+                            }
+                        } else {
+                            continue;
+                        }
+                    }
+                    std::vector<char> approve_data_list;
+                    for (auto&& [core_addr, record] : approve_list_it->second) {
+                        uint64_t record_size = record->data.size();
+                        approve_data_list.insert(approve_data_list.end(), reinterpret_cast<char*>(&record_size), reinterpret_cast<char*>(&record_size) + sizeof(uint64_t));
+                        approve_data_list.insert(approve_data_list.end(), record->data.begin(), record->data.end());
+                    }
+
+                    if (!approve_data_list.empty()) {
+                        cores.send_no_return_to_core(core_name, RPC_APPROVE_LIST, approve_data_list);
+                    }
+                }
+            }
+        }
+    }
+}
+
 bool ControllerImplementation::check_if_can_make_block(const uint64_t& timestamp)
 {
     if (not_actualized[0] || not_actualized[1]) {
@@ -76,7 +133,6 @@ bool ControllerImplementation::check_if_can_make_block(const uint64_t& timestamp
     }
     if (!check_online_nodes(timestamp)) {
         return false;
-
     }
     if (!master()) {
         return false;

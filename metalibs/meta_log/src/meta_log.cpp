@@ -17,7 +17,7 @@ std::thread* cout_printer = new std::thread([]() {
                 return ss1->str() < ss2->str();
             });
 
-            for (auto i = 0; i < size; i++) {
+            for (uint i = 0; i < size; i++) {
                 std::cout << ssout_list[i]->rdbuf();
                 delete ssout_list[i];
 
