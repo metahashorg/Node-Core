@@ -136,6 +136,7 @@ void ControllerImplementation::log_network_statistics(uint64_t timestamp)
     if (timestamp > dbg_timestamp + 60) {
         std::string log_msg = "\n";
         log_msg += "0x00112233445566778899aabbccddeeffgghhffjjiikkllmmnn\tTX\tGetCL\tApprove\tDisAprv\tGetAprv\tAprvLst\tLastBlo\tGetBlok\tGetChai\tGetBLst\tCoreLst\tPretend\tNone\tRoles\tIP";
+        log_msg += "\n";
 
         {
             std::shared_lock lock(income_nodes_stat_lock);
@@ -193,6 +194,7 @@ void ControllerImplementation::log_network_statistics(uint64_t timestamp)
                     + std::to_string(stat.dbg_RPC_NONE) + "\t"
                     + role_list
                     + ip_list;
+                log_msg += "\n";
 
                 stat.dbg_RPC_TX = 0;
                 stat.dbg_RPC_GET_CORE_LIST = 0;
