@@ -112,15 +112,15 @@ void read_stored_blocks(
     char uint64_buff[8];
     std::set<std::string> files = get_files_in_dir(path);
 
-    bool old_files = true;
+    //bool old_files = true;
     for (const std::string& file : files) {
-        if (file == last_file) {
-            old_files = false;
-        }
+    //    if (file == last_file) {
+    //        old_files = false;
+    //    }
 
-        if (old_files) {
-            continue;
-        }
+    //    if (old_files) {
+    //        continue;
+    //    }
 
         std::ifstream ifile(file.c_str(), std::ios::in | std::ios::binary);
 
