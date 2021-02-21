@@ -46,10 +46,6 @@ void ControllerImplementation::main_loop()
 
 void ControllerImplementation::process_queues()
 {
-    //moodycamel::ConcurrentQueue<transaction::TX*> tx_queue;
-    moodycamel::ConcurrentQueue<transaction::ApproveRecord*> approve_queue;
-    //moodycamel::ConcurrentQueue<block::Block*> block_queue;
-    moodycamel::ConcurrentQueue<std::pair<std::string, sha256_2>> approve_request_queue;
     {
         const uint64_t LIST_SIZE = 8000;
         {
