@@ -51,7 +51,12 @@ void ControllerImplementation::process_queues()
         {
             static std::vector<transaction::TX*> tx_list(LIST_SIZE, nullptr);
             if (auto size = tx_queue.try_dequeue_bulk(tx_list.begin(), LIST_SIZE)) {
-                transactions.insert(transactions.end(), tx_list.begin(), tx_list.begin() + size);
+                for (uint i = 0; i < size; i++) {
+                    if (tx_list[i]) {
+                        transactions.push_back(tx_list[i]);
+                    }
+                }
+                //transactions.insert(transactions.end(), tx_list.begin(), tx_list.begin() + size);
             }
         }
         {
