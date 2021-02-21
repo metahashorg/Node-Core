@@ -124,12 +124,12 @@ void ControllerImplementation::process_queues()
 
 bool ControllerImplementation::check_if_can_make_block(const uint64_t& timestamp)
 {
-    if (not_actualized[0] || not_actualized[1]) {
-        return false;
-    }
-    if (!check_online_nodes(timestamp)) {
-        return false;
-    }
+    //if (not_actualized[0] || not_actualized[1]) {
+    //    return false;
+    //}
+    //if (!check_online_nodes(timestamp)) {
+    //    return false;
+    //}
     if (!master()) {
         return false;
     }
