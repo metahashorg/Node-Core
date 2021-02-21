@@ -112,15 +112,15 @@ void read_stored_blocks(
     char uint64_buff[8];
     std::set<std::string> files = get_files_in_dir(path);
 
-    //bool old_files = true;
+    bool old_files = true;
     for (const std::string& file : files) {
-    //    if (file == last_file) {
-    //        old_files = false;
-    //    }
+        if (file == last_file) {
+            old_files = false;
+        }
 
-    //    if (old_files) {
-    //        continue;
-    //    }
+        if (old_files) {
+            continue;
+        }
 
         std::ifstream ifile(file.c_str(), std::ios::in | std::ios::binary);
 
@@ -155,10 +155,10 @@ void read_stored_blocks(
 
 void ControllerImplementation::read_and_apply_local_chain()
 {
-    auto last_file = "";
-    auto proved_block_vec = crypto::hex2bin("85e6c78616632e4fba97efb1dfb403834fe909bc34e3c7efa836ff2ea974ba9b");
-    std::copy_n(proved_block_vec.begin(), 32, proved_block.begin());
-    //auto last_file = read_last_known_state(proved_block);
+    //auto last_file = "";
+    //auto proved_block_vec = crypto::hex2bin("85e6c78616632e4fba97efb1dfb403834fe909bc34e3c7efa836ff2ea974ba9b");
+    //std::copy_n(proved_block_vec.begin(), 32, proved_block.begin());
+    auto last_file = read_last_known_state(proved_block);
 
     std::list<std::future<block::Block*>> pending_data;
 
