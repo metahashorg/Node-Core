@@ -191,22 +191,35 @@ void ControllerImplementation::read_and_apply_local_chain()
 
     DEBUG_COUT("LOCAL COMPLETE");
     {
+        std::list<std::future<transaction::ApproveRecord*>> pending_data;
+
         sha256_2 got_block = last_applied_block;
         while (blocks.contains(got_block)) {
             auto approve_list_it = block_approve.find(got_block);
             if (approve_list_it == block_approve.end() || !approve_list_it->second.count(signer.get_mh_addr())) {
-                auto* p_ar = new transaction::ApproveRecord;
-                p_ar->make(got_block, signer);
-                p_ar->approve = true;
+                auto promise = std::make_shared<std::promise<transaction::ApproveRecord*>>();
+                pending_data.emplace_back(promise->get_future());
 
-                if (!block_approve[got_block].insert({ signer.get_mh_addr(), p_ar }).second) {
-                    delete p_ar;
-                }
+                boost::asio::post(io_context, [got_block, this, promise]() {
+                    auto* p_ar = new transaction::ApproveRecord;
+                    p_ar->make(got_block, signer);
+                    p_ar->approve = true;
+
+                    promise->set_value(p_ar);
+                });
             }
 
             got_block = blocks[got_block]->get_prev_hash();
         }
+
+        for (auto&& fut : pending_data) {
+            auto p_ar = fut.get();
+            if (!block_approve[p_ar->get_block_hash()].insert({ signer.get_mh_addr(), p_ar }).second) {
+                delete p_ar;
+            }
+        }
     }
+    DEBUG_COUT("APPROVE COMPLETE");
 }
 
 void ControllerImplementation::check_blocks()
