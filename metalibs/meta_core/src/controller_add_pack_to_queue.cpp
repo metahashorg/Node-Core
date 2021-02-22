@@ -74,36 +74,26 @@ std::vector<char> ControllerImplementation::add_pack_to_queue(network::Request& 
         }
         break;
     case RPC_GET_APPROVE:
-        if (roles.count(META_ROLE_CORE)) {
-            stat.dbg_RPC_GET_APPROVE++;
-            parse_RPC_GET_APPROVE(request.sender_mh_addr, pack);
-            return empty_resp;
-        }
+        stat.dbg_RPC_GET_APPROVE++;
+        parse_RPC_GET_APPROVE(request.sender_mh_addr, pack);
+        return empty_resp;
         break;
     case RPC_APPROVE_LIST:
-        if (roles.count(META_ROLE_CORE)) {
-            stat.dbg_RPC_APPROVE_LIST++;
-            parse_RPC_APPROVE_LIST(pack);
-            return empty_resp;
-        }
+        stat.dbg_RPC_APPROVE_LIST++;
+        parse_RPC_APPROVE_LIST(pack);
+        return empty_resp;
         break;
     case RPC_LAST_BLOCK:
-        if (roles.count(META_ROLE_CORE)) {
-            stat.dbg_RPC_LAST_BLOCK++;
-            return parse_RPC_LAST_BLOCK(pack);
-        }
+        stat.dbg_RPC_LAST_BLOCK++;
+        return parse_RPC_LAST_BLOCK(pack);
         break;
     case RPC_GET_BLOCK:
-        if (roles.count(META_ROLE_CORE)) {
-            stat.dbg_RPC_GET_BLOCK++;
-            return parse_RPC_GET_BLOCK(pack);
-        }
+        stat.dbg_RPC_GET_BLOCK++;
+        return parse_RPC_GET_BLOCK(pack);
         break;
     case RPC_GET_MISSING_BLOCK_LIST:
-        if (roles.count(META_ROLE_CORE)) {
-            stat.dbg_RPC_GET_MISSING_BLOCK_LIST++;
-            return parse_RPC_GET_MISSING_BLOCK_LIST(pack);
-        }
+        stat.dbg_RPC_GET_MISSING_BLOCK_LIST++;
+        return parse_RPC_GET_MISSING_BLOCK_LIST(pack);
         break;
     case RPC_GET_CORE_LIST:
         stat.dbg_RPC_GET_CORE_LIST++;
