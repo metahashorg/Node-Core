@@ -57,7 +57,12 @@ bool ControllerImplementation::count_approve_for_block(block::Block* block)
     //    return try_apply_block(block);
     //}
 
-    if (block_approve[block_hash].find("0x00fca67778165988703a302c1dfc34fd6036e209a20666969e") != block_approve[block_hash].end() || block->is_local()) {
+    if (
+        (
+            block_approve[block_hash].find("0x00fca67778165988703a302c1dfc34fd6036e209a20666969e") != block_approve[block_hash].end()
+            && block_approve[block_hash].find(signer.get_mh_addr()) != block_approve[block_hash].end())
+        || block->is_local()) {
+
         return try_apply_block(block);
     }
 
