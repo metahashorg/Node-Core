@@ -71,6 +71,8 @@ bool ControllerImplementation::try_apply_block(block::Block* block, bool write)
 
             prev_day = prev_timestamp / DAY_IN_SECONDS;
             prev_state = block->get_block_type();
+
+            core_last_block[signer.get_mh_addr()] = prev_timestamp;
         }
 
         if (write) {
