@@ -112,15 +112,15 @@ void read_stored_blocks(
     char uint64_buff[8];
     std::set<std::string> files = get_files_in_dir(path);
 
-    //bool old_files = true;
+    bool old_files = true;
     for (const std::string& file : files) {
-        //if (file == last_file) {
-        //    old_files = false;
-        //}
+        if (file == last_file) {
+            old_files = false;
+        }
 
-        //if (old_files) {
-        //    continue;
-        //}
+        if (old_files) {
+            continue;
+        }
 
         std::ifstream ifile(file.c_str(), std::ios::in | std::ios::binary);
 
@@ -156,7 +156,6 @@ void read_stored_blocks(
 void ControllerImplementation::read_and_apply_local_chain()
 {
     auto last_file = read_last_known_state(proved_block);
-    proved_block = { { 0 } };
 
     std::list<std::future<block::Block*>> pending_data;
 
