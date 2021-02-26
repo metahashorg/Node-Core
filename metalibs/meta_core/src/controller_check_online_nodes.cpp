@@ -94,24 +94,11 @@ std::vector<char> ControllerImplementation::make_pretend_core_list(uint64_t curr
     const auto nodes = BC.get_node_state();
     const auto online_cores = cores.get_online_cores();
 
-    {
-        std::string core_list;
-        {
-            for (const auto& core : online_cores) {
-                core_list += core + "\t";
-            }
-        }
-        DEBUG_COUT("online cores:\t" + core_list);
-    }
-
     for (auto&& [addr, roles] : nodes) {
         if (online_cores.count(addr)
             && roles.count(META_ROLE_CORE)
             && abs(long(prev_timestamp) - long(core_last_block[addr])) < 3600) {
             cores_list.push_back(addr);
-        }
-        if (roles.count(META_ROLE_CORE)) {
-            DEBUG_COUT("core:\t" + addr + "\t" + std::to_string(prev_timestamp) + "\t" + std::to_string(core_last_block[addr]) + "\t" + std::to_string(abs(long(prev_timestamp) - long(core_last_block[addr]))));
         }
     }
 
