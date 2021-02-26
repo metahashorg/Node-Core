@@ -126,8 +126,6 @@ std::vector<char> ControllerImplementation::make_pretend_core_list(uint64_t curr
         return_list.insert(return_list.end(), addr.begin(), addr.end());
     }
 
-    DEBUG_COUT("pretend list\n" + std::string(return_list.begin(), return_list.end()));
-
     return return_list;
 }
 
