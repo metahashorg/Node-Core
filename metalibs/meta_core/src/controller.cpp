@@ -46,23 +46,14 @@ bool ControllerImplementation::count_approve_for_block(block::Block* block)
 {
     auto block_hash = block->get_block_hash();
 
-    //uint64_t approve_size = 0;
-    //for (auto&& [addr, _] : block_approve[block_hash]) {
-    //    if (std::find(current_cores.begin(), current_cores.end(), addr) != std::end(current_cores)) {
-    //        approve_size++;
-    //    }
-    //}
+    uint64_t approve_size = 0;
+    for (auto&& [addr, _] : block_approve[block_hash]) {
+        if (std::find(current_cores.begin(), current_cores.end(), addr) != std::end(current_cores)) {
+            approve_size++;
+        }
+    }
 
-    //if (approve_size >= min_approve || approve_size == current_cores.size() || block->is_local()) {
-    //    return try_apply_block(block);
-    //}
-
-    if (
-        (
-            block_approve[block_hash].find("0x00fca67778165988703a302c1dfc34fd6036e209a20666969e") != block_approve[block_hash].end()
-            && block_approve[block_hash].find(signer.get_mh_addr()) != block_approve[block_hash].end())
-        || block->is_local()) {
-
+    if (approve_size >= min_approve || approve_size == current_cores.size() || block->is_local()) {
         return try_apply_block(block);
     }
 
@@ -124,13 +115,11 @@ void ControllerImplementation::distribute(transaction::ApproveRecord* p_ar)
 
 bool ControllerImplementation::master()
 {
-    //if (!current_cores.empty() && current_cores[0] == signer.get_mh_addr()) {
-    //    return true;
-    //}
+    if (!current_cores.empty() && current_cores[0] == signer.get_mh_addr()) {
+        return true;
+    }
 
-    //return false;
-
-    return signer.get_mh_addr() == "0x00fca67778165988703a302c1dfc34fd6036e209a20666969e";
+    return false;
 }
 
 bool ControllerImplementation::check_block_for_appliance_and_break_on_corrupt_block(block::Block*& block)
