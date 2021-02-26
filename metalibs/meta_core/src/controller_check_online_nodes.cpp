@@ -64,6 +64,7 @@ bool ControllerImplementation::check_online_nodes(uint64_t timestamp)
                     bool all_here = true;
                     for (auto& check_core : primary_cores) {
                         if (!approve_cores.count(check_core)) {
+                            DEBUG_COUT("no approve from\t" + check_core);
                             all_here = false;
                         }
                     }
