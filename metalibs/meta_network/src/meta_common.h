@@ -5,7 +5,7 @@
 
 namespace metahash::network {
 
-const uint32_t METAHASH_MAGIC_NUMBER = 0xabcd0002;
+const uint32_t METAHASH_MAGIC_NUMBER = 0xabcd0001;
 
 namespace statics {
     enum parse_state {
