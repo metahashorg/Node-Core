@@ -119,7 +119,7 @@ const uint64_t TX_REJECT_FOUNDER_LIMIT = 0xff06;
 const uint64_t TX_REJECT_INVALID_WALLET = 0x0404;
 
 const uint64_t DAY_IN_SECONDS = 24 * 60 * 60;
-const uint64_t CORE_LIST_RENEW_PERIOD = 3 * 60;
+const uint64_t CORE_LIST_RENEW_PERIOD = 2 * 60 + 30;
 const uint64_t CORE_LIST_SILENCE_PERIOD = 10;
 
 /*                          RPC METHODS                           */
