@@ -55,7 +55,14 @@ void Connection::read(std::shared_ptr<Connection> pThis)
 
             switch (result) {
             case statics::SUCCESS: {
-                pThis->request.remote_ip_address = pThis->socket.remote_endpoint().address().to_string();
+                boost::system::error_code ec;
+                boost::asio::ip::tcp::endpoint endpoint = pThis->socket.remote_endpoint(ec);
+                if (ec) {
+                    pThis->request.remote_ip_address = "0.0.0.0";
+                } else {
+                    pThis->request.remote_ip_address = endpoint.address().to_string();                
+                }
+
                 pThis->reply.make(pThis->signer, pThis->request.request_id, pThis->request_handler(pThis->request));
 
                 pThis->write(pThis);
