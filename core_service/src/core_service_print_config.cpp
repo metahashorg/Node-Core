@@ -1,12 +1,9 @@
 #include "core_service.h"
 
 #include <meta_log.hpp>
-#include <version.h>
 
 void print_config_file_params_and_exit()
 {
-    static const std::string version = std::string(VERSION_MAJOR) + "." + std::string(VERSION_MINOR) + "." + std::string(GIT_COUNT) + "." + std::string(GIT_COMMIT_HASH);
-    DEBUG_COUT(version);
     DEBUG_COUT("Example configuration");
     DEBUG_COUT(R"(
 {

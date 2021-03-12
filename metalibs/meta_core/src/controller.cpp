@@ -1,6 +1,6 @@
 #include "controller.hpp"
 #include <meta_constants.hpp>
-#include <meta_log.hpp>
+//#include <meta_log.hpp>
 
 namespace metahash::meta_core {
 
@@ -31,7 +31,6 @@ void ControllerImplementation::apply_approve(transaction::ApproveRecord* p_ar)
 
     std::string addr = "0x" + crypto::bin2hex(crypto::get_address(p_ar->pub_key));
 
-    std::unique_lock lock(block_approve_lock);
     if (p_ar->approve) {
         if (!block_approve[block_hash].insert({ addr, p_ar }).second) {
             delete p_ar;
@@ -72,6 +71,8 @@ bool ControllerImplementation::try_apply_block(block::Block* block, bool write)
 
             prev_day = prev_timestamp / DAY_IN_SECONDS;
             prev_state = block->get_block_type();
+
+            core_last_block[signer.get_mh_addr()] = prev_timestamp;
         }
 
         if (write) {
@@ -84,6 +85,8 @@ bool ControllerImplementation::try_apply_block(block::Block* block, bool write)
                         allowed_addresses.insert(addr);
                     }
                 }
+
+                allowed_addresses.erase(signer.get_mh_addr());
 
                 listener.update_allowed_addreses(allowed_addresses);
             }

@@ -4,22 +4,22 @@
 
 namespace metahash::block {
 
-std::string RejectedTXBlock::get_sign()
+std::string RejectedTXBlock::get_sign() const
 {
     return std::string(sign);
 }
 
-std::string RejectedTXBlock::get_pub_key()
+std::string RejectedTXBlock::get_pub_key() const
 {
     return std::string(pub_key);
 }
 
-std::string RejectedTXBlock::get_data_for_sign()
+std::string RejectedTXBlock::get_data_for_sign() const
 {
     return std::string(data_for_sign);
 }
 
-const std::vector<transaction::RejectedTXInfo> RejectedTXBlock::get_txs()
+const std::vector<transaction::RejectedTXInfo> RejectedTXBlock::get_txs() const
 {
     std::vector<transaction::RejectedTXInfo> txs;
     if (data.empty()) {

@@ -71,7 +71,7 @@ void parse_block_async(
     });
 }
 
-void read_last_known_state(sha256_2& proved_block)
+std::string read_last_known_state(sha256_2& proved_block)
 {
     std::string last_file;
 
@@ -96,11 +96,14 @@ void read_last_known_state(sha256_2& proved_block)
 
         last_known_state_file.close();
     }
+
+    return last_file;
 }
 
 void read_stored_blocks(
     boost::asio::io_context& io_context,
     const std::string& path,
+    const std::string& last_file,
     std::list<std::future<metahash::block::Block*>>& pending_data)
 {
     uint files_read = 0;
@@ -109,7 +112,16 @@ void read_stored_blocks(
     char uint64_buff[8];
     std::set<std::string> files = get_files_in_dir(path);
 
+    bool old_files = true;
     for (const std::string& file : files) {
+        if (file == last_file) {
+            old_files = false;
+        }
+
+        if (old_files) {
+            continue;
+        }
+
         std::ifstream ifile(file.c_str(), std::ios::in | std::ios::binary);
 
         if (ifile.is_open()) {
@@ -143,11 +155,11 @@ void read_stored_blocks(
 
 void ControllerImplementation::read_and_apply_local_chain()
 {
-    read_last_known_state(proved_block);
+    auto last_file = read_last_known_state(proved_block);
 
     std::list<std::future<block::Block*>> pending_data;
 
-    read_stored_blocks(io_context, path, pending_data);
+    read_stored_blocks(io_context, path, last_file, pending_data);
     DEBUG_COUT("READ COMPLETE");
 
     uint blocks_processed = 0;
@@ -158,13 +170,13 @@ void ControllerImplementation::read_and_apply_local_chain()
                 blocks.insert(block);
             } else if (auto* a_block = dynamic_cast<block::ApproveBlock*>(block)) {
                 for (auto& tx : a_block->get_txs()) {
-                    block_approve[a_block->get_prev_hash()].insert({ "0x" + crypto::bin2hex(crypto::get_address(tx.pub_key)), new transaction::ApproveRecord(std::move(tx)) });
+                    block_approve[tx.get_block_hash()].insert({ "0x" + crypto::bin2hex(crypto::get_address(tx.pub_key)), new transaction::ApproveRecord(std::move(tx)) });
                 }
 
                 check_blocks();
             }
         }
-        
+
         blocks_processed++;
         if (blocks_processed % 250000 == 0) {
             DEBUG_COUT("Processed blocks\t" + std::to_string(blocks_processed));
@@ -175,6 +187,36 @@ void ControllerImplementation::read_and_apply_local_chain()
     check_blocks();
 
     DEBUG_COUT("LOCAL COMPLETE");
+    {
+        std::list<std::future<transaction::ApproveRecord*>> pending_data;
+
+        sha256_2 got_block = last_applied_block;
+        while (blocks.contains(got_block)) {
+            auto approve_list_it = block_approve.find(got_block);
+            if (approve_list_it == block_approve.end() || !approve_list_it->second.count(signer.get_mh_addr())) {
+                auto promise = std::make_shared<std::promise<transaction::ApproveRecord*>>();
+                pending_data.emplace_back(promise->get_future());
+
+                boost::asio::post(io_context, [got_block, this, promise]() {
+                    auto* p_ar = new transaction::ApproveRecord;
+                    p_ar->make(got_block, signer);
+                    p_ar->approve = true;
+
+                    promise->set_value(p_ar);
+                });
+            }
+
+            got_block = blocks[got_block]->get_prev_hash();
+        }
+
+        for (auto&& fut : pending_data) {
+            auto p_ar = fut.get();
+            if (!block_approve[p_ar->get_block_hash()].insert({ signer.get_mh_addr(), p_ar }).second) {
+                delete p_ar;
+            }
+        }
+    }
+    DEBUG_COUT("APPROVE COMPLETE");
 }
 
 void ControllerImplementation::check_blocks()
@@ -182,5 +224,4 @@ void ControllerImplementation::check_blocks()
     while (check_awaited_blocks())
         ;
 }
-
 }

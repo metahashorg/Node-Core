@@ -26,15 +26,19 @@ private:
 
     std::map<sha256_2, std::set<std::string>> missing_blocks;
 
-    std::shared_mutex block_approve_lock;
     std::unordered_map<sha256_2, std::map<std::string, transaction::ApproveRecord*>, crypto::Hasher> block_approve;
     std::unordered_map<sha256_2, std::map<std::string, transaction::ApproveRecord*>, crypto::Hasher> block_disapprove;
+
+    moodycamel::ConcurrentQueue<transaction::TX*> tx_queue;
+    moodycamel::ConcurrentQueue<transaction::ApproveRecord*> approve_queue;
+    moodycamel::ConcurrentQueue<block::Block*> block_queue;
+    moodycamel::ConcurrentQueue<std::pair<std::string, sha256_2>> approve_request_queue;
 
     sha256_2 last_applied_block = { { 0 } };
     sha256_2 last_created_block = { { 0 } };
     sha256_2 proved_block = { { 0 } };
 
-    uint64_t min_approve = 0;
+    const uint64_t min_approve = 0;
 
     uint64_t statistics_timestamp = 0;
     uint64_t prev_timestamp = 0;
@@ -58,6 +62,8 @@ private:
 
     network::meta_server listener;
 
+    std::unordered_map<std::string, uint64_t, crypto::Hasher> core_last_block;
+
     std::vector<std::string> current_cores;
     std::map<uint64_t, std::unordered_map<std::string, std::set<std::string>, crypto::Hasher>> proposed_cores;
     uint64_t core_list_generation = 0;
@@ -66,12 +72,12 @@ private:
     bool goon = true;
 
     struct Statistics {
-        uint64_t dbg_timestamp = 0;
         std::atomic<uint64_t> dbg_RPC_TX = 0;
         std::atomic<uint64_t> dbg_RPC_GET_CORE_LIST = 0;
         std::atomic<uint64_t> dbg_RPC_APPROVE = 0;
         std::atomic<uint64_t> dbg_RPC_DISAPPROVE = 0;
         std::atomic<uint64_t> dbg_RPC_GET_APPROVE = 0;
+        std::atomic<uint64_t> dbg_RPC_APPROVE_LIST = 0;
         std::atomic<uint64_t> dbg_RPC_LAST_BLOCK = 0;
         std::atomic<uint64_t> dbg_RPC_GET_BLOCK = 0;
         std::atomic<uint64_t> dbg_RPC_GET_CHAIN = 0;
@@ -79,7 +85,14 @@ private:
         std::atomic<uint64_t> dbg_RPC_CORE_LIST_APPROVE = 0;
         std::atomic<uint64_t> dbg_RPC_PRETEND_BLOCK = 0;
         std::atomic<uint64_t> dbg_RPC_NONE = 0;
-    } stat;
+
+        std::shared_mutex ip_lock;
+        std::set<std::string> ip;
+    };
+
+    std::shared_mutex income_nodes_stat_lock;
+    std::unordered_map<std::string, Statistics, crypto::Hasher> income_nodes_stat;
+    uint64_t dbg_timestamp = 0;
 
     struct Blocks {
         std::shared_mutex blocks_lock;
@@ -109,9 +122,8 @@ public:
 
 private:
     void main_loop();
-
+    void process_queues();
     bool check_if_can_make_block(const uint64_t& timestamp);
-
     bool check_awaited_blocks();
 
     std::vector<char> add_pack_to_queue(network::Request& request);
@@ -121,13 +133,13 @@ private:
     void parse_RPC_PRETEND_BLOCK(std::string_view);
     void parse_RPC_APPROVE(std::string_view);
     void parse_RPC_DISAPPROVE(std::string_view);
-    std::vector<char> parse_RPC_GET_APPROVE(std::string_view);
+    void parse_RPC_APPROVE_LIST(std::string_view);
+    void parse_RPC_GET_APPROVE(const std::string& core, std::string_view);
     std::vector<char> parse_RPC_LAST_BLOCK(std::string_view);
     std::vector<char> parse_RPC_GET_BLOCK(std::string_view);
-    std::vector<char> parse_RPC_GET_CHAIN(std::string_view);
     std::vector<char> parse_RPC_GET_MISSING_BLOCK_LIST(std::string_view);
     std::vector<char> parse_RPC_GET_CORE_LIST(std::string_view);
-    void parse_RPC_CORE_LIST_APPROVE(std::string core, std::string_view);
+    void parse_RPC_CORE_LIST_APPROVE(const std::string& core, std::string_view);
 
     void approve_block(block::Block*);
     void disapprove_block(block::Block*);

@@ -13,6 +13,10 @@ std::thread* cout_printer = new std::thread([]() {
     for (;;) {
         std::vector<std::stringstream*> ssout_list(1000);
         if (auto size = output_queue->try_dequeue_bulk(ct, ssout_list.begin(), 1000)) {
+            std::sort(ssout_list.begin(), ssout_list.begin() + size, [](std::stringstream* ss1, std::stringstream* ss2) {
+                return ss1->str() < ss2->str();
+            });
+
            for (std::size_t i = 0; i < size; i++) {
                 std::cout << ssout_list[i]->rdbuf();
                 delete ssout_list[i];

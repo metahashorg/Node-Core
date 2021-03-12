@@ -2,6 +2,7 @@
 
 #include <blockchain.h>
 #include <meta_log.hpp>
+#include <version.h>
 
 int main(int argc, char** argv)
 {
@@ -12,6 +13,9 @@ int main(int argc, char** argv)
     std::string known_hash;
     std::string key;
     std::map<std::string, std::pair<std::string, int>> core_list;
+
+    static const std::string version = std::string(VERSION_MAJOR) + "." + std::string(VERSION_MINOR) + "." + std::string(GIT_COUNT) + "." + std::string(GIT_COMMIT_HASH);
+    DEBUG_COUT(version);
 
     if (argc < 2) {
         DEBUG_COUT("Need Configuration File As Parameter");

@@ -1,5 +1,5 @@
 #include <meta_common.h>
-#include <meta_log.hpp>
+//#include <meta_log.hpp>
 #include <meta_server.h>
 #include <version.h>
 
@@ -80,8 +80,8 @@ void Connection::read(std::shared_ptr<Connection> pThis)
             } break;
             }
         } else {
-            DEBUG_COUT("error");
-            DEBUG_COUT(e.message());
+            //DEBUG_COUT("error");
+            //DEBUG_COUT(e.message());
         }
     });
 }

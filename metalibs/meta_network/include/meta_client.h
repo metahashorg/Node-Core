@@ -87,6 +87,8 @@ public:
     uint64_t get_queue_size();
 
 private:
+    void resolve(const std::string& host, const std::string& port);
+
     std::atomic<int> request_count = 0;
     moodycamel::ConcurrentQueue<Task*> tasks;
 
@@ -100,6 +102,8 @@ private:
     const std::string mh_addr;
     const std::string server;
     const int port;
+
+    const int max_connections;
 };
 }
 

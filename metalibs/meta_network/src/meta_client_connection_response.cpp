@@ -1,6 +1,6 @@
 #include <meta_client.h>
 #include <meta_common.h>
-#include <meta_log.hpp>
+//#include <meta_log.hpp>
 
 namespace metahash::network {
 
@@ -32,7 +32,7 @@ int8_t ClientConnection::Response::parse(char* buff_data, size_t buff_size, cons
         if (fill_sw(public_key, public_key_size)) {
             sender_addr = "0x" + crypto::bin2hex(crypto::get_address(public_key));
             if (mh_endpoint_addr != sender_addr) {
-                DEBUG_COUT("UNKNOWN_SENDER_METAHASH_ADDRESS");
+                //DEBUG_COUT("UNKNOWN_SENDER_METAHASH_ADDRESS");
                 return statics::UNKNOWN_SENDER_METAHASH_ADDRESS;
             }
         } else {
@@ -55,9 +55,9 @@ int8_t ClientConnection::Response::parse(char* buff_data, size_t buff_size, cons
     if (message_size && message.empty()) {
         if (fill_sw(message, message_size)) {
             if (!crypto::check_sign(message, sign, public_key)) {
-                DEBUG_COUT(crypto::bin2hex(sign));
-                DEBUG_COUT(crypto::bin2hex(public_key));
-                DEBUG_COUT("INVALID_SIGN");
+                //DEBUG_COUT(crypto::bin2hex(sign));
+                //DEBUG_COUT(crypto::bin2hex(public_key));
+                //DEBUG_COUT("INVALID_SIGN");
                 return statics::INVALID_SIGN;
             }
         } else {

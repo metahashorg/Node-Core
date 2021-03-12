@@ -1,6 +1,6 @@
 #include <meta_client.h>
 #include <meta_common.h>
-#include <meta_log.hpp>
+//#include <meta_log.hpp>
 
 namespace metahash::network {
 
@@ -11,18 +11,31 @@ meta_client::meta_client(boost::asio::io_context& io_context, const std::string&
     , mh_addr(mh_endpoint_addr)
     , server(server)
     , port(port)
+    , max_connections(max_connections)
 {
-    endpoints = resolver.resolve(server, std::to_string(port));
+    resolve(server, std::to_string(port));
+}
 
-    sockets.reserve(max_connections);
 
-    for (auto i = 0; i < max_connections; i++) {
-        sockets.emplace_back(io_context, endpoints, tasks, mh_endpoint_addr);
-    }
+void meta_client::resolve(const std::string& host, const std::string& port)
+{
+    resolver.async_resolve(host, port, [this, host, port](boost::system::error_code err, const boost::asio::ip::tcp::resolver::results_type& results) {
+        if (err) {            
+            return resolve(host, port);
+        }
 
-    for (auto& conn : sockets) {
-        conn.try_connect();
-    }
+        endpoints = results;
+
+        sockets.reserve(max_connections);
+
+        for (auto i = 0; i < max_connections; i++) {
+            sockets.emplace_back(io_context, endpoints, tasks, mh_addr);
+        }
+
+        for (auto& conn : sockets) {
+            conn.try_connect();
+        }
+    });
 }
 
 void meta_client::send_message(uint64_t request_type, const std::vector<char>& message, const std::function<void(std::vector<char>)>& callback)

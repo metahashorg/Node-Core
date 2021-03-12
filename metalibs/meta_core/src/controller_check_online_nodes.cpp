@@ -58,13 +58,13 @@ bool ControllerImplementation::check_online_nodes(uint64_t timestamp)
         }
 
         for (auto&& [cores_list, approve_cores] : proposed_cores[current_generation]) {
-
             if (approve_cores.size() >= accept_count) {
                 auto primary_cores = crypto::split(cores_list, '\n');
                 if (primary_cores.size() == METAHASH_PRIMARY_CORES_COUNT) {
                     bool all_here = true;
                     for (auto& check_core : primary_cores) {
                         if (!approve_cores.count(check_core)) {
+                            DEBUG_COUT("no approve from\t" + check_core);
                             all_here = false;
                         }
                     }
@@ -96,7 +96,9 @@ std::vector<char> ControllerImplementation::make_pretend_core_list(uint64_t curr
     const auto online_cores = cores.get_online_cores();
 
     for (auto&& [addr, roles] : nodes) {
-        if (online_cores.count(addr) && roles.count(META_ROLE_CORE)) {
+        if (online_cores.count(addr)
+            && roles.count(META_ROLE_CORE)
+            && abs(long(prev_timestamp) - long(core_last_block[addr])) < 3600) {
             cores_list.push_back(addr);
         }
     }

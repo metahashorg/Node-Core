@@ -57,29 +57,29 @@ const std::vector<char>& Block::get_data()
     return data;
 }
 
-uint64_t Block::get_block_type()
+uint64_t Block::get_block_type() const
 {
     return *(reinterpret_cast<const uint64_t*>(&data[0]));
 }
 
-uint64_t Block::get_block_timestamp()
+uint64_t Block::get_block_timestamp() const
 {
     return *(reinterpret_cast<const uint64_t*>(&data[8]));
 }
 
-sha256_2 Block::get_prev_hash()
+sha256_2 Block::get_prev_hash() const
 {
     sha256_2 prev_hash;
     std::copy_n(data.begin() + 16, 32, prev_hash.begin());
     return prev_hash;
 }
 
-sha256_2 Block::get_block_hash()
+sha256_2 Block::get_block_hash() const
 {
     return crypto::get_sha256(data);
 }
 
-bool Block::is_local()
+bool Block::is_local() const
 {
     return from_local_storage;
 }
