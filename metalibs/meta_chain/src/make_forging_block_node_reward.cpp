@@ -5,19 +5,16 @@
 
 namespace metahash::meta_chain {
 
-void BlockChain::make_forging_block_node_reward(uint64_t timestamp, std::map<std::string, std::map<std::string, std::map<std::string, uint64_t>>>& type_geo_node_delegates, std::vector<char>& txs_buff)
+void BlockChain::make_forging_block_node_reward(const uint64_t pool, std::map<std::string, std::map<std::string, std::map<std::string, uint64_t>>>& type_geo_node_delegates, std::vector<char>& txs_buff)
 {
     if (!type_geo_node_delegates.empty()) {
-        auto state_fee = wallet_map.get_wallet(STATE_FEE_WALLET);
-
         std::set<std::string> reward_nodes;
         static const std::vector<std::string> types_by_value {
             "Proxy",
             "InfrastructureTorrent",
             "Torrent",
-            "Verifier"
-            //TODO Core
-            // ,"Core"
+            "Verifier",
+            "Core"
         };
 
         uint64_t forging_node_units = 0;
@@ -37,10 +34,11 @@ void BlockChain::make_forging_block_node_reward(uint64_t timestamp, std::map<std
             { "Verifier",
                 { { "us", 0 },
                     { "eu", 0 },
+                    { "cn", 0 } } },
+            { "Core",
+                { { "us", 0 },
+                    { "eu", 0 },
                     { "cn", 0 } } }
-            //TODO Core
-            // ,{ "Core",
-            //     { { "us", 0 }}}
         };
 
         for (const auto& type : types_by_value) {
@@ -52,10 +50,7 @@ void BlockChain::make_forging_block_node_reward(uint64_t timestamp, std::map<std
             }
         }
 
-        const uint64_t pool = (FORGING_POOL(timestamp) + state_fee->get_value());
-        //TODO Core
-        // uint64_t forging_node_total = (pool * 10) / 100;
-        uint64_t forging_node_total = (pool * 16) / 100;
+        uint64_t forging_node_total = (pool * 10) / 100;
 
         std::map<std::string, std::map<std::string, uint64_t>> geo_total = {
             { "Proxy",
@@ -73,10 +68,11 @@ void BlockChain::make_forging_block_node_reward(uint64_t timestamp, std::map<std
             { "Verifier",
                 { { "us", (pool * 2) / 100 },
                     { "eu", (pool * 2) / 100 },
+                    { "cn", (pool * 2) / 100 } } },
+            { "Core",
+                { { "us", (pool * 2) / 100 },
+                    { "eu", (pool * 2) / 100 },
                     { "cn", (pool * 2) / 100 } } }
-            //TODO Core
-            // ,{ "Core",
-            //     { { "us", (pool * 6) / 100 } } }
         };
 
         const double forging_node_per_unit = double(forging_node_total) / double(forging_node_units);
@@ -96,7 +92,11 @@ void BlockChain::make_forging_block_node_reward(uint64_t timestamp, std::map<std
             { "Verifier",
                 { { "us", double(geo_total["Verifier"]["us"]) / double(geo_total_units["Verifier"]["us"]) },
                     { "eu", double(geo_total["Verifier"]["eu"]) / double(geo_total_units["Verifier"]["eu"]) },
-                    { "cn", double(geo_total["Verifier"]["cn"]) / double(geo_total_units["Verifier"]["cn"]) } } }
+                    { "cn", double(geo_total["Verifier"]["cn"]) / double(geo_total_units["Verifier"]["cn"]) } } },
+            { "Core",
+                { { "us", double(geo_total["Core"]["us"]) / double(geo_total_units["Core"]["us"]) },
+                    { "eu", double(geo_total["Core"]["eu"]) / double(geo_total_units["Core"]["eu"]) },
+                    { "cn", double(geo_total["Core"]["cn"]) / double(geo_total_units["Core"]["cn"]) } } }
         };
 
         for (auto&& [node_role, role_stat] : type_geo_node_delegates) {

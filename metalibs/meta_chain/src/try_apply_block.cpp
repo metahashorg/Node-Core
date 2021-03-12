@@ -38,10 +38,14 @@ bool BlockChain::try_apply_block(block::Block* block, bool apply)
     if (status && apply) {
         wallet_map.apply_changes();
 
+        applied_transactions.insert(temp_apply_tx.begin(), temp_apply_tx.end());
+        temp_apply_tx.clear();
+
         return true;
     }
 
     wallet_map.clear_changes();
+    temp_apply_tx.clear();
     return status;
 }
 

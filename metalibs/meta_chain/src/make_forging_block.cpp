@@ -45,18 +45,21 @@ block::Block* BlockChain::make_forging_block(uint64_t timestamp)
     uint64_t block_type = BLOCK_TYPE_FORGING;
     std::vector<char> txs_buff;
 
+    auto state_fee = wallet_map.get_wallet(STATE_FEE_WALLET);
+    const uint64_t pool = (FORGING_POOL(timestamp) + state_fee->get_value());
+
     {
         auto&& [type_geo_node_delegates, delegates] = make_forging_block_get_node_stats();        
 
-        make_forging_block_node_reward(timestamp, type_geo_node_delegates, txs_buff);
-        make_forging_block_coin_reward(timestamp, delegates, txs_buff);
+        make_forging_block_node_reward(pool, type_geo_node_delegates, txs_buff);
+        make_forging_block_coin_reward(pool, delegates, txs_buff);
     }
 
     {
         auto&& [active_forging, pasive_forging] = make_forging_block_get_wallet_stats();
 
-        make_forging_block_wallet_reward(timestamp, pasive_forging, txs_buff);
-        make_forging_block_random_reward(timestamp, active_forging, txs_buff);
+        make_forging_block_wallet_reward(pool, pasive_forging, txs_buff);
+        make_forging_block_random_reward(pool, active_forging, txs_buff);
     }
 
     {

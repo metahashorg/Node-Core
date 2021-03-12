@@ -5,17 +5,15 @@
 
 namespace metahash::meta_chain {
 
-void BlockChain::make_forging_block_wallet_reward(uint64_t timestamp, std::map<std::string, uint64_t>& pasive_forging, std::vector<char>& txs_buff)
+void BlockChain::make_forging_block_wallet_reward(const uint64_t pool, std::map<std::string, uint64_t>& pasive_forging, std::vector<char>& txs_buff)
 {
-    auto state_fee = wallet_map.get_wallet(STATE_FEE_WALLET);
-
     if (!pasive_forging.empty()) {
         uint64_t forging_shares_total = 0;
         for (const auto& addr_pair : pasive_forging) {
             forging_shares_total += addr_pair.second;
         }
 
-        const uint64_t forging_count_total = ((FORGING_POOL(timestamp) + state_fee->get_value()) * 1) / 10;
+        const uint64_t forging_count_total = (pool * 10) / 100;
 
         const uint64_t FORGING_PASSIVE_REWARD = forging_count_total / 10;
 

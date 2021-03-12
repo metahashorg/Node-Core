@@ -20,6 +20,8 @@ bool BlockChain::can_apply_common_block(block::Block* block)
                 continue;
             }
 
+            temp_apply_tx.insert(tx.hash);
+
             const std::string& addr_from = tx.addr_from;
             const std::string& addr_to = tx.addr_to;
 
