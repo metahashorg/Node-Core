@@ -101,6 +101,10 @@ std::vector<char> ControllerImplementation::make_pretend_core_list(uint64_t curr
             && abs(long(prev_timestamp) - long(core_last_block[addr])) < 3600) {
             cores_list.push_back(addr);
         }
+
+        if (roles.count(META_ROLE_CORE)) {
+            DEBUG_COUT(addr + "\t" + std::to_string(online_cores.count(addr)) + "\t" + std::to_string(prev_timestamp) + "\t" + std::to_string(core_last_block[addr]) + "\t" + std::to_string(abs(long(prev_timestamp) - long(core_last_block[addr]))));
+        }
     }
 
     std::string master;
@@ -122,7 +126,9 @@ std::vector<char> ControllerImplementation::make_pretend_core_list(uint64_t curr
 
     std::vector<char> return_list;
     return_list.insert(return_list.end(), master.begin(), master.end());
+    DEBUG_COUT(master);
     for (const auto& addr : slaves) {
+        DEBUG_COUT(addr);
         return_list.push_back('\n');
         return_list.insert(return_list.end(), addr.begin(), addr.end());
     }
