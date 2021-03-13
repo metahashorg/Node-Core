@@ -201,13 +201,28 @@ std::vector<char> ControllerImplementation::parse_RPC_GET_CORE_LIST(std::string_
 
 void ControllerImplementation::parse_RPC_CORE_LIST_APPROVE(const std::string& core, std::string_view pack)
 {
-    uint64_t current_timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
-    uint64_t current_generation = current_timestamp / CORE_LIST_RENEW_PERIOD;
-    std::string list(pack);
+    const uint64_t current_timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
+    const uint64_t current_generation = current_timestamp / CORE_LIST_RENEW_PERIOD;
+
+    const std::string list(pack);
 
     serial_execution.post([this, core, list, current_generation] {
         proposed_cores[current_generation][list].insert(core);
     });
+}
+
+void ControllerImplementation::parse_RPC_CORE_LIST_ONLINE(const std::string& core, std::string_view pack)
+{
+    const uint64_t current_timestamp = static_cast<uint64_t>(std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count());
+    const uint64_t current_generation = current_timestamp / CORE_LIST_RENEW_PERIOD;
+
+    const auto online_cores = crypto::split(std::string(pack), '\n');
+
+    if (!online_cores.empty()) {
+        serial_execution.post([this, core, online_cores, current_generation] {
+            online_sync_cores[current_generation][core].insert(online_cores.begin(), online_cores.end());
+        });
+    }
 }
 
 }

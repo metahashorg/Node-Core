@@ -105,6 +105,13 @@ std::vector<char> ControllerImplementation::add_pack_to_queue(network::Request& 
             return empty_resp;
         }
         break;
+    case RPC_CORE_LIST_ONLINE:
+        if (roles.count(META_ROLE_CORE)) {
+            stat.dbg_RPC_CORE_LIST_ONLINE++;
+            parse_RPC_CORE_LIST_ONLINE(request.sender_mh_addr, pack);
+            return empty_resp;
+        }
+        break;
     case RPC_PRETEND_BLOCK:
         if (roles.count(META_ROLE_CORE)) {
             stat.dbg_RPC_PRETEND_BLOCK++;
@@ -125,7 +132,7 @@ void ControllerImplementation::log_network_statistics(uint64_t timestamp)
     /// DEBUG INFO BEGIN
     if (timestamp > dbg_timestamp + 60) {
         std::string log_msg = "\n";
-        log_msg += "0x00112233445566778899aabbccddeeffgghhffjjiikkllmmnn\tTX\tGetCL\tApprove\tDisAprv\tGetAprv\tAprvLst\tLastBlo\tGetBlok\tGetChai\tGetBLst\tCoreLst\tPretend\tNone\tRoles\tIP";
+        log_msg += "0x00112233445566778899aabbccddeeffgghhffjjiikkllmmnn\tTX\tGetCL\tApprove\tDisAprv\tGetAprv\tAprvLst\tLastBlo\tGetBlok\tGetChai\tGetBLst\tCoreLst\tOnline\tPretend\tNone\tRoles\tIP";
         log_msg += "\n";
 
         {
@@ -161,6 +168,7 @@ void ControllerImplementation::log_network_statistics(uint64_t timestamp)
                     + stat.dbg_RPC_GET_CHAIN
                     + stat.dbg_RPC_GET_MISSING_BLOCK_LIST
                     + stat.dbg_RPC_CORE_LIST_APPROVE
+                    + stat.dbg_RPC_CORE_LIST_ONLINE
                     + stat.dbg_RPC_PRETEND_BLOCK
                     + stat.dbg_RPC_NONE;
 
@@ -180,6 +188,7 @@ void ControllerImplementation::log_network_statistics(uint64_t timestamp)
                     + std::to_string(stat.dbg_RPC_GET_CHAIN) + "\t"
                     + std::to_string(stat.dbg_RPC_GET_MISSING_BLOCK_LIST) + "\t"
                     + std::to_string(stat.dbg_RPC_CORE_LIST_APPROVE) + "\t"
+                    + std::to_string(stat.dbg_RPC_CORE_LIST_ONLINE) + "\t"
                     + std::to_string(stat.dbg_RPC_PRETEND_BLOCK) + "\t"
                     + std::to_string(stat.dbg_RPC_NONE) + "\t"
                     + role_list
@@ -197,6 +206,7 @@ void ControllerImplementation::log_network_statistics(uint64_t timestamp)
                 stat.dbg_RPC_GET_CHAIN = 0;
                 stat.dbg_RPC_GET_MISSING_BLOCK_LIST = 0;
                 stat.dbg_RPC_CORE_LIST_APPROVE = 0;
+                stat.dbg_RPC_CORE_LIST_ONLINE = 0;
                 stat.dbg_RPC_PRETEND_BLOCK = 0;
                 stat.dbg_RPC_NONE = 0;
 

@@ -135,6 +135,7 @@ const uint64_t RPC_GET_CHAIN = 0x61;
 const uint64_t RPC_GET_MISSING_BLOCK_LIST = 0x62;
 const uint64_t RPC_GET_CORE_LIST = 0x71;
 const uint64_t RPC_CORE_LIST_APPROVE = 0x81;
+const uint64_t RPC_CORE_LIST_ONLINE = 0x82;
 
 /*                           NODE ROLE CONSTANTS                           */
 const uint64_t METAHASH_PRIMARY_CORES_COUNT = 4;

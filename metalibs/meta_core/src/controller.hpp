@@ -66,6 +66,7 @@ private:
 
     std::vector<std::string> current_cores;
     std::map<uint64_t, std::unordered_map<std::string, std::set<std::string>, crypto::Hasher>> proposed_cores;
+    std::map<uint64_t, std::unordered_map<std::string, std::set<std::string>, crypto::Hasher>> online_sync_cores;
     uint64_t core_list_generation = 0;
     uint64_t generation_check_timestamp = 0;
 
@@ -83,6 +84,7 @@ private:
         std::atomic<uint64_t> dbg_RPC_GET_CHAIN = 0;
         std::atomic<uint64_t> dbg_RPC_GET_MISSING_BLOCK_LIST = 0;
         std::atomic<uint64_t> dbg_RPC_CORE_LIST_APPROVE = 0;
+        std::atomic<uint64_t> dbg_RPC_CORE_LIST_ONLINE = 0;
         std::atomic<uint64_t> dbg_RPC_PRETEND_BLOCK = 0;
         std::atomic<uint64_t> dbg_RPC_NONE = 0;
 
@@ -140,6 +142,7 @@ private:
     std::vector<char> parse_RPC_GET_MISSING_BLOCK_LIST(std::string_view);
     std::vector<char> parse_RPC_GET_CORE_LIST(std::string_view);
     void parse_RPC_CORE_LIST_APPROVE(const std::string& core, std::string_view);
+    void parse_RPC_CORE_LIST_ONLINE(const std::string& core, std::string_view);
 
     void approve_block(block::Block*);
     void disapprove_block(block::Block*);
@@ -165,7 +168,9 @@ private:
     void get_approve_for_block(std::vector<char>& get_block);
 
     bool check_online_nodes(uint64_t timestamp);
-    std::vector<char> make_pretend_core_list(uint64_t current_generation);
+    void make_online_core_list(uint64_t current_generation);
+    std::set<std::string> get_online_core_list(uint64_t current_generation, uint64_t min);
+    std::vector<char> make_pretend_core_list(uint64_t current_generation, const std::set<std::string>& cores_list);
 };
 
 }
