@@ -41,11 +41,7 @@ bool BlockChain::can_apply_common_block(block::Block* block)
 
             if (tx.state == TX_STATE_TECH_NODE_STAT && tx.json_rpc && test_nodes.find(addr_from) != test_nodes.end()) {
                 const auto& type = tx.json_rpc->parameters["type"];
-                if (type == "Proxy"
-                    || type == "InfrastructureTorrent"
-                    || type == "Torrent"
-                    || type == "Verifier") {
-
+                if (ROLES.count(type)) {
                     const auto& mhaddr = tx.json_rpc->parameters["address"];
                     node_statistics[type][mhaddr].count++;
 
