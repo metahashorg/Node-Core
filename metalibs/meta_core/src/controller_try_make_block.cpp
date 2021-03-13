@@ -6,11 +6,11 @@ namespace metahash::meta_core {
 
 bool ControllerImplementation::try_make_block(uint64_t timestamp)
 {
-    //auto lower_bound = core_list_generation * CORE_LIST_RENEW_PERIOD + CORE_LIST_SILENCE_PERIOD;
-    //auto upper_bound = (core_list_generation + 1) * CORE_LIST_RENEW_PERIOD - CORE_LIST_SILENCE_PERIOD;
-    //if (timestamp < lower_bound || timestamp > upper_bound) {
-    //    return false;
-    //}
+    auto lower_bound = core_list_generation * CORE_LIST_RENEW_PERIOD + CORE_LIST_SILENCE_PERIOD;
+    auto upper_bound = (core_list_generation + 1) * CORE_LIST_RENEW_PERIOD - CORE_LIST_SILENCE_PERIOD;
+    if (timestamp < lower_bound || timestamp > upper_bound) {
+        return false;
+    }
 
     if (last_applied_block == last_created_block) {
         if (prev_timestamp >= timestamp) {
