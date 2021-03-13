@@ -143,7 +143,7 @@ std::set<std::string> ControllerImplementation::get_online_core_list(uint64_t cu
             }
         }
 
-        std::set<std::string> cores_list = online_sync_cores[checked_generation].begin()->second;
+        cores_list = online_sync_cores[checked_generation].begin()->second;
         for (auto&& [send_core, core_list] : online_sync_cores[checked_generation]) {
             std::set<std::string> temp_set;
             std::set_intersection(cores_list.begin(), cores_list.end(), core_list.begin(), core_list.end(), std::inserter(temp_set, temp_set.begin()));
