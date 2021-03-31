@@ -30,9 +30,11 @@ bool ControllerImplementation::check_online_nodes(uint64_t timestamp)
             }
             registered_core_nodes_min_count = std::ceil(registered_core_nodes_count * 51.0 / 100.0);
         }
+        DEBUG_COUT_EXTRA("registered_core_nodes_min_count\t=\t" + std::to_string(registered_core_nodes_min_count));
 
         auto online_cores = get_online_core_list(current_generation, registered_core_nodes_min_count);
         if (online_cores.size() < METAHASH_PRIMARY_CORES_COUNT) {
+            DEBUG_COUT_EXTRA("METAHASH_PRIMARY_CORES_COUNT\t>\t" + std::to_string(online_cores.size()));
             return false;
         }
 
@@ -47,45 +49,44 @@ bool ControllerImplementation::check_online_nodes(uint64_t timestamp)
             proposed_cores[current_generation][string_list].insert(signer.get_mh_addr());
         }
 
-        auto apply_approve_cores = [this, current_generation](const auto& cores_list, const auto& approve_cores) -> bool {
+        auto apply_approve_cores = [this, current_generation](const auto& cores_list, const auto& approve_cores, bool need_primary) -> bool {
             auto primary_cores = crypto::split(cores_list, '\n');
-            if (primary_cores.size() == METAHASH_PRIMARY_CORES_COUNT) {
-                bool all_here = true;
-                for (auto& check_core : primary_cores) {
-                    if (!approve_cores.count(check_core)) {
-                        DEBUG_COUT("no approve from\t" + check_core);
-                        all_here = false;
-                    }
+            if (!primary_cores.empty()) {
+                if (need_primary && !approve_cores.count(primary_cores[0])) {
+                    return false;
                 }
 
-                if (all_here) {
-                    current_cores = primary_cores;
-                    core_list_generation = current_generation;
+                current_cores = primary_cores;
+                core_list_generation = current_generation;
 
-                    for (const auto& addr : current_cores) {
-                        DEBUG_COUT(addr);
-                    }
-
-                    return true;
+                for (const auto& addr : current_cores) {
+                    DEBUG_COUT(addr);
                 }
+
+                return true;
             }
 
             return false;
         };
 
+        std::pair<std::string, std::set<std::string>> choosen_cores;
         for (auto&& [cores_list, approve_cores] : proposed_cores[current_generation]) {
-            if (approve_cores.size() >= registered_core_nodes_min_count) {
-                if (apply_approve_cores(cores_list, approve_cores)) {
-                    return true;
-                }
+            if (approve_cores.size() > choosen_cores.second.size()) {
+                choosen_cores = {cores_list, approve_cores};
             }
         }
 
-        for (auto&& [cores_list, approve_cores] : proposed_cores[current_generation]) {
-            if (approve_cores.size() >= METAHASH_PRIMARY_CORES_COUNT) {
-                if (apply_approve_cores(cores_list, approve_cores)) {
-                    return true;
-                }
+        if (choosen_cores.second.size() >= registered_core_nodes_min_count) {
+            if (apply_approve_cores(choosen_cores.first, choosen_cores.second, false)) {
+                DEBUG_COUT("Applied by absolute maximum");
+                return true;
+            }
+        }
+
+        if (choosen_cores.second.size() >= METAHASH_PRIMARY_CORES_COUNT) {
+            if (apply_approve_cores(choosen_cores.first, choosen_cores.second, true)) {
+                DEBUG_COUT("Applied by METAHASH_PRIMARY_CORES_COUNT");
+                return true;
             }
         }
 
@@ -101,6 +102,7 @@ void ControllerImplementation::make_online_core_list(uint64_t current_generation
     const auto online_cores = cores.get_online_cores();
 
     std::vector<char> core_list;
+    std::string core_list_msg;
     bool first = true;
     for (auto&& [addr, roles] : nodes) {
         if (online_cores.count(addr)
@@ -110,17 +112,22 @@ void ControllerImplementation::make_online_core_list(uint64_t current_generation
             if (first) {
                 first = false;
             } else {
-                core_list.push_back('\n');            
+                core_list.push_back('\n'); 
+                core_list_msg += "\t";
             }
 
             core_list.insert(core_list.end(), addr.begin(), addr.end());
             online_sync_cores[current_generation][signer.get_mh_addr()].insert(addr);
+
+            core_list_msg += addr;
         }
     }
 
     if (!core_list.empty()) {
         cores.send_no_return(RPC_CORE_LIST_ONLINE, core_list);
     }
+
+    DEBUG_COUT_EXTRA("online_core_list:\t" + core_list_msg);
 }
 
 std::set<std::string> ControllerImplementation::get_online_core_list(uint64_t current_generation, uint64_t registered_core_nodes_min_count)
@@ -194,11 +201,16 @@ std::vector<char> ControllerImplementation::make_pretend_core_list(uint64_t curr
     }
 
     std::vector<char> return_list;
+    std::string core_list_msg;
     return_list.insert(return_list.end(), master.begin(), master.end());
+    core_list_msg = master;
     for (const auto& addr : slaves) {
         return_list.push_back('\n');
         return_list.insert(return_list.end(), addr.begin(), addr.end());
+        core_list_msg += "\t" + addr;
     }
+
+    DEBUG_COUT_EXTRA("pretend_core_list:\t" + core_list_msg);
 
     return return_list;
 }

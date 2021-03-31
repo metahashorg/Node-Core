@@ -10,10 +10,18 @@
 #include <sstream>
 #include <thread>
 
-#endif
-
 #define DEBUG_COUT(message) metahash::log::debug_cout(true, std::string(__FILE__), std::string(&__func__[0]), __LINE__, message)
 #define DEBUG_COUT_COND(print, message) metahash::log::debug_cout(print, std::string(__FILE__), std::string(&__func__[0]), __LINE__, message)
+
+#endif
+
+// #define DEBUG_OUTPUT_EXTRA
+#ifdef DEBUG_OUTPUT_EXTRA
+    #define DEBUG_COUT_EXTRA(message) metahash::log::debug_cout(true, std::string(__FILE__), std::string(&__func__[0]), __LINE__, message)
+#else
+    #define DEBUG_COUT_EXTRA(message) ;
+#endif
+
 
 namespace metahash::log {
 extern moodycamel::ConcurrentQueue<std::stringstream*>* output_queue;
